@@ -1,4 +1,5 @@
-/* Shared by the settings and editor windows (Mica on Windows 11, solid elsewhere). */
+/* Window backgrounds. Settings, editor and reminder windows: Mica on Windows 11, solid elsewhere.
+   Desk window: transparent in the app; a stand-in wallpaper in a plain browser (below). */
 .aux {
   position: fixed;
   inset: 0;

@@ -2,6 +2,8 @@
 
 钉在 Windows 桌面上的日历 + 甘特图，Windows 11 Fluent 风格，支持浅色/深色和自定义颜色。
 
+![FluentCal 月视图：农历、节气、法定节假日“休/班”、多日任务横条和倒数日](docs/screenshots/month-light.png)
+
 - 需求与设计：[需求文档.md](需求文档.md)
 - 开发进度：[TODO.md](TODO.md)
 
@@ -14,6 +16,22 @@
 - **外观**：浅色/深色/跟随系统，跟随 Windows 强调色或自选；背景色、透明度、亚克力毛玻璃、圆角、字号、间距；5 套预设方案。
 - **数据**：默认保存在本机 `%APPDATA%\com.fluentcal.desktop\data.json`，每天自动备份；导出 JSON / CSV（Excel）/ ICS（Outlook、Google 日历）。数据文件夹可以改到 OneDrive 等同步盘，多台电脑共用：按每个任务的最后修改时间合并，不会互相覆盖；外观和窗口位置等设置留在每台电脑上。
 - **提醒**：Windows 通知和/或屏幕右下角的提醒卡片（完成、10 分钟后再提醒），不抢焦点。
+
+## 截图
+
+深色主题、紫色强调色、“透明玻璃”预设（透出壁纸）：
+
+![深色、透明玻璃风格的月视图](docs/screenshots/month-dark.png)
+
+甘特图：依赖箭头、进度、分组汇总、里程碑，和日历是同一份数据：
+
+![甘特图](docs/screenshots/gantt.png)
+
+外观设置：浅色/深色/跟随系统、强调色、预设方案，以及背景、透明度、圆角、字号等：
+
+![外观设置](docs/screenshots/settings-appearance.png)
+
+截图用示例数据在浏览器预览中生成（`npm run readme-shots`），背景是代替桌面壁纸的渐变；实际使用时日历后面是你的桌面。
 
 ## 下载安装
 
@@ -50,6 +68,7 @@ npm test               # 前端单元测试（vitest）
 npm run typecheck      # 类型检查
 npm run e2e            # 端到端测试（无界面 Edge，14 项交互）
 npm run a11y           # 无障碍审计（axe-core）
+npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（示例数据、固定日期）
 ```
 
 浏览器预览（不需要 Tauri，数据存在 localStorage）：`npm run dev` 后打开

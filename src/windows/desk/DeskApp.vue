@@ -15,6 +15,7 @@ import TitleBar from './TitleBar.vue';
 import MonthView from './MonthView.vue';
 import SearchPanel from './SearchPanel.vue';
 import CountdownBar from './CountdownBar.vue';
+import '../window-shell.css';
 
 const GanttView = defineAsyncComponent(() => import('./gantt/GanttView.vue'));
 

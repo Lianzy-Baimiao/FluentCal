@@ -12,6 +12,7 @@
     "typecheck": "vue-tsc --noEmit",
     "tauri": "node scripts/tauri.mjs",
     "shots": "node scripts/shot.mjs",
+    "readme-shots": "vite build && node scripts/readme-shots.mjs",
     "e2e": "vite build && node scripts/e2e.mjs",
     "a11y": "vite build && node scripts/a11y.mjs"
   },
