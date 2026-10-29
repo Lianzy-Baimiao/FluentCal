@@ -1,0 +1,11 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+shots/
+*.log
+.DS_Store
+# reference installer (not ours)
+xdiarys-setup-v3.exe
+# machine-specific GNU toolchain paths; see src-tauri/.cargo/config.toml.example
+src-tauri/.cargo/config.toml

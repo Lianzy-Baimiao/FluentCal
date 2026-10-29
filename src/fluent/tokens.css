@@ -1,0 +1,174 @@
+/* Windows 11 / WinUI 3 theme resources as CSS custom properties.
+   Theme: <html data-theme="light|dark">. The accent palette (--accent-*) is set from JS
+   by applyTheme(); defaults below are the Windows 11 blue palette. */
+
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-icon: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+
+  --accent-light3: #99EBFF;
+  --accent-light2: #4CC2FF;
+  --accent-light1: #0091F8;
+  --accent-base: #0078D4;
+  --accent-dark1: #0067C0;
+  --accent-dark2: #003E92;
+  --accent-dark3: #001A68;
+  --text-on-accent-light: #FFFFFF;
+  --text-on-accent-dark: #000000;
+
+  --radius-control: 4px;
+  --radius-overlay: 8px;
+  --dur-fast: 83ms;
+  --dur-normal: 187ms;
+  --dur-slow: 333ms;
+  --ease: cubic-bezier(0, 0, 0, 1);
+}
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --text-primary: #000000E4;
+  --text-secondary: #0000009E;
+  --text-tertiary: #00000072;
+  --text-disabled: #0000005C;
+  --text-inverse: #FFFFFF;
+
+  --accent-fill: var(--accent-dark1);
+  --accent-fill-hover: color-mix(in srgb, var(--accent-dark1) 90%, transparent);
+  --accent-fill-pressed: color-mix(in srgb, var(--accent-dark1) 80%, transparent);
+  --accent-fill-disabled: #00000037;
+  --accent-text: var(--accent-dark2);
+  --accent-text-secondary: var(--accent-dark3);
+  --text-on-accent: var(--text-on-accent-light);
+  --text-on-accent-secondary: color-mix(in srgb, var(--text-on-accent-light) 70%, transparent);
+  --text-on-accent-disabled: #FFFFFF;
+
+  --control-fill: #FFFFFFB3;
+  --control-fill-hover: #F9F9F980;
+  --control-fill-pressed: #F9F9F94D;
+  --control-fill-disabled: #F9F9F94D;
+  --control-fill-input-active: #FFFFFF;
+  --control-alt-fill: #00000006;
+  --control-alt-fill-hover: #0000000F;
+  --control-alt-fill-pressed: #00000018;
+  --control-strong-fill: #00000072;
+  --control-strong-fill-disabled: #00000051;
+  --control-solid-fill: #FFFFFF;
+  --control-stroke: #0000000F;
+  --control-stroke-secondary: #00000029;
+  --control-strong-stroke: #00000072;
+  --control-strong-stroke-disabled: #00000037;
+  --elev-top: var(--control-stroke);
+  --elev-bottom: var(--control-stroke-secondary);
+  --accent-elev-top: #FFFFFF14;
+  --accent-elev-bottom: #00000066;
+
+  --subtle-fill-hover: #00000009;
+  --subtle-fill-pressed: #00000006;
+  --card-fill: #FFFFFFB3;
+  --card-fill-secondary: #F6F6F680;
+  --card-stroke: #0000000F;
+  --surface-stroke: #75757566;
+  --surface-stroke-flyout: #0000000F;
+
+  --layer-fill: #FFFFFF80;
+  --layer-fill-alt: #FFFFFF;
+  --solid-base: #F3F3F3;
+  --solid-secondary: #EEEEEE;
+  --solid-tertiary: #F9F9F9;
+  --solid-quarternary: #FFFFFF;
+  --flyout-fill: rgba(252, 252, 252, 0.85);
+  --tooltip-fill: #F9F9F9;
+  --smoke: #0000004D;
+  --divider: #00000014;
+  --focus-outer: #000000E4;
+  --focus-inner: #FFFFFFB3;
+
+  --success: #0F7B0F;
+  --caution: #9D5D00;
+  --critical: #C42B1C;
+  --attention: var(--accent-fill);
+  --info-bg: #F6F6F680;
+  --success-bg: #DFF6DD;
+  --caution-bg: #FFF4CE;
+  --critical-bg: #FDE7E9;
+
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.19), 0 2px 21px rgba(0, 0, 0, 0.15);
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-tooltip: 0 4px 8px rgba(0, 0, 0, 0.14);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --text-primary: #FFFFFF;
+  --text-secondary: #FFFFFFC5;
+  --text-tertiary: #FFFFFF8B;
+  --text-disabled: #FFFFFF5D;
+  --text-inverse: #000000E4;
+
+  --accent-fill: var(--accent-light2);
+  --accent-fill-hover: color-mix(in srgb, var(--accent-light2) 90%, transparent);
+  --accent-fill-pressed: color-mix(in srgb, var(--accent-light2) 80%, transparent);
+  --accent-fill-disabled: #FFFFFF28;
+  --accent-text: var(--accent-light3);
+  --accent-text-secondary: var(--accent-light3);
+  --text-on-accent: var(--text-on-accent-dark);
+  --text-on-accent-secondary: color-mix(in srgb, var(--text-on-accent-dark) 50%, transparent);
+  --text-on-accent-disabled: #FFFFFF87;
+
+  --control-fill: #FFFFFF0F;
+  --control-fill-hover: #FFFFFF15;
+  --control-fill-pressed: #FFFFFF08;
+  --control-fill-disabled: #FFFFFF0B;
+  --control-fill-input-active: #1E1E1EB3;
+  --control-alt-fill: #0000001A;
+  --control-alt-fill-hover: #FFFFFF0B;
+  --control-alt-fill-pressed: #FFFFFF12;
+  --control-strong-fill: #FFFFFF8B;
+  --control-strong-fill-disabled: #FFFFFF3F;
+  --control-solid-fill: #454545;
+  --control-stroke: #FFFFFF12;
+  --control-stroke-secondary: #FFFFFF18;
+  --control-strong-stroke: #FFFFFF8B;
+  --control-strong-stroke-disabled: #FFFFFF28;
+  --elev-top: var(--control-stroke-secondary);
+  --elev-bottom: var(--control-stroke);
+  --accent-elev-top: #FFFFFF14;
+  --accent-elev-bottom: #00000023;
+
+  --subtle-fill-hover: #FFFFFF0F;
+  --subtle-fill-pressed: #FFFFFF0A;
+  --card-fill: #FFFFFF0D;
+  --card-fill-secondary: #FFFFFF08;
+  --card-stroke: #00000019;
+  --surface-stroke: #75757566;
+  --surface-stroke-flyout: #00000033;
+
+  --layer-fill: #3A3A3A4C;
+  --layer-fill-alt: #FFFFFF0D;
+  --solid-base: #202020;
+  --solid-secondary: #1C1C1C;
+  --solid-tertiary: #282828;
+  --solid-quarternary: #2C2C2C;
+  --flyout-fill: rgba(44, 44, 44, 0.96);
+  --tooltip-fill: #2C2C2C;
+  --smoke: #0000004D;
+  --divider: #FFFFFF15;
+  --focus-outer: #FFFFFF;
+  --focus-inner: #000000B3;
+
+  --success: #6CCB5F;
+  --caution: #FCE100;
+  --critical: #FF99A4;
+  --attention: var(--accent-fill);
+  --info-bg: #FFFFFF08;
+  --success-bg: #393D1B;
+  --caution-bg: #433519;
+  --critical-bg: #442726;
+
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.26);
+  --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.37), 0 2px 21px rgba(0, 0, 0, 0.37);
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.13);
+  --shadow-tooltip: 0 4px 8px rgba(0, 0, 0, 0.26);
+}

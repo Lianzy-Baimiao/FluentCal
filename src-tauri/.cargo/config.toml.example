@@ -1,0 +1,27 @@
+# Only needed to build with the GNU toolchain (x86_64-pc-windows-gnu) on a machine without
+# MSVC Build Tools. With MSVC (the default Rust toolchain on Windows) you need none of this.
+# Copy to config.toml (not committed) and replace <user> and the tool paths with your own.
+#
+# 1. raw-dylib crates (windows-sys, getrandom, ...) need an import-library tool. The GNU
+#    dlltool bundled with rust-mingw needs an assembler (as.exe) that is not shipped, so use
+#    llvm-dlltool from llvm-mingw (https://github.com/mstorsjo/llvm-mingw).
+# 2. GNU bfd ld mis-links LLVM-style import libraries (binaries crash with an access
+#    violation in std startup), so link with lld: make a folder containing a hard link named
+#    ld.exe to rustc's own rust-lld.exe (plus libgcc_s_seh-1.dll and libwinpthread-1.dll), and
+#    `-B` makes gcc pick it up instead of bfd ld.
+# 3. tauri-build compiles the icon/manifest resource with `windres` from PATH, so
+#    `npm run tauri` (scripts/tauri.mjs) appends ~/tools/llvm-mingw/bin to PATH when it
+#    exists. The linker is pinned to rustc's self-contained gcc by absolute path; otherwise
+#    rustc would pick llvm-mingw's clang-based x86_64-w64-mingw32-gcc from PATH and fail to
+#    find libgcc.
+[target.x86_64-pc-windows-gnu]
+linker = "C:\\Users\\<user>\\.rustup\\toolchains\\stable-x86_64-pc-windows-gnu\\lib\\rustlib\\x86_64-pc-windows-gnu\\bin\\self-contained\\x86_64-w64-mingw32-gcc.exe"
+rustflags = [
+    "-C", "dlltool=C:\\Users\\<user>\\tools\\llvm-mingw\\bin\\llvm-dlltool.exe",
+    "-C", "link-arg=-BC:\\Users\\<user>\\tools\\lld-ld\\",
+]
+
+# GNU ld cannot open object files under a non-ASCII path. If the project folder name has
+# Chinese (or other non-ASCII) characters, build into an ASCII-only directory:
+# [build]
+# target-dir = "C:\\Users\\<user>\\tools\\build\\fluentcal"

@@ -1,0 +1,49 @@
+.settings .page {
+  max-width: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings .row-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.settings .note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.settings .warn {
+  font-size: 12px;
+  color: var(--caution);
+}
+.settings .chips {
+  display: flex;
+  gap: 4px;
+}
+.settings .chips button {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 15px;
+  border: 1px solid var(--control-stroke);
+  background: var(--control-fill);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.settings .chips button:hover {
+  background: var(--control-fill-hover);
+}
+.settings .chips button.on {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--text-on-accent);
+}
+.settings .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

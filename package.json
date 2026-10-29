@@ -1,0 +1,33 @@
+{
+  "name": "fluentcal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "vue-tsc --noEmit",
+    "tauri": "node scripts/tauri.mjs",
+    "shots": "node scripts/shot.mjs",
+    "e2e": "vite build && node scripts/e2e.mjs",
+    "a11y": "vite build && node scripts/a11y.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.4",
+    "tyme4ts": "1.5.4",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "@vitejs/plugin-vue": "6.0.10",
+    "axe-core": "^4.14.0",
+    "playwright-core": "1.64.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "vue-tsc": "3.3.13"
+  }
+}

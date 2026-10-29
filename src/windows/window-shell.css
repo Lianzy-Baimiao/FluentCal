@@ -1,0 +1,25 @@
+/* Shared by the settings and editor windows (Mica on Windows 11, solid elsewhere). */
+.aux {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+html.no-mica .aux,
+html.browser .aux {
+  background: var(--solid-base);
+}
+/* Browser preview of the desk window: a stand-in wallpaper behind the transparent calendar. */
+html.browser[data-window='desk'] body {
+  background:
+    radial-gradient(ellipse at 70% 110%, #1f6fd1 0%, transparent 55%),
+    radial-gradient(ellipse at 20% -10%, #7aa7e8 0%, transparent 50%),
+    linear-gradient(160deg, #0b2a5b, #1b4f9c 55%, #0d2244);
+}
+html.browser[data-window='desk'][data-theme='light'] body {
+  background:
+    radial-gradient(ellipse at 70% 110%, #4b96f0 0%, transparent 55%),
+    radial-gradient(ellipse at 20% -10%, #e8f1fd 0%, transparent 55%),
+    linear-gradient(160deg, #cfe2fb, #8db8ef 60%, #5d93e0);
+}

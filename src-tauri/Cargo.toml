@@ -1,0 +1,53 @@
+[package]
+name = "fluentcal"
+version = "0.1.0"
+description = "FluentCal 桌面日历：钉在桌面上的 Windows 11 风格日历与甘特图"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+name = "fluentcal_lib"
+crate-type = ["rlib"]
+# Unit-test executables don't get the Windows app manifest; tests live in tests/ instead.
+test = false
+doctest = false
+
+[[bin]]
+name = "fluentcal"
+path = "src/main.rs"
+test = false
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+embed-resource = "3.0.12"
+
+[dependencies]
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2.5.5"
+tauri-plugin-autostart = "2.7.0"
+tauri-plugin-global-shortcut = "2.4.1"
+tauri-plugin-notification = "2.8.0"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-opener = "2.7.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+windows-version = "0.1.7"
+# Same version tauri/tao use, so HWND types match and nothing is compiled twice.
+windows = { version = "0.62.2", features = [
+    "Foundation",
+    "UI_ViewManagement",
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
