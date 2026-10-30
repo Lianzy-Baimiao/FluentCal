@@ -241,6 +241,12 @@ unsafe extern "system" fn subclass_proc(
             refresh_ex_style(hwnd);
             return LRESULT(0);
         }
+        // PBT_APMRESUMESUSPEND (7) / PBT_APMRESUMEAUTOMATIC (0x12): back from sleep.
+        WM_POWERBROADCAST if matches!(wp.0, 7 | 0x12) => {
+            if let Some(app) = APP.get() {
+                crate::on_resume(app);
+            }
+        }
         WM_SETTINGCHANGE | WM_DWMCOLORIZATIONCOLORCHANGED | WM_SYSCOLORCHANGE => {
             if let Some(app) = APP.get() {
                 let _ = app.emit("system://theme", ());

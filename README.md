@@ -16,6 +16,7 @@
 - **外观**：浅色/深色/跟随系统，跟随 Windows 强调色或自选；背景色、透明度、亚克力毛玻璃、圆角、字号、间距；5 套预设方案。
 - **数据**：默认保存在本机 `%APPDATA%\com.fluentcal.desktop\data.json`，每天自动备份；导出 JSON / CSV（Excel）/ ICS（Outlook、Google 日历）。数据文件夹可以改到 OneDrive 等同步盘，多台电脑共用：按每个任务的最后修改时间合并，不会互相覆盖；外观和窗口位置等设置留在每台电脑上。
 - **提醒**：Windows 通知和/或屏幕右下角的提醒卡片（完成、10 分钟后再提醒），不抢焦点。
+- **云同步**：多台电脑共用任务。可以同步到坚果云、Nextcloud、群晖等 WebDAV 网盘，GitHub/Gitee 私有仓库（每次上传是一次提交，可查看历史），或 Google 云端硬盘。按任务合并，同时修改不会互相覆盖。密码和 Token 只保存在 Windows 凭据管理器里。
 
 ## 截图
 
@@ -30,6 +31,10 @@
 外观设置：浅色/深色/跟随系统、强调色、预设方案，以及背景、透明度、圆角、字号等：
 
 ![外观设置](docs/screenshots/settings-appearance.png)
+
+同步设置：WebDAV、GitHub/Gitee 私有仓库、Google 云端硬盘，或者 OneDrive 等同步盘里的文件夹：
+
+![同步设置](docs/screenshots/settings-sync.png)
 
 截图用示例数据在浏览器预览中生成（`npm run readme-shots`），背景是代替桌面壁纸的渐变；实际使用时日历后面是你的桌面。
 
@@ -50,6 +55,7 @@
 | 快速新建任务 | `Ctrl+Alt+N`，或在日历里 `Ctrl+N` |
 | 添加任务 | 双击日期空白处，回车保存并继续输入，Esc 结束 |
 | 调整位置和大小 | 标题栏 🔒 按钮解锁 → 按住日历任意位置拖动、拖四边或四角调整大小 → 点“完成” |
+| 多台电脑同步 | 设置 › 同步：选同步方式、填写账号 →“测试连接”→“开启同步”。另一台电脑用同样的设置开启，两边都有数据时可选合并或用云端数据 |
 | 换一块屏幕显示 | 托盘菜单“显示在”，或设置 › 常规 ›“显示在”（有多块屏幕时出现）；调整模式下也可以直接拖过去 |
 | 翻页 / 回到今天 | 滚轮或 `PageUp`/`PageDown`；`Home` |
 | 甘特图缩放 | `Ctrl` + 滚轮 |
@@ -77,7 +83,7 @@ npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（�
 - `http://localhost:1420/?w=settings&page=appearance` 设置
 - `http://localhost:1420/?w=gallery` Fluent 组件库
 
-Rust 测试：`cd src-tauri && cargo test`。
+Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee、Google）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。
 
 ### 工具链
 
@@ -98,6 +104,7 @@ src-tauri/src
   store.rs           JSON 存储：原子写入、防抖、每日备份、损坏自动恢复
   merge.rs, sync.rs  多台电脑共用数据文件夹时按条目合并、监视外部修改
   datadir.rs         自定义数据文件夹
+  cloud/             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee）、gdrive.rs + oauth.rs，secrets.rs 凭据管理器
   reminder.rs        提醒调度；reminder_popup.rs 右下角提醒卡片
   tray.rs            托盘菜单
   lib.rs             窗口、快捷键、开机启动、命令
@@ -120,3 +127,6 @@ src
 - **按 Win+D 后日历消失了？** 确认设置 › 常规 › 窗口层级为“嵌入桌面”。
 - **点不到桌面图标？** 日历盖住的区域点不到下面的图标；可以缩小日历、移到空白处，或开启“鼠标穿透”（在托盘菜单关闭）。
 - **节假日不是最新的？** 设置 › 常规 › 节假日 › 立即检查。国务院通常在每年 11 月公布下一年安排。
+- **两台电脑改了同一个任务？** 取最后修改的一方；不同任务的修改都保留，删除也会同步。开启同步前、用云端数据替换前都会自动备份本机数据（设置 › 数据 › 备份文件）。
+- **同步了哪些内容？** 任务、分组和日期颜色。外观、窗口位置等设置留在每台电脑上；节假日数据每台电脑自己联网获取。
+- **Google 云端硬盘为什么要自己创建 OAuth 客户端？** 开源程序无法内置经过 Google 审核的客户端。按设置页里的步骤创建一次，多台电脑用同一个即可。在国内访问 Google 需要代理（设置 › 同步 › 高级 › 网络代理）。

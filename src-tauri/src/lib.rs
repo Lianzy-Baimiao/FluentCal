@@ -1,3 +1,4 @@
+pub mod cloud;
 mod datadir;
 mod desktop;
 mod reminder;
@@ -186,10 +187,15 @@ pub(crate) fn on_settings_changed(app: &AppHandle, old: &Value, new: &Value) {
     if changed("/shortcuts") {
         register_shortcuts(app);
     }
+    if changed("/sync") {
+        if let Some(c) = app.try_state::<Arc<cloud::service::Cloud>>() {
+            c.reconfigure(new);
+        }
+    }
     if changed("/general/autostart") {
         sync_autostart(app);
     }
-    if ["/desk/pinMode", "/desk/locked", "/desk/clickThrough", "/calendar/view"]
+    if ["/desk/pinMode", "/desk/locked", "/desk/clickThrough", "/calendar/view", "/sync/enabled", "/sync/provider"]
         .iter()
         .any(|p| changed(p))
     {
@@ -232,8 +238,18 @@ pub(crate) fn restart(app: &AppHandle) {
 
 pub(crate) fn quit(app: &AppHandle) {
     QUITTING.store(true, Ordering::Relaxed);
+    if let Some(c) = app.try_state::<Arc<cloud::service::Cloud>>() {
+        c.quit_flush();
+    }
     app.state::<Arc<Store>>().flush();
     app.exit(0);
+}
+
+/// Back from sleep (WM_POWERBROADCAST).
+pub(crate) fn on_resume(app: &AppHandle) {
+    if let Some(c) = app.try_state::<Arc<cloud::service::Cloud>>() {
+        c.nudge_after_wake();
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -568,6 +584,8 @@ pub fn run() {
             let (dir, local_settings, info) = datadir::resolve(&default);
             let store = Store::open_with(dir, local_settings)?;
             store.set_app(handle.clone());
+            // Sync state is per PC: keep it out of a shared data folder.
+            app.manage(cloud::service::Cloud::start(store.clone(), Some(handle.clone()), default.join("cloud-state.json")));
             app.manage(store);
             app.manage(info);
             // Fired/snoozed reminders are per PC: keep them out of a shared folder.
@@ -581,6 +599,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             screens_list,
             desk_move_to_screen,
+            cloud::commands::sync_status,
+            cloud::commands::sync_now,
+            cloud::commands::sync_probe,
+            cloud::commands::sync_enable,
+            cloud::commands::sync_disable,
+            cloud::commands::sync_set_secret,
+            cloud::commands::sync_secrets,
+            cloud::commands::sync_google_login,
+            cloud::commands::sync_google_logout,
             store::store_get,
             store::store_put,
             store::store_patch_settings,

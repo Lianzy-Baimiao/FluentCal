@@ -14,6 +14,7 @@ const pages = [
   ['gantt', '/?w=desk', 'gantt'],
   ['settings-appearance', '/?w=settings&page=appearance'],
   ['settings-general', '/?w=settings&page=general'],
+  ['settings-sync', '/?w=settings&page=sync', 'webdav'],
   ['editor', '/?w=editor'],
 ];
 let total = 0;
@@ -24,6 +25,10 @@ for (const theme of ['light', 'dark']) {
     await p.waitForTimeout(600);
     if (action === 'gantt') {
       await p.getByText('甘特', { exact: true }).first().click();
+      await p.waitForTimeout(400);
+    } else if (action === 'webdav') {
+      await p.getByRole('combobox', { name: '同步方式' }).click();
+      await p.getByRole('option', { name: /WebDAV/ }).click();
       await p.waitForTimeout(400);
     }
     await p.addScriptTag({ content: axe });

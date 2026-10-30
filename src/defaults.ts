@@ -49,6 +49,17 @@ export const DEFAULT_SETTINGS: Settings = {
   reminders: { enabled: true, style: 'both', allDayTime: '09:00', defaultOffsets: [] },
   holidays: { autoUpdate: true, lastCheck: 0 },
   shortcuts: { toggle: 'Ctrl+Alt+D', newTask: 'Ctrl+Alt+N' },
+  // Keep in sync with cloud/service.rs Config::from_settings (absent fields use these too).
+  sync: {
+    enabled: false,
+    provider: '',
+    interval: 5,
+    proxy: '',
+    webdav: { url: '', user: '', folder: 'FluentCal' },
+    github: { repo: '', branch: '', path: '' },
+    gitee: { repo: '', branch: '', path: '' },
+    gdrive: { clientId: '', email: '' },
+  },
 };
 
 type Json = unknown;

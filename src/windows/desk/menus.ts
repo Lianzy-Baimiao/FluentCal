@@ -1,6 +1,7 @@
 import { showMenu, TASK_COLORS, type MenuItem } from '@/fluent';
 import type { ISODate, PinMode, Task, ThemeMode } from '@/types';
 import { call, screenTitle, type Screen } from '@/api';
+import { syncNow, syncStatus } from '@/composables/sync';
 import { doc, patchSettings } from '@/stores/doc';
 import { addDays } from '@/lib/date';
 import type { Occurrence } from '@/lib/recur';
@@ -111,6 +112,7 @@ export async function moreMenu(at: At): Promise<void> {
   const items: MenuItem[] = [
     { label: '新建任务…', icon: 'add', shortcut: 'Ctrl+N', action: () => openEditor({ mode: 'new' }) },
     { label: '搜索', icon: 'search', shortcut: 'Ctrl+F', action: () => (ui.searchOpen = true) },
+    ...(syncStatus.enabled ? [{ label: '立即同步', icon: 'sync', action: () => void syncNow() }] : []),
     { separator: true },
     {
       label: '显示已完成任务',

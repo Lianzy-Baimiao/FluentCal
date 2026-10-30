@@ -79,6 +79,8 @@ try {
   const gantt = { view: 'gantt' };
   await shot('gantt', { url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: gantt, gantt: { groupFilter: ['web', 'app'] } } });
   await shot('settings-appearance', { url: '?w=settings&page=appearance&theme=dark', size: { width: 980, height: 548 }, dark: true, settings: { theme: { mode: 'dark' } } });
+  const sync = { enabled: true, provider: 'webdav', webdav: { url: 'https://dav.jianguoyun.com/dav/', user: 'me@example.com', folder: 'FluentCal' } };
+  await shot('settings-sync', { url: '?w=settings&page=sync&theme=light', size: { width: 980, height: 590 }, settings: { theme: { mode: 'light' }, sync } });
 } finally {
   await browser.close();
   await server.close();

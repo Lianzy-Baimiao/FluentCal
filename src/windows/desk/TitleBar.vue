@@ -9,6 +9,10 @@ import type { CalendarView } from '@/types';
 import { defaultWeeksStart, goToday, openSettings, page, ui } from './state';
 import { moreMenu } from './menus';
 import YearMonthPicker from './YearMonthPicker.vue';
+import { syncNow, syncStatus, watchSync } from '@/composables/sync';
+import { statusLine } from '@/lib/syncText';
+
+watchSync();
 
 const view = computed(() => doc.settings.calendar.view);
 const locked = computed(() => doc.settings.desk.locked);
@@ -72,6 +76,16 @@ const pickerOpen = ref(false);
     <div class="right">
       <FSegmented v-model="viewModel" class="f-seg" :options="views" size="small" />
       <FButton variant="subtle" size="icon" icon="search" title="搜索 (Ctrl+F)" @click="ui.searchOpen = !ui.searchOpen" />
+      <FButton
+        v-if="syncStatus.enabled"
+        class="sync-btn"
+        :class="{ spinning: syncStatus.syncing, failed: !!syncStatus.error }"
+        variant="subtle"
+        size="icon"
+        :icon="syncStatus.error ? 'warning' : 'sync'"
+        :title="`${statusLine(syncStatus)}（点击立即同步）`"
+        @click="syncNow"
+      />
       <FButton
         variant="subtle"
         size="icon"
@@ -147,9 +161,21 @@ const pickerOpen = ref(false);
 .unlocked {
   color: var(--accent-text);
 }
+.sync-btn.failed {
+  color: var(--caution);
+}
+.sync-btn.spinning :deep(.f-icon) {
+  animation: sync-spin 1s linear infinite;
+}
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @container (max-width: 520px) {
   .today-btn,
-  .settings-btn {
+  .settings-btn,
+  .sync-btn {
     display: none;
   }
 }

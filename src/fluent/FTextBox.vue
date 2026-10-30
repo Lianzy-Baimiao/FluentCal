@@ -19,6 +19,7 @@ const props = withDefaults(
     label?: string;
     /** Reduced height (24px) for dense toolbars. */
     small?: boolean;
+    type?: 'text' | 'password' | 'url';
   }>(),
   { rows: 3 },
 );
@@ -80,7 +81,7 @@ defineExpose({
     <input
       v-else
       ref="input"
-      type="text"
+      :type="type ?? 'text'"
       :value="modelValue"
       :placeholder="placeholder"
       :maxlength="maxlength"

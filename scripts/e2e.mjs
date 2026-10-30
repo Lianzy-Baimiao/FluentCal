@@ -189,6 +189,36 @@ await check('settings change theme in the desk window', async () => {
   assert((await desk.evaluate(() => document.documentElement.dataset.theme)) === 'dark', 'theme not applied');
 });
 
+await check('cloud sync: WebDAV set up, tested, turned on (merge), icon on the calendar', async () => {
+  const st = await ctx.newPage();
+  st.on('pageerror', (e) => errors.push(e.message));
+  await st.goto(`${base}/?w=settings&theme=light&page=sync&cloud=data`);
+  await st.getByRole('combobox', { name: '同步方式' }).click();
+  await st.getByRole('option', { name: /WebDAV/ }).click();
+  await st.getByRole('button', { name: '坚果云', exact: true }).click();
+  await st.getByRole('textbox', { name: '用户名' }).fill('me@example.com');
+  const pw = st.getByLabel('密码', { exact: true });
+  await pw.fill('app-password');
+  await pw.press('Enter');
+  await st.getByText('已保存（输入新值可替换）').waitFor({ timeout: 3000 });
+  assert((await pw.inputValue()) === '', 'password stays in the box');
+  await st.getByRole('button', { name: '测试连接' }).click();
+  await st.getByText(/云端已有 12 个任务/).waitFor({ timeout: 3000 });
+  await st.getByRole('button', { name: '开启同步' }).click();
+  await st.getByRole('dialog').getByRole('button', { name: '合并' }).click();
+  await st.getByText('已开启同步。').waitFor({ timeout: 3000 });
+  const s = (await stored(st)).settings.sync;
+  assert(s.enabled && s.provider === 'webdav' && s.webdav.url === 'https://dav.jianguoyun.com/dav/', `sync settings: ${JSON.stringify(s)}`);
+  assert(await st.getByRole('combobox', { name: '同步方式' }).isDisabled(), 'provider locked while on');
+  const icon = desk.locator('.titlebar .sync-btn');
+  await icon.waitFor({ timeout: 3000 });
+  assert(/已同步到 WebDAV/.test((await icon.getAttribute('title')) ?? ''), 'sync icon tooltip');
+  await st.getByRole('button', { name: '关闭同步' }).click();
+  await desk.waitForTimeout(300);
+  assert(!(await icon.count()), 'icon gone after turning sync off');
+  await st.close();
+});
+
 for (const [s, n] of results) console.log(`${s} ${n}`);
 if (errors.length) console.log('page errors:\n' + errors.join('\n'));
 await browser.close();

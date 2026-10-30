@@ -32,12 +32,20 @@ tauri-plugin-opener = "2.7.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 windows-version = "0.1.7"
+# Cloud sync (src/cloud). native-tls = Windows schannel with the system certificate store;
+# rustls would need ring, which needs a C compiler and assembler (see .cargo/config.toml.example).
+ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no-default", "gzip", "win-system-proxy"] }
+base64 = "0.23.1"
+sha2 = "0.10.9"
+getrandom = "0.3.4"
 # Same version tauri/tao use, so HWND types match and nothing is compiled twice.
 windows = { version = "0.62.2", features = [
     "Foundation",
     "UI_ViewManagement",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
+    "Win32_Security",
+    "Win32_Security_Credentials",
     "Win32_System_Diagnostics_Debug",
     "Win32_System_LibraryLoader",
     "Win32_System_Registry",

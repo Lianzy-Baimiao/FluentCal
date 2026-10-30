@@ -33,6 +33,8 @@ export const GLYPHS = {
   today: '\uE8D1',
   filter: '\uE71C',
   sync: '\uE895',
+  cloud: '\uE753',
+  key: '\uE8D7',
   save: '\uE74E',
   folder: '\uE8B7',
   openFile: '\uE8E5',

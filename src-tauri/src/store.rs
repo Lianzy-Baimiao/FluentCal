@@ -9,7 +9,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     sync::{Arc, Condvar, Mutex},
     thread,
     time::Duration,
@@ -40,6 +40,7 @@ pub struct Store {
     recovered: Mutex<Option<String>>,
     app: Mutex<Option<AppHandle>>,
     save_failing: AtomicBool,
+    data_gen: AtomicU64,
 }
 
 #[derive(Clone, Serialize)]
@@ -89,6 +90,7 @@ impl Store {
             recovered: Mutex::new(recovered),
             app: Mutex::new(None),
             save_failing: AtomicBool::new(false),
+            data_gen: AtomicU64::new(0),
         });
         store.daily_backup();
         let saver = store.clone();
@@ -214,7 +216,61 @@ impl Store {
         (old, new)
     }
 
+    /// Counts changes to the collections (not settings), so cloud sync can tell edits apart
+    /// from window moves.
+    pub fn data_gen(&self) -> u64 {
+        self.data_gen.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn bump_data(&self) {
+        self.data_gen.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Merges the synced collections of a cloud copy (see cloud::cloud_view) into ours.
+    /// Returns true when our data changed; windows are told to reload.
+    pub fn absorb_cloud(&self, view: &Value) -> bool {
+        let changed = {
+            let mut g = self.inner.lock().unwrap();
+            let before = crate::cloud::cloud_view(&g.doc);
+            let changed = crate::merge::merge_cols(&mut g.doc, view, &crate::cloud::SYNCED);
+            crate::merge::prune(&mut g.doc, now_ms());
+            // Also new tombstones alone: they must reach the disk, or a deletion could come back.
+            if crate::cloud::cloud_view(&g.doc) != before {
+                self.mark_dirty(&mut g);
+            }
+            changed
+        };
+        if changed {
+            self.bump_data();
+            self.emit_reload();
+        }
+        changed
+    }
+
+    /// "Use the cloud data": replaces the synced collections with the cloud copy (backed up
+    /// first). Settings and holiday data stay.
+    pub fn replace_cloud(&self, view: &Value) -> Result<(), String> {
+        self.manual_backup("pre-sync").map_err(|e| e.to_string())?;
+        {
+            let mut g = self.inner.lock().unwrap();
+            for col in crate::cloud::SYNCED {
+                g.doc[col] = view.get(col).cloned().unwrap_or_else(|| json!({}));
+                g.doc["meta"][col] = view.pointer(&format!("/meta/{col}")).cloned().unwrap_or_else(|| json!({}));
+            }
+            self.mark_dirty(&mut g);
+        }
+        self.bump_data();
+        self.emit_reload();
+        Ok(())
+    }
+
+    /// Backup before a sync merges into this PC's data for the first time.
+    pub fn backup(&self, prefix: &str) -> Result<String, String> {
+        self.manual_backup(prefix).map_err(|e| e.to_string())
+    }
+
     pub fn put(&self, collection: &str, items: &Map<String, Value>) {
+        self.bump_data();
         let mut g = self.inner.lock().unwrap();
         crate::merge::stamp(&mut g.doc, collection, items.keys(), now_ms());
         if let Some(Value::Object(col)) = g.doc.get_mut(collection) {
@@ -231,10 +287,17 @@ impl Store {
 
     /// Replaces the document (import, restore). Its items count as edited now, so a synced
     /// copy elsewhere doesn't undo the import; earlier deletions are remembered.
+    /// This PC's cloud sync settings are kept: they go with passwords in the Windows
+    /// credential store, which a backup from another PC doesn't have.
     fn replace(&self, mut doc: Value) {
+        self.bump_data();
         let mut g = self.inner.lock().unwrap();
         let old_meta = g.doc.get("meta").cloned();
         crate::merge::stamp_all(&mut doc, old_meta.as_ref(), now_ms());
+        let sync = g.doc.pointer("/settings/sync").cloned();
+        if let (Some(s), Some(settings)) = (sync, doc.get_mut("settings").and_then(Value::as_object_mut)) {
+            settings.insert("sync".into(), s);
+        }
         g.doc = doc;
         self.mark_dirty(&mut g);
     }

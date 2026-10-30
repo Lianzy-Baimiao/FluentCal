@@ -60,7 +60,12 @@ fn check_main(store: &Store) -> bool {
     if shared(&g.doc) != shared(&file_view) {
         store.mark_dirty(&mut g);
     }
-    changed && shared(&g.doc) != before
+    let changed = changed && shared(&g.doc) != before;
+    drop(g);
+    if changed {
+        store.bump_data();
+    }
+    changed
 }
 
 fn is_conflict_copy(name: &str) -> bool {
@@ -88,6 +93,9 @@ fn merge_conflict_copies(store: &Store) -> bool {
                 changed = true;
                 store.mark_dirty(&mut g);
             }
+        }
+        if changed {
+            store.bump_data();
         }
         let stem = name.trim_end_matches(".json");
         let _ = fs::rename(&path, store.dir.join(format!("{stem}.merged-{}.json", now_ms())));

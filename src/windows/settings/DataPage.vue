@@ -132,6 +132,7 @@ const when = (ms: number) => new Date(ms).toLocaleString('zh-CN');
           <FButton v-if="dir?.custom" variant="subtle" @click="changeDir(true)">恢复默认</FButton>
         </div>
       </FSettingsCard>
+      <p class="note">想通过坚果云、GitHub、Google 云端硬盘等在多台电脑间同步，请到“同步”页设置。</p>
       <FInfoBar v-if="dir?.missing" severity="warning" title="找不到自定义数据文件夹">
         {{ dir.missing }} 现在无法访问（同步盘未启动或磁盘未连接），本次使用的是本机默认文件夹。重新连接后重启程序即可。
       </FInfoBar>

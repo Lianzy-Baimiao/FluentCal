@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, type Component } from 'vue';
+import { computed, onMounted, provide, ref, type Component } from 'vue';
 import { FNavView } from '@/fluent';
 import { call, currentWindow, on } from '@/api';
 import { initStore, storeState } from '@/stores/doc';
@@ -10,6 +10,7 @@ import CalendarPage from './CalendarPage.vue';
 import GanttPage from './GanttPage.vue';
 import RemindersPage from './RemindersPage.vue';
 import DataPage from './DataPage.vue';
+import SyncPage from './SyncPage.vue';
 import AboutPage from './AboutPage.vue';
 import '../window-shell.css';
 import './settings.css';
@@ -23,6 +24,7 @@ const items = [
   { key: 'gantt', label: '甘特图', icon: 'gantt' },
   { key: 'reminders', label: '提醒', icon: 'alarm' },
   { key: 'data', label: '数据', icon: 'data' },
+  { key: 'sync', label: '同步', icon: 'cloud' },
 ];
 const footer = [{ key: 'about', label: '关于', icon: 'info' }];
 const pages: Record<string, Component> = {
@@ -32,10 +34,15 @@ const pages: Record<string, Component> = {
   gantt: GanttPage,
   reminders: RemindersPage,
   data: DataPage,
+  sync: SyncPage,
   about: AboutPage,
 };
 const pageKey = ref('general');
 const page = computed(() => pages[pageKey.value] ?? GeneralPage);
+/** Lets a page send the user to another one ("set the data folder on the Data page"). */
+provide('settingsNav', (key: string) => {
+  if (key in pages) pageKey.value = key;
+});
 
 async function takePending() {
   const p = await call<{ page?: string } | null>('pending_take');

@@ -72,6 +72,31 @@ export interface Screen {
   current: boolean;
 }
 
+/** Cloud sync status (src-tauri/src/cloud/service.rs Status). */
+export interface SyncStatus {
+  enabled: boolean;
+  provider: string;
+  syncing: boolean;
+  lastSync: number | null;
+  error: string | null;
+  errorKind: 'network' | 'auth' | 'config' | 'remote' | 'server' | 'conflict' | null;
+  /** Automatic sync stopped until settings change or "sync now". */
+  halted: boolean;
+  /** Local edits not uploaded yet. */
+  pending: boolean;
+  remoteDevice: string | null;
+  remoteSavedAt: number | null;
+}
+
+/** What "test connection" found in the cloud. */
+export interface SyncProbe {
+  exists: boolean;
+  tasks: number;
+  groups: number;
+  device: string | null;
+  savedAt: number | null;
+}
+
 export const screenTitle = (s: Screen) => `显示器 ${s.number}${s.primary ? '（主）' : ''}  ${s.width}×${s.height}`;
 
 // ---------------------------------------------------------------------------------------
@@ -111,6 +136,29 @@ const mock = (() => {
   const save = (d: Json) => localStorage.setItem(KEY, JSON.stringify(d));
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   let pendingTaken = false;
+  // Cloud sync stand-in: ?cloud=data pretends the cloud already holds tasks.
+  const secrets = new Set<string>();
+  const syncStatus: SyncStatus = { enabled: false, provider: '', syncing: false, lastSync: null, error: null, errorKind: null, halted: false, pending: false, remoteDevice: null, remoteSavedAt: null };
+  const PROVIDER_NAMES: Record<string, string> = { webdav: 'WebDAV', github: 'GitHub', gitee: 'Gitee', gdrive: 'Google 云端硬盘' };
+  let seeded = false;
+  /** A preview opened with sync already on (screenshots) starts as "synced a moment ago". */
+  const seedSync = (d: Json) => {
+    if (seeded) return;
+    seeded = true;
+    const s = (d.settings as { sync?: { enabled?: boolean; provider?: string } }).sync;
+    if (!s?.enabled || !PROVIDER_NAMES[s.provider ?? '']) return;
+    Object.assign(syncStatus, { enabled: true, provider: PROVIDER_NAMES[s.provider!], lastSync: Date.now() - 120_000, remoteDevice: 'OFFICE-PC', remoteSavedAt: Date.now() - 3_600_000 });
+    const keys: Record<string, string[]> = { webdav: ['webdav'], github: ['github'], gitee: ['gitee'], gdrive: ['google-secret', 'google-refresh'] };
+    for (const k of keys[s.provider!] ?? []) secrets.add(k);
+  };
+  const setSyncEnabled = (d: Json, on: boolean) => {
+    deepMerge(d.settings as Json, { sync: { enabled: on } });
+    save(d);
+    broadcast('store://settings', { origin: 'rust', settings: d.settings });
+    const provider = String((d.settings as { sync?: { provider?: string } }).sync?.provider ?? '');
+    Object.assign(syncStatus, { enabled: on, provider: PROVIDER_NAMES[provider] ?? '', lastSync: on ? Date.now() : syncStatus.lastSync, error: null });
+    broadcast('sync://status', { ...syncStatus });
+  };
 
   async function call<T>(cmd: string, a: Json): Promise<T> {
     const d = load();
@@ -221,6 +269,49 @@ const mock = (() => {
           };
           input.click();
         });
+        break;
+      case 'sync_status':
+        seedSync(d);
+        res = { ...syncStatus };
+        break;
+      case 'sync_now':
+        if (!syncStatus.enabled) throw new Error('同步没有开启');
+        Object.assign(syncStatus, { lastSync: Date.now(), remoteDevice: 'BROWSER', remoteSavedAt: Date.now(), error: null, pending: false });
+        broadcast('sync://status', { ...syncStatus });
+        res = { ...syncStatus };
+        break;
+      case 'sync_probe':
+        await new Promise((r) => setTimeout(r, 300));
+        res = query.get('cloud') === 'data'
+          ? ({ exists: true, tasks: 12, groups: 2, device: 'OFFICE-PC', savedAt: Date.now() - 3_600_000 } satisfies SyncProbe)
+          : ({ exists: false, tasks: 0, groups: 0, device: null, savedAt: null } satisfies SyncProbe);
+        break;
+      case 'sync_enable':
+        setSyncEnabled(d, true);
+        res = { ...syncStatus };
+        break;
+      case 'sync_disable':
+        setSyncEnabled(d, false);
+        break;
+      case 'sync_set_secret':
+        if (a.value) secrets.add(String(a.key));
+        else secrets.delete(String(a.key));
+        break;
+      case 'sync_secrets':
+        res = [...secrets];
+        break;
+      case 'sync_google_login':
+        secrets.add('google-refresh');
+        deepMerge(d.settings as Json, { sync: { gdrive: { email: 'me@example.com' } } });
+        save(d);
+        broadcast('store://settings', { origin: 'rust', settings: d.settings });
+        res = 'me@example.com';
+        break;
+      case 'sync_google_logout':
+        secrets.delete('google-refresh');
+        deepMerge(d.settings as Json, { sync: { gdrive: { email: '' } } });
+        save(d);
+        broadcast('store://settings', { origin: 'rust', settings: d.settings });
         break;
       default:
         // desk_ready, desk_summon, desk_hide, reminders_set, app_quit, open_data_dir…

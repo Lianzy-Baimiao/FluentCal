@@ -156,7 +156,23 @@ export interface Settings {
   };
   holidays: { autoUpdate: boolean; lastCheck: number };
   shortcuts: { toggle: string; newTask: string };
+  /** Cloud sync (SYN). Per PC; passwords and tokens are in Windows Credential Manager. */
+  sync: {
+    enabled: boolean;
+    /** '' = off; 'folder' = a shared data folder (DAT-04), not a network sync. */
+    provider: SyncProvider;
+    /** Minutes between pulls; 0 = only after start and edits. */
+    interval: number;
+    /** '' = Windows system proxy, 'direct' = none, otherwise http://host:port. */
+    proxy: string;
+    webdav: { url: string; user: string; folder: string };
+    github: { repo: string; branch: string; path: string };
+    gitee: { repo: string; branch: string; path: string };
+    gdrive: { clientId: string; email: string };
+  };
 }
+
+export type SyncProvider = '' | 'webdav' | 'github' | 'gitee' | 'gdrive' | 'folder';
 
 export interface Doc {
   version: number;

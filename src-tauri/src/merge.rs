@@ -52,8 +52,13 @@ pub fn stamp_all(doc: &mut Value, old_meta: Option<&Value>, now: i64) {
 /// is absent on the winning side is deleted. Settings stay ours (they are per PC).
 /// Returns true when anything changed.
 pub fn merge(ours: &mut Value, theirs: &Value) -> bool {
+    merge_cols(ours, theirs, &COLLECTIONS)
+}
+
+/// `merge` limited to some collections (cloud sync leaves holiday data alone).
+pub fn merge_cols(ours: &mut Value, theirs: &Value, cols: &[&str]) -> bool {
     let mut changed = false;
-    for col in COLLECTIONS {
+    for &col in cols {
         let their_items = theirs.get(col).and_then(Value::as_object).cloned().unwrap_or_default();
         let their_meta = theirs.pointer(&format!("/meta/{col}")).and_then(Value::as_object).cloned().unwrap_or_default();
         let our_ids: Vec<String> = ours[col].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
