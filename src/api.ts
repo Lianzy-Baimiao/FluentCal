@@ -221,7 +221,7 @@ const mock = (() => {
           transparency: true,
           accent: query.get('accent') ?? '#0078D4',
           accentPalette: [],
-          version: '0.1.0-web',
+          version: '0.2.0-web',
           dataDir: '（浏览器预览，数据保存在 localStorage）',
           autostart: false,
           shortcutErrors: [],

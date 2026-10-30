@@ -1,6 +1,6 @@
 [package]
 name = "fluentcal"
-version = "0.1.0"
+version = "0.2.0"
 description = "FluentCal 桌面日历：钉在桌面上的 Windows 11 风格日历与甘特图"
 edition = "2021"
 rust-version = "1.80"
