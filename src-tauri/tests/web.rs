@@ -2,7 +2,7 @@
 mod common;
 
 use common::*;
-use fluentcal_lib::web::{allowed_peer, start, Asset, Ctx};
+use fluentcal_lib::web::{allowed_peer, bind_host, start, Asset, Ctx};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 
@@ -89,6 +89,56 @@ fn serves_the_page_and_guards_the_data() {
     drop(running);
     let again = start(Arc::new(Ctx { store: s, token: Arc::new(Mutex::new(TOKEN.into())), asset: Box::new(asset), accent: Box::new(|| "#000000".into()), pc: "X".into() }), &addr.to_string());
     assert!(again.is_ok(), "port still taken: {:?}", again.err());
+}
+
+/// A page polling over one kept-alive connection: 200, then 304s. Every reply says where it
+/// ends (Content-Length, no chunked framing on the 304), and the next request on the same
+/// connection is answered. With `Transfer-Encoding: chunked` on the 304 (tiny_http's choice
+/// when the length isn't given), Edge left every other poll hanging.
+#[test]
+fn polling_on_one_connection() {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::time::Duration;
+    let s = store("web-poll");
+    put_task(&s, "t1", "x");
+    let ctx = Arc::new(Ctx { store: s, token: Arc::new(Mutex::new(TOKEN.into())), asset: Box::new(asset), accent: Box::new(|| "#000000".into()), pc: "X".into() });
+    let running = start(ctx, "127.0.0.1:0").unwrap();
+    let conn = std::net::TcpStream::connect(running.addr).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(3))).unwrap(); // no answer: fail, don't hang
+    let mut w = conn.try_clone().unwrap();
+    let mut r = BufReader::new(conn);
+    let mut etag = String::new();
+    for i in 0..4 {
+        let inm = if etag.is_empty() { String::new() } else { format!("If-None-Match: {etag}\r\n") };
+        write!(w, "GET /api/doc HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer {TOKEN}\r\n{inm}\r\n").unwrap();
+        let (mut status, mut len, mut chunked) = (String::new(), None::<usize>, false);
+        r.read_line(&mut status).unwrap();
+        loop {
+            let mut line = String::new();
+            r.read_line(&mut line).unwrap();
+            let Some((k, v)) = line.trim_end().split_once(':') else { break };
+            match k.to_ascii_lowercase().as_str() {
+                "content-length" => len = v.trim().parse().ok(),
+                "transfer-encoding" => chunked = true,
+                "etag" => etag = v.trim().to_owned(),
+                _ => {}
+            }
+        }
+        let want = if i == 0 { "200" } else { "304" };
+        assert_eq!(status.split(' ').nth(1), Some(want), "request {i}: {status}");
+        assert!(!chunked, "request {i}: chunked framing");
+        let len = len.unwrap_or_else(|| panic!("request {i}: no Content-Length"));
+        assert!(i == 0 || len == 0, "request {i}: a 304 with a body");
+        r.by_ref().take(len as u64).read_to_end(&mut Vec::new()).unwrap();
+    }
+}
+
+#[test]
+fn listens_only_where_asked() {
+    assert_eq!(bind_host(false, false), None, "nothing asked for: no server");
+    assert_eq!(bind_host(false, true), Some("127.0.0.1"), "this PC's browser only: loopback");
+    assert_eq!(bind_host(true, false), Some("0.0.0.0"));
+    assert_eq!(bind_host(true, true), Some("0.0.0.0"), "all interfaces include loopback");
 }
 
 #[test]

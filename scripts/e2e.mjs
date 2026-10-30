@@ -100,6 +100,29 @@ await check('search jumps and highlights a day', async () => {
   await desk.waitForSelector('.cell.flash', { timeout: 2000 });
 });
 
+await check('right-click a day › 在浏览器中查看 opens the read-only web view', async () => {
+  await desk.keyboard.press('Escape'); // the search box from the previous check
+  const served = { version: 1, tasks: { b1: { id: 'b1', title: '浏览器里的任务', start: plus(0), end: plus(0), progress: 0, done: false, order: 1, createdAt: 0, updatedAt: 0 } }, groups: {}, dayMarks: {}, holidays: {}, settings: { theme: { mode: 'light', accent: 'system' } } };
+  await ctx.route('**/api/doc', (route) =>
+    route.request().headers()['authorization'] === 'Bearer 0123456789abcdef0123456789abcdef'
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ doc: served, accent: '#0078D4', pc: 'TEST-PC' }) })
+      : route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"访问码无效"}' }),
+  );
+  try {
+    const day = desk.locator(`.cell[data-date="${target}"]:not(.dim)`);
+    const cell = await ((await day.count()) ? day : desk.locator('.cell:not(.dim)').last()).boundingBox();
+    await desk.mouse.click(cell.x + cell.width / 2, cell.y + cell.height - 6, { button: 'right' });
+    const [page] = await Promise.all([ctx.waitForEvent('page'), desk.getByRole('menuitem', { name: /在浏览器中查看/ }).click()]);
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.getByText('浏览器里的任务').first().waitFor({ timeout: 5000 });
+    assert(page.url().includes('w=web') && !page.url().includes('#k='), page.url());
+    assert(/只读/.test(await page.locator('.foot').textContent()), 'not read-only');
+    await page.close();
+  } finally {
+    await ctx.unroute('**/api/doc');
+  }
+});
+
 await check('Gantt: drag a bar moves the task', async () => {
   await desk.getByText('甘特', { exact: true }).first().click();
   await desk.waitForSelector('.g-chart .bar');
@@ -260,7 +283,7 @@ await check('web view: access code, phone list, read-only, live update, wrong co
 await check('settings: web view page with QR code', async () => {
   const st = await ctx.newPage();
   await st.goto(`${base}/?w=settings&theme=light&page=web`);
-  await st.getByRole('switch', { name: '网页查看' }).click();
+  await st.getByRole('switch', { name: '允许局域网内的设备查看' }).click();
   await st.locator('svg.qr').waitFor({ timeout: 3000 });
   assert(await st.getByText('http://192.168.1.23:18765').isVisible(), 'address listed');
   assert((await stored(st)).settings.web.enabled === true, 'setting saved');

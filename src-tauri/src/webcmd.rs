@@ -1,11 +1,12 @@
-//! Tauri side of the web view (web.rs): settings web.enabled / web.port, the access code in
-//! Windows Credential Manager, this PC's local network addresses, and the settings page's
-//! commands.
+//! Tauri side of the web view (web.rs): settings web.enabled / web.port, "view in browser" on
+//! this PC, the access code in Windows Credential Manager, this PC's local network addresses,
+//! and the settings page's commands.
 
 use crate::cloud::secrets;
 use crate::store::Store;
 use crate::web::{self, Asset, Ctx, Running};
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 
@@ -17,6 +18,8 @@ pub struct WebState {
     error: Mutex<Option<String>>,
     token: Arc<Mutex<String>>,
     accent: Arc<Mutex<String>>,
+    /// This PC's browser asked for the page ("在浏览器中查看"); until FluentCal exits.
+    local: AtomicBool,
 }
 
 fn new_token() -> String {
@@ -27,7 +30,13 @@ fn new_token() -> String {
 
 pub fn state() -> WebState {
     let token = secrets::get(TOKEN_KEY).unwrap_or_default();
-    WebState { running: Mutex::new(None), error: Mutex::new(None), token: Arc::new(Mutex::new(token)), accent: Arc::new(Mutex::new("#0078D4".into())) }
+    WebState {
+        running: Mutex::new(None),
+        error: Mutex::new(None),
+        token: Arc::new(Mutex::new(token)),
+        accent: Arc::new(Mutex::new("#0078D4".into())),
+        local: AtomicBool::new(false),
+    }
 }
 
 /// The access code, made the first time the web view is used.
@@ -44,26 +53,33 @@ fn port(store: &Store) -> u16 {
     store.setting("/web/port").and_then(|v| v.as_u64()).map_or(DEFAULT_PORT, |p| p.clamp(1024, 65535) as u16)
 }
 
-/// Starts, restarts or stops the server to match the settings (at startup and when they change).
+/// At startup and when the web settings change: refreshes the accent colour (on the main
+/// thread, where UISettings works), then matches the server to the settings.
 pub fn apply(app: &AppHandle) {
+    *app.state::<WebState>().accent.lock().unwrap() = crate::desktop::system_info().accent.unwrap_or_else(|| "#0078D4".into());
+    reconcile(app);
+}
+
+/// Starts, restarts or stops the server: all interfaces when other devices may view, loopback
+/// when only this PC's browser asked, otherwise none.
+fn reconcile(app: &AppHandle) {
     let store = app.state::<Arc<Store>>().inner().clone();
     let st = app.state::<WebState>();
-    *st.accent.lock().unwrap() = crate::desktop::system_info().accent.unwrap_or_else(|| "#0078D4".into());
-    let enabled = store.setting_bool("/web/enabled", false);
     let port = port(&store);
     let mut running = st.running.lock().unwrap();
-    if !enabled {
+    let Some(host) = web::bind_host(store.setting_bool("/web/enabled", false), st.local.load(Ordering::Relaxed)) else {
         *running = None;
         *st.error.lock().unwrap() = None;
         return;
-    }
-    if running.as_ref().is_some_and(|r| r.addr.port() == port) {
+    };
+    // Tests bind to 127.0.0.1 so Windows Firewall doesn't ask.
+    let host = if std::env::var("FLUENTCAL_WEB_BIND").is_ok_and(|v| v == "127.0.0.1") { "127.0.0.1" } else { host };
+    let want: std::net::SocketAddr = format!("{host}:{port}").parse().expect("ip:port");
+    if running.as_ref().is_some_and(|r| r.addr == want) {
         return;
     }
     *running = None; // frees the old port first
     ensure_token(&st);
-    // Tests bind to 127.0.0.1 so Windows Firewall doesn't ask.
-    let host = if std::env::var("FLUENTCAL_WEB_BIND").is_ok_and(|v| v == "127.0.0.1") { "127.0.0.1" } else { "0.0.0.0" };
     let handle = app.clone();
     let accent = st.accent.clone();
     let ctx = Arc::new(Ctx {
@@ -107,10 +123,32 @@ fn link(ip: &str, port: u16, token: &str) -> String {
     format!("http://{ip}:{port}/?w=web#k={token}")
 }
 
+/// "在浏览器中查看": makes sure the server answers on this PC (loopback only unless other
+/// devices may view) and returns the link with the access code.
+pub fn local_url(app: &AppHandle) -> Result<String, String> {
+    let st = app.state::<WebState>();
+    st.local.store(true, Ordering::Relaxed);
+    reconcile(app);
+    if let Some(e) = st.error.lock().unwrap().clone() {
+        return Err(e);
+    }
+    let port = st.running.lock().unwrap().as_ref().map(|r| r.addr.port()).ok_or("网页服务没有启动")?;
+    let token = st.token.lock().unwrap().clone();
+    Ok(link("127.0.0.1", port, &token))
+}
+
+/// Async so that binding (or waiting for the old server to stop) never holds up the UI thread.
+#[tauri::command]
+pub async fn web_local_url(app: AppHandle) -> Result<String, String> {
+    local_url(&app)
+}
+
 #[tauri::command]
 pub fn web_info(store: State<'_, Arc<Store>>, st: State<'_, WebState>) -> WebInfo {
     let port = port(&store);
-    let token = ensure_token(&st);
+    // Only read: opening the settings page must not create an access code. The server makes
+    // one when it starts, and the links are shown only while it runs.
+    let token = st.token.lock().unwrap().clone();
     let running = st.running.lock().unwrap().as_ref().map(|r| r.addr.port());
     let addresses = local_addresses()
         .into_iter()

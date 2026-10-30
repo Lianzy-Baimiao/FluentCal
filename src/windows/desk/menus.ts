@@ -17,7 +17,7 @@ import {
   setDayMark,
   setOccurrenceDone,
 } from '@/lib/tasks';
-import { goToday, notify, openEditor, openSettings, ui } from './state';
+import { goToday, notify, openEditor, openInBrowser, openSettings, ui } from './state';
 
 type At = Parameters<typeof showMenu>[1];
 
@@ -94,6 +94,7 @@ export function cellMenu(date: ISODate, at: At): Promise<void> {
     !!mark && { label: '清除日期颜色', icon: 'close', action: () => void setDayMark(date, null) },
     { separator: true },
     { label: '回到今天', icon: 'today', shortcut: 'Home', action: goToday },
+    { label: '在浏览器中查看', icon: 'globe', action: () => void openInBrowser() },
   ];
   return showMenu(items.filter(Boolean) as MenuItem[], at);
 }
@@ -116,6 +117,7 @@ export async function moreMenu(at: At): Promise<void> {
     { label: '新建任务…', icon: 'add', shortcut: 'Ctrl+N', action: () => openEditor({ mode: 'new' }) },
     { label: '搜索', icon: 'search', shortcut: 'Ctrl+F', action: () => (ui.searchOpen = true) },
     ...(syncStatus.enabled ? [{ label: '立即同步', icon: 'sync', action: () => void syncNow() }] : []),
+    { label: '在浏览器中查看', icon: 'globe', action: () => void openInBrowser() },
     { separator: true },
     {
       label: '显示已完成任务',

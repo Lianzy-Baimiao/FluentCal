@@ -29,6 +29,16 @@ export function notify(text: string, undo = false): void {
   toastTimer = setTimeout(() => (ui.toast = null), undo ? 6000 : 2500);
 }
 
+/** "在浏览器中查看": the read-only web view in this PC's default browser. FluentCal starts a
+ * server on 127.0.0.1 for it the first time (no firewall prompt, no other device can reach it). */
+export async function openInBrowser(): Promise<void> {
+  try {
+    await call('open_url', { url: await call<string>('web_local_url') });
+  } catch (e) {
+    notify(`无法在浏览器中查看：${String(e)}（端口在 设置 › 网页查看 中修改）`);
+  }
+}
+
 export type EditorPayload =
   | { mode: 'edit'; taskId: string; date?: ISODate }
   | { mode: 'new'; start?: ISODate; end?: ISODate; groupId?: string; title?: string; milestone?: boolean };

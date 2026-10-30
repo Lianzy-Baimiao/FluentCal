@@ -61,8 +61,11 @@ async function fetchDoc(): Promise<void> {
   if (!t) return setStatus('noToken');
   if (busy) return;
   busy = true;
+  // A request that never ends (a dropped Wi-Fi connection) must not stop the polling.
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 10_000);
   try {
-    const res = await fetch('/api/doc', { headers: { Authorization: `Bearer ${t}`, ...(etag ? { 'If-None-Match': etag } : {}) }, cache: 'no-store' });
+    const res = await fetch('/api/doc', { headers: { Authorization: `Bearer ${t}`, ...(etag ? { 'If-None-Match': etag } : {}) }, cache: 'no-store', signal: ac.signal });
     if (res.status === 401) return setStatus('unauthorized');
     if (res.status === 304) return setStatus('ok');
     if (!res.ok) return setStatus('offline');
@@ -77,6 +80,7 @@ async function fetchDoc(): Promise<void> {
   } catch {
     setStatus('offline');
   } finally {
+    clearTimeout(timer);
     busy = false;
   }
 }
@@ -85,7 +89,8 @@ function start() {
   if (started) return;
   started = true;
   void fetchDoc();
-  setInterval(() => void fetchDoc(), 5000);
+  // A tab in the background doesn't ask; coming back checks at once (below).
+  setInterval(() => document.visibilityState === 'visible' && void fetchDoc(), 5000);
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && void fetchDoc());
 }
 

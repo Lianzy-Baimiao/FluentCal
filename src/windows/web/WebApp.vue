@@ -53,14 +53,19 @@ const viewModel = computed({
 });
 const title = computed(() => (view.value === 'list' ? '近期' : viewTitle()));
 
+// Opened on this PC ("在浏览器中查看"): the server there runs only after that menu item.
+const onThisPc = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
+const reopen = '在日历上右键 ›“在浏览器中查看”重新打开';
 const notice = computed(() => {
   switch (status.value) {
     case 'offline':
-      return { sev: 'warning' as const, text: `连不上${pc.value ? ` ${pc.value} 上的` : '电脑上的'} FluentCal（电脑关机、程序已退出或不在同一网络）。显示的是上次的数据，恢复后会自动更新。` };
+      return onThisPc
+        ? { sev: 'warning' as const, text: `连不上 FluentCal（程序已退出或重新启动过）。显示的是上次的数据；${reopen}。` }
+        : { sev: 'warning' as const, text: `连不上${pc.value ? ` ${pc.value} 上的` : '电脑上的'} FluentCal（电脑关机、程序已退出或不在同一网络）。显示的是上次的数据，恢复后会自动更新。` };
     case 'unauthorized':
-      return { sev: 'error' as const, text: '访问码无效或已更换。请在电脑上打开 FluentCal › 设置 › 网页查看，重新扫码或复制链接。' };
+      return { sev: 'error' as const, text: `访问码无效或已更换。${onThisPc ? `请${reopen}。` : '请在电脑上打开 FluentCal › 设置 › 网页查看，重新扫码或复制链接。'}` };
     case 'noToken':
-      return { sev: 'error' as const, text: '缺少访问码。请在电脑上打开 FluentCal › 设置 › 网页查看，扫码或复制完整的链接。' };
+      return { sev: 'error' as const, text: `缺少访问码。${onThisPc ? `请${reopen}。` : '请在电脑上打开 FluentCal › 设置 › 网页查看，扫码或复制完整的链接。'}` };
     default:
       return null;
   }

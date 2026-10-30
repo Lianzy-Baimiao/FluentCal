@@ -41,7 +41,7 @@ for (const theme of ['light', 'dark']) {
       await p.getByRole('option', { name: /WebDAV/ }).click();
       await p.waitForTimeout(400);
     } else if (action === 'web-on') {
-      const sw = p.getByRole('switch', { name: '网页查看' });
+      const sw = p.getByRole('switch', { name: '允许局域网内的设备查看' });
       if (!(await sw.isChecked())) await sw.click();
       await p.waitForTimeout(800);
     } else if (action?.startsWith('web-')) {

@@ -173,6 +173,15 @@ fn test_raised() -> bool {
 }
 
 /// Lets the calendar take keyboard focus (the user started typing in it).
+/// Before opening a link from a click in our window or tray menu: passes the right to come to
+/// the foreground on to the browser, so its window comes up instead of only flashing on the
+/// taskbar (the desk window doesn't activate, and the browser didn't get the click).
+pub fn allow_foreground() {
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+    }
+}
+
 pub fn activate_for_keyboard(win: &WebviewWindow) {
     if is_foreground() {
         return;

@@ -96,6 +96,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         menu.append(&on)?;
     }
     menu.append_items(&[
+        &MenuItem::with_id(app, "openInBrowser", "在浏览器中查看", true, None::<&str>)?,
         &CheckMenuItem::with_id(app, "lock", "锁定位置和大小", true, locked, None::<&str>)?,
         &CheckMenuItem::with_id(app, "clickThrough", "鼠标穿透", true, click_through, None::<&str>)?,
         &PredefinedMenuItem::separator(app)?,
@@ -118,6 +119,17 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
             }
         }
         "quit" => crate::quit(app),
+        "openInBrowser" => {
+            // Off the UI thread: starting the server may wait for an old one to stop.
+            let app = app.clone();
+            std::thread::spawn(move || match crate::webcmd::local_url(&app) {
+                Ok(url) => {
+                    let _ = crate::open_in_browser(&app, url);
+                }
+                // e.g. the port is taken: the settings page shows why and has the port field
+                Err(_) => crate::open_settings(&app, Some("web".into())),
+            });
+        }
         "lock" => {
             let v = !store.setting_bool("/desk/locked", true);
             patch_settings_from_rust(app, &store, json!({ "desk": { "locked": v } }));

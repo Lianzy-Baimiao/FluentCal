@@ -49,6 +49,17 @@ impl Reply {
     }
 }
 
+/// Where the server listens. `lan`: the setting "other devices may view" (all interfaces,
+/// Windows Firewall asks once). `local`: this PC's own browser asked for the page, so loopback
+/// only, which reaches no other device and needs no firewall rule. Neither: no server at all.
+pub fn bind_host(lan: bool, local: bool) -> Option<&'static str> {
+    match (lan, local) {
+        (true, _) => Some("0.0.0.0"),
+        (false, true) => Some("127.0.0.1"),
+        (false, false) => None,
+    }
+}
+
 /// Local network and this PC only.
 pub fn allowed_peer(ip: IpAddr) -> bool {
     match ip {
@@ -139,7 +150,8 @@ fn serve(ctx: &Ctx, req: Request) {
     } else {
         Reply::new(403)
     };
-    let mut res = Response::new(reply.status.into(), Vec::new(), Cursor::new(reply.body), None, None);
+    let len = reply.body.len();
+    let mut res = Response::new(reply.status.into(), Vec::new(), Cursor::new(reply.body), Some(len), None);
     let common = [("X-Content-Type-Options", "nosniff"), ("Referrer-Policy", "no-referrer"), ("X-Frame-Options", "DENY")];
     for (k, v) in common.iter().map(|(k, v)| (*k, v.to_string())).chain(reply.headers) {
         if let Ok(h) = Header::from_bytes(k.as_bytes(), v.as_bytes()) {

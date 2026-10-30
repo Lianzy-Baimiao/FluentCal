@@ -458,12 +458,18 @@ fn open_data_dir(app: AppHandle) -> Result<(), String> {
     app.opener().open_path(dir.display().to_string(), None::<&str>).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+/// Opens an http(s) link in the default browser.
+pub(crate) fn open_in_browser(app: &AppHandle, url: String) -> Result<(), String> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("only http(s) urls are allowed".into());
     }
+    desktop::allow_foreground();
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    open_in_browser(&app, url)
 }
 
 /// Shows a save dialog and writes `content`. Returns the chosen path, or None if cancelled.
@@ -582,6 +588,7 @@ pub fn run() {
             cloud::commands::sync_google_login,
             cloud::commands::sync_google_logout,
             webcmd::web_info,
+            webcmd::web_local_url,
             webcmd::web_reset_token,
             store::store_get,
             store::store_put,

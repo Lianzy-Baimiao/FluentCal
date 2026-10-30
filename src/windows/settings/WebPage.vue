@@ -40,6 +40,14 @@ async function copy(url: string) {
   }
 }
 
+async function openLocal() {
+  try {
+    await call('open_url', { url: await call<string>('web_local_url') });
+  } catch (e) {
+    msg.value = { sev: 'error', text: `无法在浏览器中查看：${String(e)}` };
+  }
+}
+
 async function reset() {
   const r = await confirm({ title: '更换访问码？', content: '已经发出的链接和已打开的网页会立即失效，需要重新扫码。', primaryText: '更换' });
   if (r !== 'primary') return;
@@ -51,12 +59,17 @@ async function reset() {
 
 <template>
   <div class="page">
-    <FSettingsGroup title="网页查看">
-      <FSettingsCard icon="globe" title="在手机或其他电脑的浏览器中查看" description="同一 Wi-Fi/局域网内的设备打开链接或扫二维码即可查看日历、列表和甘特图。只能查看，不能修改">
-        <FToggle v-model="enabled" label="网页查看" />
+    <FInfoBar v-if="info?.error" severity="error" title="网页服务没有启动">{{ info.error }}</FInfoBar>
+    <FInfoBar v-if="msg" :severity="msg.sev" closable @close="msg = null">{{ msg.text }}</FInfoBar>
+    <FSettingsGroup title="这台电脑">
+      <FSettingsCard icon="desktop" title="在浏览器中查看" description="用这台电脑的浏览器查看日历、列表和甘特图（只读）。只有本机能访问，不需要下面的开关，也不会弹出防火墙询问；日历上右键也能打开">
+        <FButton @click="openLocal">打开</FButton>
       </FSettingsCard>
-      <FInfoBar v-if="info?.error" severity="error" title="网页服务没有启动">{{ info.error }}</FInfoBar>
-      <FInfoBar v-if="msg" :severity="msg.sev" closable @close="msg = null">{{ msg.text }}</FInfoBar>
+    </FSettingsGroup>
+    <FSettingsGroup title="手机和其他设备">
+      <FSettingsCard icon="globe" title="允许局域网内的设备查看" description="同一 Wi-Fi/局域网内的手机、平板或电脑打开链接或扫二维码即可查看。只能查看，不能修改">
+        <FToggle v-model="enabled" label="允许局域网内的设备查看" />
+      </FSettingsCard>
     </FSettingsGroup>
 
     <FSettingsGroup v-if="enabled && info?.running" title="打开方式">
@@ -70,7 +83,6 @@ async function reset() {
             <FButton size="small" @click="copy(a.url)">复制链接</FButton>
           </div>
           <div class="row-ctl start">
-            <FButton size="small" variant="subtle" icon="globe" @click="call('open_url', { url: info.localUrl })">在本机浏览器中打开</FButton>
             <FButton size="small" variant="subtle" icon="key" @click="reset">更换访问码</FButton>
           </div>
         </div>
@@ -83,7 +95,7 @@ async function reset() {
       </FSettingsCard>
     </FSettingsGroup>
     <ul class="note list">
-      <li>第一次开启时 Windows 防火墙会询问是否允许 FluentCal 访问网络，请勾选“专用网络”并允许，否则手机连不上。</li>
+      <li>第一次打开“允许局域网内的设备查看”时 Windows 防火墙会询问是否允许 FluentCal 访问网络，请勾选“专用网络”并允许，否则手机连不上。</li>
       <li>链接里带有访问码，知道链接的人都能查看你的日程；不小心发给了别人就点“更换访问码”。</li>
       <li>局域网内传输没有加密，只在家里、公司等信任的网络中使用。</li>
       <li>网页由这台电脑上运行的 FluentCal 提供：电脑关机或退出 FluentCal 后打不开。在电脑上的修改几秒内会出现在网页上。</li>
@@ -119,7 +131,7 @@ code {
   font-size: 14px;
   user-select: all;
 }
-.start {
+.row-ctl.start {
   justify-content: flex-start;
   margin-top: 4px;
 }

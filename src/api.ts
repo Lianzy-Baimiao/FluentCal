@@ -291,6 +291,10 @@ const mock = (() => {
       case 'web_reset_token':
         mockToken = Math.random().toString(16).slice(2).padEnd(32, '0');
         break;
+      case 'web_local_url':
+        // FluentCal answers on 127.0.0.1; the preview serves the same page itself.
+        res = `${location.origin}/?w=web#k=${mockToken}`;
+        break;
       case 'sync_now':
         if (!syncStatus.enabled) throw new Error('同步没有开启');
         Object.assign(syncStatus, { lastSync: Date.now(), remoteDevice: 'BROWSER', remoteSavedAt: Date.now(), error: null, pending: false });
