@@ -4,6 +4,28 @@
 slint::slint! {
     import { LineEdit } from "std-widgets.slint";
 
+    // Does per-pixel transparency reach the screen? Fully transparent apart from a red bar, a
+    // 30 % white band and an orange square (FLUENTCAL_SPIKE_ALPHATEST=1).
+    export component AlphaTest inherits Window {
+        title: "FluentCal 原型";
+        no-frame: true;
+        width: 600px;
+        height: 300px;
+        background: transparent;
+        Rectangle { y: 20px; height: 30px; background: #ff0000; }
+        Rectangle { y: 160px; height: 50px; background: #ffffff4d; }
+        Rectangle { x: 280px; y: 240px; width: 40px; height: 40px; background: #ff8000; }
+    }
+
+    // An opaque pure-blue window to put the transparency test on (FLUENTCAL_SPIKE_BACKDROP=1).
+    export component Backdrop inherits Window {
+        title: "FluentCal 背景";
+        no-frame: true;
+        width: 600px;
+        height: 300px;
+        background: #0000ff;
+    }
+
     export component Spike inherits Window {
         title: "FluentCal 原型";
         preferred-width: 760px;
@@ -116,39 +138,78 @@ fn main() -> Result<(), slint::PlatformError> {
             if std::env::var("FLUENTCAL_SPIKE_TRANSPARENT").is_ok_and(|v| v == "1") { a.with_transparent(true) } else { a }
         })
         .select()?;
-    let ui = Spike::new()?;
-    ui.set_renderer(std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "默认".into()).into());
-    // The window is created once the event loop runs: pin it as soon as it exists.
-    let weak = ui.as_weak();
-    let pin = slint::Timer::default();
-    let pin_handle = std::rc::Rc::new(std::cell::Cell::new(false));
-    let done = pin_handle.clone();
-    pin.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(5), move || {
-        if done.get() {
-            return;
-        }
-        let Some(ui) = weak.upgrade() else { return };
-        ui.window().with_winit_window(|w: &winit::window::Window| {
-            if let Ok(h) = w.window_handle() {
-                if let RawWindowHandle::Win32(h) = h.as_raw() {
-                    let hwnd = HWND(h.hwnd.get() as *mut _);
-                    // FLUENTCAL_SPIKE_PIN=0: an ordinary window, for trying it by hand.
-                    if !std::env::var("FLUENTCAL_SPIKE_PIN").is_ok_and(|v| v == "0") {
-                        pin_to_desktop(hwnd, pos);
-                    }
-                    if std::env::var("FLUENTCAL_SPIKE_ACRYLIC").is_ok_and(|v| v == "1") {
-                        set_acrylic(hwnd);
-                    }
-                    done.set(true);
-                }
-            }
-        });
-    });
     // FLUENTCAL_SPIKE_QUIT=seconds: measurement runs end by themselves.
     if let Some(s) = std::env::var("FLUENTCAL_SPIKE_QUIT").ok().and_then(|s| s.parse().ok()) {
         slint::Timer::single_shot(std::time::Duration::from_secs(s), || {
             let _ = slint::quit_event_loop();
         });
     }
+    if std::env::var("FLUENTCAL_SPIKE_ALPHATEST").is_ok_and(|v| v == "1") {
+        let _backdrop = if std::env::var("FLUENTCAL_SPIKE_BACKDROP").is_ok_and(|v| v == "1") {
+            let bg = Backdrop::new()?;
+            let wb = bg.as_weak();
+            let setup = when_created(move |f| wb.upgrade().map(|ui| ui.window().with_winit_window(|win| f(win))).flatten(), pos);
+            bg.show()?;
+            Some((bg, setup))
+        } else {
+            None
+        };
+        let ui = AlphaTest::new()?;
+        let w = ui.as_weak();
+        let _setup = when_created(move |f| w.upgrade().map(|ui| ui.window().with_winit_window(|win| f(win))).flatten(), pos);
+        return ui.run();
+    }
+    let ui = Spike::new()?;
+    ui.set_renderer(std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "默认".into()).into());
+    let w = ui.as_weak();
+    let _setup = when_created(move |f| w.upgrade().map(|ui| ui.window().with_winit_window(|win| f(win))).flatten(), pos);
     ui.run()
+}
+
+type WithWindow = dyn Fn(&mut dyn FnMut(&winit::window::Window) -> bool) -> Option<bool>;
+
+/// The window is created once the event loop runs: set it up as soon as it exists.
+fn when_created(with: impl Fn(&mut dyn FnMut(&winit::window::Window) -> bool) -> Option<bool> + 'static, pos: Option<(i32, i32)>) -> slint::Timer {
+    let with: Box<WithWindow> = Box::new(with);
+    let done = std::rc::Rc::new(std::cell::Cell::new(false));
+    let timer = slint::Timer::default();
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(5), move || {
+        if done.get() {
+            return;
+        }
+        let ok = with(&mut |w| match w.window_handle().map(|h| h.as_raw()) {
+            Ok(RawWindowHandle::Win32(h)) => {
+                setup(HWND(h.hwnd.get() as *mut _), pos);
+                true
+            }
+            _ => false,
+        });
+        if ok == Some(true) {
+            done.set(true);
+        }
+    });
+    timer
+}
+
+fn setup(hwnd: HWND, pos: Option<(i32, i32)>) {
+    let env = |k: &str| std::env::var(k).ok();
+    // FLUENTCAL_SPIKE_INSERT_AFTER=hwnd: directly under that window in the z-order (tests).
+    if env("FLUENTCAL_SPIKE_TOPMOST").as_deref() == Some("1") {
+        // Tests: above everything, at `pos`, never activated.
+        let (x, y) = pos.unwrap_or((0, 0));
+        unsafe {
+            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    } else if let Some(after) = env("FLUENTCAL_SPIKE_INSERT_AFTER").and_then(|v| v.parse::<isize>().ok()) {
+        let (x, y) = pos.unwrap_or((0, 0));
+        unsafe {
+            let _ = SetWindowPos(hwnd, Some(HWND(after as *mut _)), x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    } else if env("FLUENTCAL_SPIKE_PIN").as_deref() != Some("0") {
+        // FLUENTCAL_SPIKE_PIN=0: an ordinary window, for trying it by hand.
+        pin_to_desktop(hwnd, pos);
+    }
+    if env("FLUENTCAL_SPIKE_ACRYLIC").as_deref() == Some("1") {
+        set_acrylic(hwnd);
+    }
 }

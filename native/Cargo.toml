@@ -1,15 +1,16 @@
-[package]
-name = "fluentcal-native"
-version = "0.0.1"
-description = "FluentCal 桌面日历：Rust 原生界面（M10，原型阶段）"
+# FluentCal, Rust native (需求文档 7.7): `core` holds the data, sync and calendar logic (no UI,
+# tested on its own); `app` is the Slint user interface and the Windows integration.
+[workspace]
+resolver = "2"
+members = ["core", "app"]
+
+[workspace.package]
+version = "0.3.0"
 edition = "2021"
 publish = false
 
-[[bin]]
-name = "fluentcal-spike"
-path = "src/main.rs"
-
-[dependencies]
-raw-window-handle = "0.6"
-slint = { version = "1.18.1", features = ["unstable-winit-030"] }
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
