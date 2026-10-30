@@ -9,3 +9,6 @@ shots/
 xdiarys-setup-v3.exe
 # machine-specific GNU toolchain paths; see src-tauri/.cargo/config.toml.example
 src-tauri/.cargo/config.toml
+
+# native/: same machine-specific toolchain paths as src-tauri
+native/.cargo/config.toml
