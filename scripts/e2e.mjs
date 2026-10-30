@@ -219,6 +219,54 @@ await check('cloud sync: WebDAV set up, tested, turned on (merge), icon on the c
   await st.close();
 });
 
+await check('web view: access code, phone list, read-only, live update, wrong code', async () => {
+  const TOKEN = '0123456789abcdef0123456789abcdef';
+  const task = (id, title, start, extra = {}) => ({ id, title, start, end: start, progress: 0, done: false, order: 1, createdAt: 0, updatedAt: 0, ...extra });
+  const served = { version: 1, tasks: { w1: task('w1', '网页里的任务', plus(0), { time: '09:30', notes: '带上材料' }), w2: task('w2', '每周例会', plus(1), { repeat: { freq: 'weekly' } }) }, groups: {}, dayMarks: {}, holidays: {}, settings: { calendar: { weekStart: 1 }, theme: { mode: 'light', accent: 'system' } } };
+  let rev = 1;
+  const wctx = await browser.newContext({ viewport: { width: 390, height: 760 } });
+  await wctx.route('**/api/doc', (route) => {
+    const auth = route.request().headers()['authorization'];
+    if (auth !== `Bearer ${TOKEN}`) return route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"访问码无效"}' });
+    if (route.request().headers()['if-none-match'] === `"r${rev}"`) return route.fulfill({ status: 304, headers: { ETag: `"r${rev}"` } });
+    route.fulfill({ status: 200, contentType: 'application/json', headers: { ETag: `"r${rev}"` }, body: JSON.stringify({ doc: served, accent: '#0078D4', pc: 'TEST-PC' }) });
+  });
+  const w = await wctx.newPage();
+  w.on('pageerror', (e) => errors.push(e.message));
+  await w.goto(`${base}/?w=web#k=${TOKEN}`);
+  await w.getByText('网页里的任务').waitFor({ timeout: 5000 });
+  assert(!w.url().includes('#k='), 'access code left in the address bar');
+  assert((await w.evaluate(() => localStorage.getItem('fluentcal.web.token'))) === TOKEN, 'access code not kept');
+  assert(await w.getByRole('radio', { name: '列表' }).isChecked(), 'phones start on the list');
+  await w.getByText('网页里的任务').click();
+  const dlg = w.getByRole('dialog');
+  await dlg.getByText('带上材料').waitFor({ timeout: 2000 });
+  assert(/09:30/.test(await dlg.textContent()), 'details show the time');
+  await dlg.getByRole('button', { name: '关闭' }).click();
+  await w.getByRole('radio', { name: '月', exact: true }).click();
+  const cell = w.locator('.cell:not(.dim)').filter({ hasNot: w.locator('.chip') }).first();
+  await cell.dblclick();
+  assert(!(await w.locator('input.quick-add').count()), 'quick add opened in the web view');
+  await w.locator('.chip').filter({ hasText: '网页里的任务' }).first().click({ button: 'right' });
+  assert(!(await w.getByRole('menu').count()), 'a menu opened in the web view');
+  served.tasks.w3 = task('w3', '电脑上刚加的', plus(0));
+  rev = 2;
+  await w.getByText('电脑上刚加的').first().waitFor({ timeout: 8000 });
+  await w.goto(`${base}/?w=web#k=${'f'.repeat(32)}`);
+  await w.getByText(/访问码无效/).waitFor({ timeout: 5000 });
+  await wctx.close();
+});
+
+await check('settings: web view page with QR code', async () => {
+  const st = await ctx.newPage();
+  await st.goto(`${base}/?w=settings&theme=light&page=web`);
+  await st.getByRole('switch', { name: '网页查看' }).click();
+  await st.locator('svg.qr').waitFor({ timeout: 3000 });
+  assert(await st.getByText('http://192.168.1.23:18765').isVisible(), 'address listed');
+  assert((await stored(st)).settings.web.enabled === true, 'setting saved');
+  await st.close();
+});
+
 for (const [s, n] of results) console.log(`${s} ${n}`);
 if (errors.length) console.log('page errors:\n' + errors.join('\n'));
 await browser.close();

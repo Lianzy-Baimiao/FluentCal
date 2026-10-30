@@ -1,11 +1,11 @@
 import { reactive } from 'vue';
 import type { ISODate } from '@/types';
-import { addDays, addMonths, startOfMonth, startOfWeek } from '@/lib/date';
+import { addDays, addMonths, parts, startOfMonth, startOfWeek } from '@/lib/date';
 import { call } from '@/api';
-import { doc, patchSettings } from '@/stores/doc';
+import { doc, patchSettings, storeState } from '@/stores/doc';
 import { now } from '@/composables/now';
 
-/** UI state shared by the desk window's components. */
+/** UI state shared by the desk window's components (and the web view, which reuses them). */
 export const ui = reactive({
   /** Month view: any day of the shown month. Weeks view: first shown week. */
   cursor: startOfMonth(now.value) as ISODate,
@@ -33,12 +33,35 @@ export type EditorPayload =
   | { mode: 'edit'; taskId: string; date?: ISODate }
   | { mode: 'new'; start?: ISODate; end?: ISODate; groupId?: string; title?: string; milestone?: boolean };
 
+/** Web view: the task shown in the read-only details dialog. */
+export const details = reactive({ open: false, taskId: '', date: '' as ISODate });
+
 export function openEditor(payload: EditorPayload): void {
+  if (storeState.readOnly) {
+    if (payload.mode === 'edit') Object.assign(details, { open: true, taskId: payload.taskId, date: payload.date ?? '' });
+    return;
+  }
   void call('editor_open', { payload });
 }
 
 export function openSettings(page?: string): void {
   void call('settings_open', { page });
+}
+
+/** "2026年10月", the range of the weeks view, or "甘特图" (title bar and web view). */
+export function viewTitle(): string {
+  const view = doc.settings.calendar.view;
+  if (view === 'gantt') return '甘特图';
+  if (view === 'weeks') {
+    const s = ui.weeksStart || defaultWeeksStart();
+    const e = addDays(s, doc.settings.calendar.weeksRows * 7 - 1);
+    const [sy, sm, sd] = parts(s);
+    const [ey, em, ed] = parts(e);
+    const yr = sy === parts(now.value)[0] ? '' : `${sy}年`;
+    return sy === ey ? `${yr}${sm}月${sd}日 – ${em}月${ed}日` : `${sy}年${sm}月${sd}日 – ${ey}年${em}月${ed}日`;
+  }
+  const [y, m] = parts(ui.cursor);
+  return `${y}年${m}月`;
 }
 
 /** First week of the rolling multi-week view (for today, or for `day`). */

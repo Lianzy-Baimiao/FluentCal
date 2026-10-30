@@ -53,11 +53,20 @@ const server = await preview({ preview: { port: 1433, strictPort: true }, logLev
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const shots = [];
 try {
-  async function shot(name, { url, size, settings, dark = false, before }) {
-    const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 2, timezoneId: 'Asia/Shanghai', locale: 'zh-CN', colorScheme: dark ? 'dark' : 'light' });
+  // `web`: the page a phone gets from FluentCal's web view, with /api/doc answered here the
+  // way web.rs answers it (only the display settings).
+  async function shot(name, { url, size, settings, dark = false, before, web, storage = {} }) {
+    const ctx = await browser.newContext({ viewport: size, deviceScaleFactor: 2, timezoneId: 'Asia/Shanghai', locale: 'zh-CN', colorScheme: dark ? 'dark' : 'light', ...(web && { isMobile: true, hasTouch: true }) });
     await ctx.clock.setFixedTime(NOW);
     const doc = JSON.stringify(demoDoc(settings));
     await ctx.addInitScript((d) => localStorage.getItem('fluentcal.mock.doc') || localStorage.setItem('fluentcal.mock.doc', d), doc);
+    await ctx.addInitScript((s) => Object.entries(s).forEach(([k, v]) => localStorage.setItem(k, v)), storage);
+    if (web) {
+      const { tasks, groups, dayMarks, holidays, settings: s } = demoDoc(settings);
+      const shown = Object.fromEntries(Object.entries(s).filter(([k]) => ['calendar', 'tasks', 'gantt', 'theme'].includes(k)));
+      const body = JSON.stringify({ doc: { version: 1, tasks, groups, dayMarks, holidays, settings: shown }, accent: '#0078D4', pc: 'MY-PC' });
+      await ctx.route('**/api/doc', (r) => r.fulfill({ status: 200, contentType: 'application/json', body }));
+    }
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -81,6 +90,10 @@ try {
   await shot('settings-appearance', { url: '?w=settings&page=appearance&theme=dark', size: { width: 980, height: 548 }, dark: true, settings: { theme: { mode: 'dark' } } });
   const sync = { enabled: true, provider: 'webdav', webdav: { url: 'https://dav.jianguoyun.com/dav/', user: 'me@example.com', folder: 'FluentCal' } };
   await shot('settings-sync', { url: '?w=settings&page=sync&theme=light', size: { width: 980, height: 590 }, settings: { theme: { mode: 'light' }, sync } });
+  const phone = { width: 390, height: 760 };
+  const webUrl = `?w=web&theme=light#k=${'0'.repeat(32)}`;
+  await shot('web-phone-list', { url: webUrl, size: phone, web: true, settings: { theme: { mode: 'light' } } });
+  await shot('web-phone-month', { url: webUrl, size: phone, web: true, settings: { theme: { mode: 'light' } }, storage: { 'fluentcal.web.view': 'month' } });
 } finally {
   await browser.close();
   await server.close();

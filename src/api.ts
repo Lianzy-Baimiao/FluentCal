@@ -4,6 +4,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import * as web from './webApi';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -14,12 +15,17 @@ export const windowLabel: string = isTauri ? getCurrentWebviewWindow().label : (
 /** Identifies this window in change events (unique per browser tab in mock mode). */
 export const origin: string = isTauri ? windowLabel : `${windowLabel}:${Math.random().toString(36).slice(2, 8)}`;
 
+/** The read-only web view served by FluentCal in the local network (see webApi.ts). */
+export const isWeb = !isTauri && windowLabel === 'web';
+
 export function call<T = void>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  return isTauri ? invoke<T>(cmd, args) : mock.call<T>(cmd, args ?? {});
+  if (isTauri) return invoke<T>(cmd, args);
+  return isWeb ? web.call<T>(cmd, args ?? {}) : mock.call<T>(cmd, args ?? {});
 }
 
 /** Subscribes to a backend event; returns an unsubscribe function. */
 export function on<T>(event: string, cb: (payload: T) => void): () => void {
+  if (isWeb) return web.on(event, cb as (p: unknown) => void);
   if (!isTauri) return mock.on(event, cb as (p: unknown) => void);
   const p = listen<T>(event, (e) => cb(e.payload));
   return () => void p.then((un) => un());
@@ -136,6 +142,7 @@ const mock = (() => {
   const save = (d: Json) => localStorage.setItem(KEY, JSON.stringify(d));
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
   let pendingTaken = false;
+  let mockToken = '0123456789abcdef0123456789abcdef';
   // Cloud sync stand-in: ?cloud=data pretends the cloud already holds tasks.
   const secrets = new Set<string>();
   const syncStatus: SyncStatus = { enabled: false, provider: '', syncing: false, lastSync: null, error: null, errorKind: null, halted: false, pending: false, remoteDevice: null, remoteSavedAt: null };
@@ -273,6 +280,16 @@ const mock = (() => {
       case 'sync_status':
         seedSync(d);
         res = { ...syncStatus };
+        break;
+      case 'web_info': {
+        const w = (d.settings as { web?: { enabled?: boolean; port?: number } }).web ?? {};
+        const port = w.port ?? 18765;
+        const url = (ip: string) => `http://${ip}:${port}/?w=web#k=${mockToken}`;
+        res = { enabled: !!w.enabled, running: !!w.enabled, port, error: null, addresses: [{ ip: '192.168.1.23', label: 'WLAN', virt: false, url: url('192.168.1.23') }], localUrl: url('127.0.0.1') };
+        break;
+      }
+      case 'web_reset_token':
+        mockToken = Math.random().toString(16).slice(2).padEnd(32, '0');
         break;
       case 'sync_now':
         if (!syncStatus.enabled) throw new Error('同步没有开启');

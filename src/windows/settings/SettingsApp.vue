@@ -11,6 +11,7 @@ import GanttPage from './GanttPage.vue';
 import RemindersPage from './RemindersPage.vue';
 import DataPage from './DataPage.vue';
 import SyncPage from './SyncPage.vue';
+import WebPage from './WebPage.vue';
 import AboutPage from './AboutPage.vue';
 import '../window-shell.css';
 import './settings.css';
@@ -25,6 +26,7 @@ const items = [
   { key: 'reminders', label: '提醒', icon: 'alarm' },
   { key: 'data', label: '数据', icon: 'data' },
   { key: 'sync', label: '同步', icon: 'cloud' },
+  { key: 'web', label: '网页查看', icon: 'globe' },
 ];
 const footer = [{ key: 'about', label: '关于', icon: 'info' }];
 const pages: Record<string, Component> = {
@@ -35,6 +37,7 @@ const pages: Record<string, Component> = {
   reminders: RemindersPage,
   data: DataPage,
   sync: SyncPage,
+  web: WebPage,
   about: AboutPage,
 };
 const pageKey = ref('general');

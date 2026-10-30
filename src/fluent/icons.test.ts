@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GLYPHS, ICON_NAMES, SVG_ICONS } from './icons';
+import { GLYPHS, ICON_NAMES, SVG_ICONS, WEB_SVG } from './icons';
 
 describe('icons', () => {
   it('maps every glyph to one private-use codepoint', () => {
@@ -7,6 +7,13 @@ describe('icons', () => {
       expect(g, name).toHaveLength(1);
       const cp = g.codePointAt(0)!;
       expect(cp >= 0xe000 && cp <= 0xf8ff, `${name} U+${cp.toString(16)}`).toBe(true);
+    }
+  });
+
+  it('has web outlines only for existing glyphs', () => {
+    for (const [name, paths] of Object.entries(WEB_SVG)) {
+      expect(name in GLYPHS, name).toBe(true);
+      expect(paths!.length, name).toBeGreaterThan(0);
     }
   });
 

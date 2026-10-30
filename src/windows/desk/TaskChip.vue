@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { taskColor, vTip } from '@/fluent';
+import { FIcon, taskColor, vTip } from '@/fluent';
 import type { Chip } from '@/lib/layout';
-import { doc } from '@/stores/doc';
+import { doc, storeState } from '@/stores/doc';
 import { isDark } from '@/composables/theme';
 import { formatRange } from '@/lib/date';
 import { describeRule } from '@/lib/recur';
@@ -57,6 +57,7 @@ const style = computed(() =>
     aria-roledescription="任务"
     :aria-label="`${task.title}${occ.done ? '，已完成' : ''}`"
     v-tip="tip"
+    @click="storeState.readOnly && emit('open')"
     @dblclick.stop="emit('open')"
     @contextmenu.prevent.stop="emit('menu', $event)"
     @pointerdown="emit('pointerdown', $event)"
@@ -69,7 +70,7 @@ const style = computed(() =>
       :aria-checked="occ.done"
       tabindex="-1"
       :aria-label="occ.done ? '标记为未完成' : '标记为完成'"
-      @click.stop="emit('toggle')"
+      @click.stop="!storeState.readOnly && emit('toggle')"
       @dblclick.stop
       @pointerdown.stop
     >
@@ -77,7 +78,7 @@ const style = computed(() =>
     </button>
     <span v-if="task.time && !chip.contLeft" class="time">{{ task.time }}</span>
     <span class="title">{{ task.title }}</span>
-    <span v-if="task.repeat" class="f-icon rep" aria-hidden="true">&#xE8EE;</span>
+    <FIcon v-if="task.repeat" name="repeat" class="rep" :size="10" />
   </div>
 </template>
 

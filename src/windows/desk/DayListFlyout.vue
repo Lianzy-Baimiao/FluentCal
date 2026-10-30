@@ -7,7 +7,7 @@ import { dayInfo } from '@/lib/lunar';
 import { occurrences } from '@/lib/recur';
 import type { Chip } from '@/lib/layout';
 import { addTask, setOccurrenceDone } from '@/lib/tasks';
-import { doc, taskList } from '@/stores/doc';
+import { doc, storeState, taskList } from '@/stores/doc';
 import { openEditor } from './state';
 import { chipMenu } from './menus';
 import TaskChip from './TaskChip.vue';
@@ -55,7 +55,7 @@ async function add() {
         <div v-for="c in chips" :key="c.key" class="item">
           <TaskChip
             :chip="c"
-            @toggle="setOccurrenceDone(c.occ.task, c.occ.date, !c.occ.done)"
+            @toggle="!storeState.readOnly && setOccurrenceDone(c.occ.task, c.occ.date, !c.occ.done)"
             @open="openEditor({ mode: 'edit', taskId: c.occ.task.id, date: c.occ.date })"
             @menu="(e) => chipMenu(c.occ, { x: e.clientX, y: e.clientY })"
             @key="(e) => e.key === 'Enter' && openEditor({ mode: 'edit', taskId: c.occ.task.id, date: c.occ.date })"
@@ -63,7 +63,7 @@ async function add() {
         </div>
         <p v-if="!chips.length" class="empty">这一天还没有任务</p>
       </div>
-      <div class="add">
+      <div v-if="!storeState.readOnly" class="add">
         <input v-model="text" placeholder="添加任务，回车保存" maxlength="200" aria-label="添加任务" @keydown.enter.prevent="add" />
         <FButton variant="subtle" size="icon" icon="add" title="添加" @click="add" />
       </div>

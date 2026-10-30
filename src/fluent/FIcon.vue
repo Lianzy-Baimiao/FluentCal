@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { GLYPHS, SVG_ICONS, type IconName } from './icons';
+import { GLYPHS, SVG_ICONS, WEB_SVG, type IconName } from './icons';
 
 const props = withDefaults(defineProps<{ name: IconName | string; size?: number; title?: string }>(), {
   size: 16,
 });
 
-const svg = computed(() => (SVG_ICONS as Record<string, readonly string[]>)[props.name]);
+/** The web view (phones) has no icon font. */
+const web = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window) && new URLSearchParams(location.search).get('w') === 'web';
+const svg = computed(() => (SVG_ICONS as Record<string, readonly string[]>)[props.name] ?? (web ? (WEB_SVG as Record<string, readonly string[]>)[props.name] : undefined));
 const glyph = computed(() => (GLYPHS as Record<string, string>)[props.name] ?? '');
 </script>
 

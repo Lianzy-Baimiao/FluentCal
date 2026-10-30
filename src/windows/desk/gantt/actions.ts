@@ -4,7 +4,7 @@ import type { GanttScale, Group, ISODate } from '@/types';
 import { addDays } from '@/lib/date';
 import { UNGROUPED, UNGROUPED_GROUP } from '@/lib/gantt';
 import { addTask, deleteGroup, makeGroup, saveGroup, saveTask } from '@/lib/tasks';
-import { doc, groupList, patchSettings, put } from '@/stores/doc';
+import { doc, groupList, patchSettings, put, storeState } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { colorSwatches } from '../menus';
 import { openEditor } from '../state';
@@ -15,6 +15,10 @@ export const editing = ref('');
 export const editText = ref('');
 
 export async function startRename(kind: 'task' | 'group', id: string) {
+  if (storeState.readOnly) {
+    if (kind === 'task') openEditor({ mode: 'edit', taskId: id }); // the web view's details
+    return;
+  }
   if (!gs.value.showTable) {
     if (kind === 'task') openEditor({ mode: 'edit', taskId: id });
     return;
@@ -73,6 +77,7 @@ export async function createTask(groupId: string, start: ISODate, end: ISODate, 
 
 /** "Add task" row: a few days right after the group's last task (or today). */
 export function addInGroup(groupId: string, milestone = false) {
+  if (storeState.readOnly) return;
   const list = Object.values(doc.tasks).filter((t) => (t.groupId ?? UNGROUPED) === groupId);
   const last = list.reduce<ISODate>((m, t) => (t.end > m ? t.end : m), '');
   const start = last ? addDays(last, 1) : now.value;
@@ -81,6 +86,7 @@ export function addInGroup(groupId: string, milestone = false) {
 }
 
 export async function newGroup() {
+  if (storeState.readOnly) return;
   const palette = ['blue', 'purple', 'teal', 'orange', 'pink', 'green', 'indigo', 'red'];
   const g = makeGroup('新分组', palette[groupList.value.length % palette.length]);
   await saveGroup(g);
@@ -92,6 +98,8 @@ export async function newGroup() {
 
 export function toggleCollapse(g: Group) {
   if (g.id === UNGROUPED) ungroupedCollapsed.value = !ungroupedCollapsed.value;
+  // Web view: only in this page (collapsing is a way of looking, not an edit).
+  else if (storeState.readOnly) doc.groups[g.id] = { ...g, collapsed: !g.collapsed };
   else void saveGroup({ ...g, collapsed: !g.collapsed });
 }
 
@@ -102,6 +110,7 @@ function moveGroup(g: Group, dir: -1 | 1) {
 }
 
 export function groupMenu(g: Group, at: { x: number; y: number } | DOMRect) {
+  if (storeState.readOnly) return;
   const real = g.id !== UNGROUPED;
   const items: (MenuItem | false)[] = [
     { label: '添加任务', icon: 'add', action: () => addInGroup(g.id) },

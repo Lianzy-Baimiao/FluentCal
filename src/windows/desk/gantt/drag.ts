@@ -3,7 +3,7 @@ import type { ISODate } from '@/types';
 import { addDays, diffDays } from '@/lib/date';
 import { canLink } from '@/lib/gantt';
 import { saveTask } from '@/lib/tasks';
-import { doc } from '@/stores/doc';
+import { doc, storeState } from '@/stores/doc';
 import { openEditor } from '../state';
 import { createTask } from './actions';
 import { chartEl, dw, preview, range, RH, selected, type Bar } from './model';
@@ -51,6 +51,7 @@ const span = (a: ISODate, b: ISODate) => `${a.slice(5).replace('-', '/')} – ${
 export function onBarDown(bar: Bar, e: PointerEvent) {
   if (e.button !== 0) return;
   selected.value = bar.task.id;
+  if (storeState.readOnly) return onBarDblClick(bar); // web view: a tap shows the details
   if (bar.rep) return; // repeating instances are edited as a series in the editor
   const role = (e.target as HTMLElement).dataset.handle as Mode | undefined;
   const mode: Mode = bar.task.milestone ? 'move' : (role ?? 'move');
@@ -102,7 +103,7 @@ export function onBarDblClick(bar: Bar) {
 
 /** Drag on an "add" row to create a task spanning the dragged days; a click creates a short one. */
 export function onAddRowDown(groupId: string, row: number, e: PointerEvent) {
-  if (e.button !== 0 || !chartEl.value) return;
+  if (e.button !== 0 || !chartEl.value || storeState.readOnly) return;
   const left = chartEl.value.getBoundingClientRect().left;
   const at = (x: number) => addDays(range.value.start, Math.floor((x - left) / dw.value));
   const d0 = at(e.clientX);
@@ -137,7 +138,7 @@ function barUnder(x: number, y: number): string | undefined {
 
 /** Drag from the end of `bar` onto another bar: that task gets `bar` as predecessor. */
 export function onLinkDown(bar: Bar, e: PointerEvent) {
-  if (e.button !== 0 || !chartEl.value) return;
+  if (e.button !== 0 || !chartEl.value || storeState.readOnly) return;
   e.stopPropagation();
   const from = bar.task.id;
   const rect = () => chartEl.value!.getBoundingClientRect();

@@ -38,12 +38,17 @@ ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no
 base64 = "0.23.1"
 sha2 = "0.10.9"
 getrandom = "0.3.4"
+# Web view (src/web.rs): a small HTTP/1.1 server without TLS for the local network.
+tiny_http = "0.12.0"
 # Same version tauri/tao use, so HWND types match and nothing is compiled twice.
 windows = { version = "0.62.2", features = [
     "Foundation",
     "UI_ViewManagement",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
     "Win32_Security",
     "Win32_Security_Credentials",
     "Win32_System_Diagnostics_Debug",

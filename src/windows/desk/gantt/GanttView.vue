@@ -4,7 +4,7 @@ import { confirm, FButton, FSegmented, showMenu, type MenuItem } from '@/fluent'
 import type { Task } from '@/types';
 import { parts } from '@/lib/date';
 import { saveGroup } from '@/lib/tasks';
-import { doc, groupList, patchSettings } from '@/stores/doc';
+import { doc, groupList, patchSettings, storeState } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { removeTask } from '../menus';
 import { openEditor, ui } from '../state';
@@ -96,6 +96,7 @@ watch(() => ui.ganttFocus, (id) => id && (focusTask(id), (ui.ganttFocus = '')));
 
 /** A Gantt row is the whole series, so deleting a repeating task asks first. */
 async function removeRow(t: Task) {
+  if (storeState.readOnly) return;
   if (t.repeat) {
     const r = await confirm({ title: '删除整个重复任务？', content: `“${t.title}”的所有重复都会被删除（可以用 Ctrl+Z 撤销）。`, primaryText: '全部删除', danger: true });
     if (r !== 'primary') return;
@@ -150,7 +151,7 @@ onBeforeUnmount(() => {
       <FSegmented v-model="scale" :options="scales" size="small" />
       <FButton variant="subtle" size="small" icon="today" @click="scrollToDate(now, 0.3, true)">今天</FButton>
       <span class="spacer" />
-      <FButton variant="subtle" size="small" icon="add" @click="newGroup">新建分组</FButton>
+      <FButton v-if="!storeState.readOnly" variant="subtle" size="small" icon="add" @click="newGroup">新建分组</FButton>
       <FButton variant="subtle" size="icon" icon="filter" title="显示选项" @click="optionsMenu" />
     </div>
     <div ref="el" class="g-scroll" tabindex="0" aria-label="甘特图" @scroll.passive="updateLabel" @keydown="onKey">
@@ -185,7 +186,7 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="!rows.length" class="g-empty">
         <p>还没有可显示的任务。</p>
-        <FButton variant="accent" icon="add" @click="newGroup">新建分组</FButton>
+        <FButton v-if="!storeState.readOnly" variant="accent" icon="add" @click="newGroup">新建分组</FButton>
       </div>
     </div>
     <div v-if="dragTip.show" class="g-dragtip" :style="{ left: `${dragTip.x}px`, top: `${dragTip.y}px` }">{{ dragTip.text }}</div>

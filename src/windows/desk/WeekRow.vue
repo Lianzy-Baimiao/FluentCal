@@ -4,6 +4,7 @@ import { vTip } from '@/fluent';
 import type { ISODate } from '@/types';
 import type { Chip, WeekLayout } from '@/lib/layout';
 import { addTask } from '@/lib/tasks';
+import { storeState } from '@/stores/doc';
 import { notify, ui } from './state';
 import type { CellInfo } from './types';
 import TaskChip from './TaskChip.vue';
@@ -79,7 +80,7 @@ function qaClose() {
 }
 
 function onCellDblClick(date: ISODate) {
-  ui.quickAdd = { date };
+  if (!storeState.readOnly) ui.quickAdd = { date };
 }
 </script>
 

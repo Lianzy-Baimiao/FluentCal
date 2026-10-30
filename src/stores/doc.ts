@@ -17,7 +17,13 @@ export const doc = reactive<Doc>({
   settings: structuredClone(DEFAULT_SETTINGS),
 });
 
-export const storeState = reactive({ ready: false, recovered: null as string | null });
+export const storeState = reactive({
+  ready: false,
+  recovered: null as string | null,
+  /** Web view: data can be looked at, not changed (writes are dropped and counted). */
+  readOnly: false,
+  blocked: 0,
+});
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -100,6 +106,10 @@ export function initStore(): Promise<void> {
 /** Writes items (null = delete) to a collection, locally first, then to the backend.
  * `history: false` is for writes the user did not make (sample data, auto-postpone). */
 export function put<C extends Collection>(col: C, items: Record<string, Doc[C][string] | null>, opts: { history?: boolean } = {}): Promise<void> {
+  if (storeState.readOnly) {
+    storeState.blocked++; // the web view tells the user
+    return Promise.resolve();
+  }
   const plain = clone(items) as Record<string, unknown>;
   if (col !== 'holidays' && opts.history !== false) record(col, plain);
   applyItems(col, plain);

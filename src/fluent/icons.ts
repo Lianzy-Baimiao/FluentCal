@@ -110,6 +110,35 @@ export const SVG_ICONS = {
   milestone: ['M8 1.7 14.3 8 8 14.3 1.7 8z'],
 } as const;
 
+/** The web view (?w=web on a phone) has no Segoe Fluent Icons font: outlines for the glyphs it
+ * uses, same 16×16 box as SVG_ICONS. */
+export const WEB_SVG: Partial<Record<GlyphName, readonly string[]>> = {
+  chevronLeft: ['M10 3 5 8l5 5'],
+  chevronRight: ['M6 3l5 5-5 5'],
+  chevronDown: ['M3 6l5 5 5-5'],
+  chevronUp: ['M3 10l5-5 5 5'],
+  close: ['M3.5 3.5l9 9', 'M12.5 3.5l-9 9'],
+  search: ['M10.5 10.5 14 14', 'M6.75 2.5a4.25 4.25 0 1 0 0 8.5 4.25 4.25 0 1 0 0-8.5z'],
+  checkMark: ['M2.5 8.5 6 12l7.5-8'],
+  add: ['M8 2.5v11', 'M2.5 8h11'],
+  repeat: ['M2.5 7.5a5 5 0 0 1 9-3L13 6', 'M13 2.5V6H9.5', 'M13.5 8.5a5 5 0 0 1-9 3L3 10', 'M3 13.5V10h3.5'],
+  sync: ['M2.5 7.5a5 5 0 0 1 9-3L13 6', 'M13 2.5V6H9.5', 'M13.5 8.5a5 5 0 0 1-9 3L3 10', 'M3 13.5V10h3.5'],
+  today: ['M2.5 3.5h11v10h-11z', 'M2.5 6.5h11', 'M5.5 2v2.5', 'M10.5 2v2.5', 'M7 9h2v2H7z'],
+  calendar: ['M2.5 3.5h11v10h-11z', 'M2.5 6.5h11', 'M5.5 2v2.5', 'M10.5 2v2.5'],
+  calendarDay: ['M2.5 3.5h11v10h-11z', 'M2.5 6.5h11', 'M5.5 2v2.5', 'M10.5 2v2.5'],
+  flag: ['M3.5 14.5V2', 'M3.5 2.5h9l-2 3 2 3h-9'],
+  clock: ['M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11z', 'M8 5v3.5l2.5 1.5'],
+  warning: ['M8 2 14.5 13.5h-13z', 'M8 6.5v3.5', 'M8 11.5v.5'],
+  info: ['M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11z', 'M8 7.5v4', 'M8 5v.5'],
+  error: ['M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11z', 'M6 6l4 4', 'M10 6l-4 4'],
+  completed: ['M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11z', 'M5.5 8.2 7.3 10l3.4-3.8'],
+  filter: ['M2.5 3.5h11L9.5 8.5V13l-3-1.5V8.5z'],
+  list: ['M5.5 4h8', 'M5.5 8h8', 'M5.5 12h8', 'M2.5 4h.5', 'M2.5 8h.5', 'M2.5 12h.5'],
+  group: ['M2.5 3.5h11v4h-11z', 'M2.5 9.5h11v4h-11z'],
+  download: ['M8 2.5v8', 'M4.5 7 8 10.5 11.5 7', 'M3 13.5h10'],
+  more: ['M3 8h.5', 'M8 8h.5', 'M13 8h.5'],
+};
+
 export type IconName = GlyphName | keyof typeof SVG_ICONS;
 
 export const ICON_NAMES = [...Object.keys(GLYPHS), ...Object.keys(SVG_ICONS)] as IconName[];

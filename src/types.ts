@@ -159,6 +159,8 @@ export interface Settings {
   holidays: { autoUpdate: boolean; lastCheck: number };
   shortcuts: { toggle: string; newTask: string };
   /** Cloud sync (SYN). Per PC; passwords and tokens are in Windows Credential Manager. */
+  /** Web view in the local network (WEB). Per PC; the access code is in Credential Manager. */
+  web: { enabled: boolean; port: number };
   sync: {
     enabled: boolean;
     /** '' = off; 'folder' = a shared data folder (DAT-04), not a network sync. */

@@ -17,6 +17,7 @@
 - **数据**：默认保存在本机 `%APPDATA%\com.fluentcal.desktop\data.json`，每天自动备份；导出 JSON / CSV（Excel）/ ICS（Outlook、Google 日历）。数据文件夹可以改到 OneDrive 等同步盘，多台电脑共用：按每个任务的最后修改时间合并，不会互相覆盖；外观和窗口位置等设置留在每台电脑上。
 - **提醒**：Windows 通知和/或屏幕右下角的提醒卡片（完成、10 分钟后再提醒），不抢焦点。
 - **云同步**：多台电脑共用任务。可以同步到坚果云、Nextcloud、群晖等 WebDAV 网盘，GitHub/Gitee 私有仓库（每次上传是一次提交，可查看历史），或 Google 云端硬盘。按任务合并，同时修改不会互相覆盖。密码和 Token 只保存在 Windows 凭据管理器里。
+- **网页查看**：在手机、平板或另一台电脑的浏览器里查看日历、列表和甘特图。网页由这台电脑上运行的 FluentCal 在局域网内提供，开启后扫二维码即可打开，不需要云同步，也不用装 App。只能查看；电脑上的修改几秒内出现在网页上；链接带随机访问码。
 
 ## 截图
 
@@ -35,6 +36,10 @@
 同步设置：WebDAV、GitHub/Gitee 私有仓库、Google 云端硬盘，或者 OneDrive 等同步盘里的文件夹：
 
 ![同步设置](docs/screenshots/settings-sync.png)
+
+网页查看：手机浏览器里的列表视图和月视图（只读）：
+
+<img src="docs/screenshots/web-phone-list.png" width="300" alt="手机浏览器中的列表视图：按天列出近期任务"> <img src="docs/screenshots/web-phone-month.png" width="300" alt="手机浏览器中的月视图">
 
 截图用示例数据在浏览器预览中生成（`npm run readme-shots`），背景是代替桌面壁纸的渐变；实际使用时日历后面是你的桌面。
 
@@ -56,6 +61,7 @@
 | 添加任务 | 双击日期空白处，回车保存并继续输入，Esc 结束 |
 | 调整位置和大小 | 标题栏 🔒 按钮解锁 → 按住日历任意位置拖动、拖四边或四角调整大小 → 点“完成” |
 | 多台电脑同步 | 设置 › 同步：选同步方式、填写账号 →“测试连接”→“开启同步”。另一台电脑用同样的设置开启，两边都有数据时可选合并或用云端数据 |
+| 在手机上查看 | 设置 › 网页查看：打开开关，用手机扫二维码（手机和电脑连同一个 Wi-Fi）。第一次开启时 Windows 防火墙会询问，勾选“专用网络”并允许 |
 | 换一块屏幕显示 | 托盘菜单“显示在”，或设置 › 常规 ›“显示在”（有多块屏幕时出现）；调整模式下也可以直接拖过去 |
 | 翻页 / 回到今天 | 滚轮或 `PageUp`/`PageDown`；`Home` |
 | 甘特图缩放 | `Ctrl` + 滚轮 |
@@ -72,7 +78,7 @@ npm run tauri dev      # 开发运行（桌面日历 + 热更新）
 npm run tauri build    # 生成 NSIS 安装包，输出到 <target 目录>\release\bundle\nsis\
 npm test               # 前端单元测试（vitest）
 npm run typecheck      # 类型检查
-npm run e2e            # 端到端测试（无界面 Edge，14 项交互）
+npm run e2e            # 端到端测试（无界面 Edge，17 项交互）
 npm run a11y           # 无障碍审计（axe-core）
 npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（示例数据、固定日期）
 ```
@@ -83,7 +89,7 @@ npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（�
 - `http://localhost:1420/?w=settings&page=appearance` 设置
 - `http://localhost:1420/?w=gallery` Fluent 组件库
 
-Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee、Google）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。
+Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee、Google）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`tests/web.rs` 在本机端口上测试网页查看服务：访问码、返回的数据、304、路径穿越、响应头。
 
 ### 工具链
 
@@ -106,13 +112,14 @@ src-tauri/src
   datadir.rs         自定义数据文件夹
   cloud/             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee）、gdrive.rs + oauth.rs，secrets.rs 凭据管理器
   reminder.rs        提醒调度；reminder_popup.rs 右下角提醒卡片
+  web.rs             网页查看：局域网 HTTP 服务（访问码、只读数据、静态文件）；webcmd.rs 开关、端口、本机地址
   tray.rs            托盘菜单
   lib.rs             窗口、快捷键、开机启动、命令
 src
   fluent/      Windows 11 Fluent 组件库与主题
   lib/         日期、农历节假日、重复规则、日历布局、甘特几何、导出、合并等（核心逻辑有单元测试）
   stores/      数据与设置（多窗口同步、撤销/重做）
-  windows/     desk（桌面日历 + 甘特图）、settings、editor、reminder、gallery
+  windows/     desk（桌面日历 + 甘特图）、settings、editor、reminder、gallery、web（网页查看，数据经 webApi.ts 从 FluentCal 获取）
 ```
 
 ## 致谢
@@ -120,6 +127,7 @@ src
 - 法定节假日数据：[NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)
 - 农历、节气、宜忌：[tyme4ts](https://github.com/6tail/tyme4ts)（MIT）
 - 框架：[Tauri](https://tauri.app)（MIT / Apache-2.0）、[Vue](https://vuejs.org)（MIT）
+- 二维码：[uqr](https://github.com/unjs/uqr)（MIT）
 - 图标：Windows 自带的 Segoe Fluent Icons 字体（不随程序分发）
 
 ## 常见问题
@@ -130,3 +138,5 @@ src
 - **两台电脑改了同一个任务？** 取最后修改的一方；不同任务的修改都保留，删除也会同步。开启同步前、用云端数据替换前都会自动备份本机数据（设置 › 数据 › 备份文件）。
 - **同步了哪些内容？** 任务、分组和日期颜色。外观、窗口位置等设置留在每台电脑上；节假日数据每台电脑自己联网获取。
 - **Google 云端硬盘为什么要自己创建 OAuth 客户端？** 开源程序无法内置经过 Google 审核的客户端。按设置页里的步骤创建一次，多台电脑用同一个即可。在国内访问 Google 需要代理（设置 › 同步 › 高级 › 网络代理）。
+- **手机打不开网页查看的链接？** 手机和电脑要连同一个局域网，电脑上的 FluentCal 要在运行。第一次开启时如果在防火墙询问里点了“取消”，到 Windows 安全中心 › 防火墙和网络保护 ›“允许应用通过防火墙”，给 FluentCal 勾选“专用”。只勾选了“专用”而电脑当前的网络是“公用网络”时也连不上，可在 Windows 设置 › 网络和 Internet 里把它改为“专用网络”。访客 Wi-Fi 通常不允许设备之间互相访问。
+- **网页查看安全吗？** 链接带 128 位随机访问码，只回应局域网内的设备，网页只能查看。局域网内传输没有加密，只在家里、公司等信任的网络中使用。链接不小心发给了别人，点“更换访问码”，旧链接立即失效。

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { FButton, FSegmented, vTip } from '@/fluent';
-import { addDays, formatYMD, parts, weekday, WEEKDAY_SHORT } from '@/lib/date';
+import { formatYMD, weekday, WEEKDAY_SHORT } from '@/lib/date';
 import { dayInfo } from '@/lib/lunar';
 import { doc, patchSettings } from '@/stores/doc';
 import { now } from '@/composables/now';
 import type { CalendarView } from '@/types';
-import { defaultWeeksStart, goToday, openSettings, page, ui } from './state';
+import { goToday, openSettings, page, ui, viewTitle } from './state';
 import { moreMenu } from './menus';
 import YearMonthPicker from './YearMonthPicker.vue';
 import { syncNow, syncStatus, watchSync } from '@/composables/sync';
@@ -17,19 +17,7 @@ watchSync();
 const view = computed(() => doc.settings.calendar.view);
 const locked = computed(() => doc.settings.desk.locked);
 
-const title = computed(() => {
-  if (view.value === 'gantt') return '甘特图';
-  if (view.value === 'weeks') {
-    const s = ui.weeksStart || defaultWeeksStart();
-    const e = addDays(s, doc.settings.calendar.weeksRows * 7 - 1);
-    const [sy, sm, sd] = parts(s);
-    const [ey, em, ed] = parts(e);
-    const yr = sy === parts(now.value)[0] ? '' : `${sy}年`;
-    return sy === ey ? `${yr}${sm}月${sd}日 – ${em}月${ed}日` : `${sy}年${sm}月${sd}日 – ${ey}年${em}月${ed}日`;
-  }
-  const [y, m] = parts(ui.cursor);
-  return `${y}年${m}月`;
-});
+const title = computed(viewTitle);
 
 const todayTip = computed(() => {
   const i = dayInfo(now.value);

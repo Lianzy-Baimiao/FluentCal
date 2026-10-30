@@ -9,6 +9,8 @@ pub mod merge;
 pub mod store;
 pub mod sync;
 mod tray;
+pub mod web;
+mod webcmd;
 
 use desktop::PinMode;
 use serde::Serialize;
@@ -152,6 +154,9 @@ pub(crate) fn on_settings_changed(app: &AppHandle, old: &Value, new: &Value) {
     }
     if changed("/shortcuts") {
         register_shortcuts(app);
+    }
+    if changed("/web") {
+        webcmd::apply(app);
     }
     if changed("/sync") {
         if let Some(c) = app.try_state::<Arc<cloud::service::Cloud>>() {
@@ -552,11 +557,13 @@ pub fn run() {
             store.set_app(handle.clone());
             // Sync state is per PC: keep it out of a shared data folder.
             app.manage(cloud::service::Cloud::start(store.clone(), Some(handle.clone()), default.join("cloud-state.json")));
+            app.manage(webcmd::state());
             app.manage(store);
             app.manage(info);
             // Fired/snoozed reminders are per PC: keep them out of a shared folder.
             app.manage(reminder::start(handle.clone(), default));
             create_desk(&handle)?;
+            webcmd::apply(&handle);
             tray::create(&handle)?;
             register_shortcuts(&handle);
             sync_autostart(&handle);
@@ -574,6 +581,8 @@ pub fn run() {
             cloud::commands::sync_secrets,
             cloud::commands::sync_google_login,
             cloud::commands::sync_google_logout,
+            webcmd::web_info,
+            webcmd::web_reset_token,
             store::store_get,
             store::store_put,
             store::store_patch_settings,

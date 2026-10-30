@@ -7,7 +7,7 @@ import { almanac, dayInfo } from '@/lib/lunar';
 import { occurrences, type Occurrence } from '@/lib/recur';
 import { layoutWeek, type Chip } from '@/lib/layout';
 import { moveOccurrence, setOccurrenceDone } from '@/lib/tasks';
-import { doc, taskList } from '@/stores/doc';
+import { doc, storeState, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { defaultWeeksStart, goToday, openEditor, page, ui } from './state';
 import { cellMenu, chipMenu, removeTask } from './menus';
@@ -113,7 +113,7 @@ const headers = computed(() =>
 
 // ---------------------------------------------------------------- chips
 
-const toggle = (c: Chip) => void setOccurrenceDone(c.occ.task, c.occ.date, !c.occ.done);
+const toggle = (c: Chip) => void (!storeState.readOnly && setOccurrenceDone(c.occ.task, c.occ.date, !c.occ.done));
 const open = (c: Chip) => openEditor({ mode: 'edit', taskId: c.occ.task.id, date: c.occ.date });
 const menu = (c: Chip, e: MouseEvent) => void chipMenu(c.occ, { x: e.clientX, y: e.clientY });
 
@@ -139,7 +139,7 @@ function dateAt(x: number, y: number): ISODate | undefined {
 }
 
 function chipDown(c: Chip, e: PointerEvent) {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || storeState.readOnly) return;
   const at = dateAt(e.clientX, e.clientY);
   ds = { c, x: e.clientX, y: e.clientY, offset: at ? diffDays(c.occ.start, at) : 0, el: e.currentTarget as HTMLElement, id: e.pointerId };
   window.addEventListener('pointermove', onMove);
@@ -202,7 +202,7 @@ function onGridKey(e: KeyboardEvent) {
   if (!target.classList.contains('cell')) return;
   const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
   if (e.key in moves) select(addDays(ui.selected, moves[e.key]));
-  else if (e.key === 'Enter') ui.quickAdd = { date: ui.selected };
+  else if (e.key === 'Enter' && !storeState.readOnly) ui.quickAdd = { date: ui.selected };
   else if (e.key === 'Home') {
     goToday();
     select(now.value);

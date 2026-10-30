@@ -10,7 +10,7 @@ import { chipMenu } from '../menus';
 import { openEditor } from '../state';
 import { addInGroup, commitRename, editing, editText, groupMenu, revealDate, startRename, toggleCollapse } from './actions';
 import { rows, selected, tableW, ungroupedCollapsed } from './model';
-import { patchSettings } from '@/stores/doc';
+import { patchSettings, storeState } from '@/stores/doc';
 import { UNGROUPED } from '@/lib/gantt';
 
 const showDates = computed(() => tableW.value >= 230);
@@ -22,6 +22,7 @@ const collapsed = (id: string, c?: boolean) => (id === UNGROUPED ? ungroupedColl
 function clickTask(t: Task) {
   selected.value = t.id;
   revealDate(t.start);
+  if (storeState.readOnly) openEditor({ mode: 'edit', taskId: t.id }); // web view: details
 }
 
 function menuFor(t: Task, e: MouseEvent) {
@@ -97,7 +98,7 @@ function splitDown(e: PointerEvent) {
           :aria-checked="r.task.done"
           :aria-label="`完成 ${r.task.title}`"
           :style="{ '--bar': taskColor(r.task.color, isDark).bar }"
-          @click.stop="setOccurrenceDone(r.task, r.task.start, !r.task.done)"
+          @click.stop="!storeState.readOnly && setOccurrenceDone(r.task, r.task.start, !r.task.done)"
           @dblclick.stop
         >
           <FIcon v-if="r.task.done" name="checkMark" :size="9" />
@@ -120,7 +121,7 @@ function splitDown(e: PointerEvent) {
         <span v-if="showPct && !r.task.milestone && !r.task.repeat" class="pct">{{ r.task.done ? 100 : r.task.progress }}%</span>
       </div>
       <div v-else class="t-row add" role="listitem">
-        <button type="button" @click="addInGroup(r.groupId)"><FIcon name="add" :size="11" /> 添加任务</button>
+        <button v-if="!storeState.readOnly" type="button" @click="addInGroup(r.groupId)"><FIcon name="add" :size="11" /> 添加任务</button>
       </div>
     </template>
     <div class="g-split" aria-hidden="true" title="拖动调整宽度" @pointerdown.prevent="splitDown" />

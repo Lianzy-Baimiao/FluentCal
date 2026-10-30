@@ -2,7 +2,7 @@ import { showMenu, TASK_COLORS, type MenuItem } from '@/fluent';
 import type { ISODate, PinMode, Task, ThemeMode } from '@/types';
 import { call, screenTitle, type Screen } from '@/api';
 import { syncNow, syncStatus } from '@/composables/sync';
-import { doc, patchSettings } from '@/stores/doc';
+import { doc, patchSettings, storeState } from '@/stores/doc';
 import { addDays } from '@/lib/date';
 import type { Occurrence } from '@/lib/recur';
 import { inGantt } from '@/lib/gantt';
@@ -28,12 +28,14 @@ export const colorSwatches = (selected: string | undefined, withDefault = true) 
 
 /** Deletes a task (or one occurrence) and offers undo. */
 export async function removeTask(t: Task, date?: ISODate, mode: DeleteMode = 'all'): Promise<void> {
+  if (storeState.readOnly) return;
   if (t.repeat && date) await deleteOccurrence(t, date, mode);
   else await deleteTask(t.id);
   notify(`已删除“${t.title.length > 16 ? `${t.title.slice(0, 16)}…` : t.title}”`, true);
 }
 
 export function chipMenu(occ: Occurrence, at: At): Promise<void> {
+  if (storeState.readOnly) return Promise.resolve(); // web view: every item edits
   const t = occ.task;
   const items: (MenuItem | false)[] = [
     {
@@ -81,6 +83,7 @@ export function chipMenu(occ: Occurrence, at: At): Promise<void> {
 }
 
 export function cellMenu(date: ISODate, at: At): Promise<void> {
+  if (storeState.readOnly) return Promise.resolve();
   const mark = doc.dayMarks[date];
   const items: (MenuItem | false)[] = [
     { label: '快速添加', icon: 'add', shortcut: '双击', action: () => (ui.quickAdd = { date }) },
