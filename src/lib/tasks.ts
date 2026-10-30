@@ -32,7 +32,9 @@ export function makeTask(p: Partial<Task> & { title: string; start: ISODate }): 
 }
 
 export function saveTask(t: Task): Promise<void> {
-  return put('tasks', { [t.id]: { ...t, updatedAt: Date.now() } });
+  // A renamed sample task is the user's own now: "清除示例数据" must not take it.
+  const own = t.sample && doc.tasks[t.id] && doc.tasks[t.id].title !== t.title;
+  return put('tasks', { [t.id]: { ...t, sample: own ? undefined : t.sample, updatedAt: Date.now() } });
 }
 
 export function addTask(p: Partial<Task> & { title: string; start: ISODate }): Promise<Task> {
@@ -104,7 +106,7 @@ export function deleteOccurrence(t: Task, date: ISODate, mode: DeleteMode): Prom
 }
 
 export function duplicateTask(t: Task): Promise<Task> {
-  return addTask({ ...t, title: `${t.title}（副本）`, order: undefined });
+  return addTask({ ...t, title: `${t.title}（副本）`, order: undefined, sample: undefined });
 }
 
 /** Moves overdue single-day tasks (late by at most 30 days) to today. */
@@ -126,7 +128,31 @@ export function makeGroup(name: string, color = 'blue'): Group {
 }
 
 export function saveGroup(g: Group): Promise<void> {
-  return put('groups', { [g.id]: g });
+  const own = g.sample && doc.groups[g.id] && doc.groups[g.id].name !== g.name;
+  return put('groups', { [g.id]: own ? { ...g, sample: undefined } : g });
+}
+
+/** First-run sample tasks and groups still there. */
+export function sampleCount(): number {
+  return Object.values(doc.tasks).filter((t) => t.sample).length + Object.values(doc.groups).filter((g) => g.sample).length;
+}
+
+/** "清除示例数据": removes the sample tasks and groups in one undo step. The user's own tasks
+ * in a sample group become ungrouped; predecessors pointing at sample tasks are dropped. */
+export async function clearSampleData(): Promise<number> {
+  const gone = new Set(Object.values(doc.tasks).filter((t) => t.sample).map((t) => t.id));
+  const groups = Object.values(doc.groups).filter((g) => g.sample).map((g) => g.id);
+  const tasks: Record<string, Task | null> = {};
+  for (const id of gone) tasks[id] = null;
+  for (const t of Object.values(doc.tasks)) {
+    if (gone.has(t.id)) continue;
+    const ungroup = !!t.groupId && groups.includes(t.groupId);
+    const deps = t.deps?.some((d) => gone.has(d));
+    if (ungroup || deps) tasks[t.id] = { ...t, groupId: ungroup ? undefined : t.groupId, deps: deps ? t.deps!.filter((d) => !gone.has(d)) : t.deps, updatedAt: Date.now() };
+  }
+  if (Object.keys(tasks).length) await put('tasks', tasks);
+  if (groups.length) await put('groups', Object.fromEntries(groups.map((id) => [id, null])));
+  return gone.size;
 }
 
 /** Deletes a group; its tasks become ungrouped. */

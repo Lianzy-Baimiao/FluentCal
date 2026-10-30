@@ -55,6 +55,8 @@ export interface Task {
   countdown?: boolean;
   /** Overrides settings.tasks.autoPostpone for this task. */
   autoPostpone?: boolean;
+  /** First-run sample data ("清除示例数据" removes it); dropped once the user renames it. */
+  sample?: boolean;
   order: number;
   createdAt: number;
   updatedAt: number;
@@ -65,6 +67,8 @@ export interface Group {
   name: string;
   color: string;
   collapsed?: boolean;
+  /** First-run sample data. */
+  sample?: boolean;
   order: number;
 }
 
@@ -84,7 +88,8 @@ export type CalendarView = 'month' | 'weeks' | 'gantt';
 export type GanttScale = 'day' | 'week' | 'month';
 
 export interface Settings {
-  general: { autostart: boolean; seeded: boolean };
+  /** onboarded: the first-run welcome bar was dismissed (or the samples cleared). */
+  general: { autostart: boolean; seeded: boolean; onboarded: boolean };
   theme: {
     mode: ThemeMode;
     /** 'system' or #RRGGBB */

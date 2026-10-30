@@ -10,7 +10,9 @@ const base = 'http://localhost:1432';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const ctx = await browser.newContext({ viewport: { width: 980, height: 700 } });
 // The web view reads /api/doc from FluentCal; here a fixed document stands in.
-const today = new Date().toISOString().slice(0, 10);
+// Local date (the page's "today"); toISOString would be yesterday or tomorrow near midnight.
+const d0 = new Date();
+const today = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`;
 const webDoc = {
   version: 1, groups: {}, dayMarks: {}, holidays: {}, settings: { theme: { mode: 'system', accent: 'system' } },
   tasks: { a: { id: 'a', title: '网页查看示例', start: today, end: today, time: '09:00', progress: 0, done: false, order: 1, createdAt: 0, updatedAt: 0 } },

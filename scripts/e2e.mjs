@@ -293,6 +293,38 @@ await check('settings: web view page with QR code', async () => {
   await st.close();
 });
 
+await check('first run: welcome bar, clear sample data (a renamed one stays), undo', async () => {
+  const fctx = await browser.newContext({ viewport: { width: 900, height: 620 } });
+  const f = await fctx.newPage();
+  f.on('pageerror', (e) => errors.push(e.message));
+  await f.goto(`${base}/?w=desk&theme=light`);
+  await f.getByText('欢迎使用 FluentCal').waitFor({ timeout: 5000 });
+  let d = await stored(f);
+  assert(Object.values(d.tasks).length === 6 && Object.values(d.tasks).every((t) => t.sample), 'six sample tasks');
+  // A sample task the user renamed is theirs now.
+  await f.getByText('甘特', { exact: true }).first().click();
+  await f.locator('.t-row.task', { hasText: '前端开发' }).click();
+  await f.keyboard.press('F2');
+  await f.locator('input.rename').fill('我的前端任务');
+  await f.keyboard.press('Enter');
+  await f.waitForTimeout(150);
+  d = await stored(f);
+  assert(!Object.values(d.tasks).find((t) => t.title === '我的前端任务').sample, 'renamed task still a sample');
+  await f.getByRole('button', { name: '清除示例数据' }).click();
+  await f.waitForTimeout(150);
+  d = await stored(f);
+  const left = Object.values(d.tasks);
+  assert(left.length === 1 && left[0].title === '我的前端任务' && !left[0].groupId && !left[0].deps?.length, JSON.stringify(left));
+  assert(!Object.values(d.groups).length && d.settings.general.onboarded, 'group gone, onboarded');
+  assert(!(await f.getByText('欢迎使用 FluentCal').count()), 'welcome bar still shown');
+  await f.getByRole('button', { name: '撤销' }).click();
+  await f.waitForTimeout(150);
+  d = await stored(f);
+  assert(Object.values(d.tasks).length === 6 && Object.values(d.groups).length === 1, 'undo did not restore the samples');
+  assert(!(await f.getByText('欢迎使用 FluentCal').count()), 'welcome bar back after undo');
+  await fctx.close();
+});
+
 for (const [s, n] of results) console.log(`${s} ${n}`);
 if (errors.length) console.log('page errors:\n' + errors.join('\n'));
 await browser.close();

@@ -13,6 +13,7 @@
     "tauri": "node scripts/tauri.mjs",
     "shots": "node scripts/shot.mjs",
     "readme-shots": "vite build && node scripts/readme-shots.mjs",
+    "glyphs": "python scripts/glyph-coverage.py src/fluent/icons.ts",
     "e2e": "vite build && node scripts/e2e.mjs",
     "a11y": "vite build && node scripts/a11y.mjs"
   },

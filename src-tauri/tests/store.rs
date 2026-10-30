@@ -89,6 +89,31 @@ fn unreadable_bytes_recover_from_backup_and_are_kept_aside() {
 }
 
 #[test]
+fn damaged_file_comes_back_as_last_saved() {
+    let dir = temp_dir("lastsaved");
+    let task = |id: &str| {
+        let mut m = Map::new();
+        m.insert(id.into(), json!({ "id": id, "title": id }));
+        m
+    };
+    {
+        let s = Store::open(dir.clone()).unwrap();
+        s.put("tasks", &task("a"));
+        assert!(s.flush());
+        s.put("tasks", &task("b")); // after the daily backup was taken
+        assert!(s.flush());
+    }
+    assert!(dir.join("backups").join("last-saved.json").exists());
+    fs::write(dir.join("data.json"), b"{ \"tasks\": ").unwrap();
+    let s = Store::open(dir.clone()).unwrap();
+    assert_eq!(s.take_recovered().as_deref(), Some("last-saved.json"));
+    let tasks = s.snapshot()["tasks"].clone();
+    assert!(tasks.get("a").is_some() && tasks.get("b").is_some(), "nothing lost: {tasks}");
+    drop(s);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn corrupt_without_backup_does_not_reseed_samples() {
     let dir = temp_dir("nobackup");
     fs::write(dir.join("data.json"), b"not json").unwrap();

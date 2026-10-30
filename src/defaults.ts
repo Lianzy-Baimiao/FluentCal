@@ -1,7 +1,7 @@
 import type { Settings } from './types';
 
 export const DEFAULT_SETTINGS: Settings = {
-  general: { autostart: true, seeded: false },
+  general: { autostart: true, seeded: false, onboarded: false },
   theme: { mode: 'system', accent: 'system', reduceMotion: false },
   desk: {
     pinMode: 'desktop',

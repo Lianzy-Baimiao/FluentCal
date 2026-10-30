@@ -8,7 +8,7 @@ import { startThemeSync, deskVars } from '@/composables/theme';
 import { now, startClock } from '@/composables/now';
 import { computeReminders } from '@/lib/reminders';
 import { sampleData } from '@/lib/seed';
-import { autoPostpone } from '@/lib/tasks';
+import { autoPostpone, clearSampleData, sampleCount } from '@/lib/tasks';
 import { startOfMonth } from '@/lib/date';
 import { defaultWeeksStart, goToday, notify, openEditor, page, ui } from './state';
 import TitleBar from './TitleBar.vue';
@@ -22,6 +22,13 @@ const GanttView = defineAsyncComponent(() => import('./gantt/GanttView.vue'));
 const view = computed(() => doc.settings.calendar.view);
 const desk = computed(() => doc.settings.desk);
 const notice = ref('');
+// First run (REL-03): how to use the calendar, and a way out of the sample data.
+const welcome = computed(() => storeState.ready && !storeState.readOnly && !doc.settings.general.onboarded && sampleCount() > 0);
+async function clearSamples() {
+  const n = await clearSampleData();
+  patchSettings({ general: { onboarded: true } });
+  notify(`已删除 ${n} 个示例任务`, true);
+}
 const saveError = ref<string | null>(null);
 
 startThemeSync();
@@ -162,7 +169,12 @@ watch(
   () => storeState.recovered,
   (r) => {
     if (r === null) return;
-    notice.value = r ? `数据文件已损坏，已从备份 ${r} 恢复。` : '数据文件已损坏且没有可用备份，已重新开始。';
+    notice.value =
+      r === 'last-saved.json'
+        ? '数据文件已损坏，已恢复到最后一次保存的内容。'
+        : r
+          ? `数据文件已损坏，已从备份 ${r} 恢复。`
+          : '数据文件已损坏且没有可用备份，已重新开始。';
   },
   { immediate: true },
 );
@@ -179,6 +191,13 @@ watch(
         按住日历任意位置拖动来移动（可拖到其他屏幕），拖动四边或四角调整大小。
         <template #action>
           <FButton variant="accent" size="small" @click="patchSettings({ desk: { locked: true } })">完成</FButton>
+        </template>
+      </FInfoBar>
+      <FInfoBar v-if="welcome && desk.locked" class="bar" severity="info" title="欢迎使用 FluentCal">
+        双击日期添加任务，右键任务可完成、改颜色、删除；Ctrl+Alt+D 唤出日历。现在显示的是示例任务。
+        <template #action>
+          <FButton size="small" @click="clearSamples">清除示例数据</FButton>
+          <FButton variant="accent" size="small" @click="patchSettings({ general: { onboarded: true } })">知道了</FButton>
         </template>
       </FInfoBar>
       <FInfoBar v-if="notice" class="bar" severity="warning" closable @close="notice = ''">{{ notice }}</FInfoBar>

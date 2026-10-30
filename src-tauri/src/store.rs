@@ -19,6 +19,9 @@ use tauri::{AppHandle, Emitter, State, Webview};
 pub const COLLECTIONS: [&str; 4] = ["tasks", "groups", "dayMarks", "holidays"];
 const SAVE_DEBOUNCE: Duration = Duration::from_millis(400);
 const DAILY_BACKUPS_KEPT: usize = 14;
+/// In backups/: the last saved content. Recovery takes the newest valid file there, which is
+/// this one; the backup list in Settings leaves it out (it equals the current data).
+pub const LATEST_COPY: &str = "last-saved.json";
 const MANUAL_BACKUPS_KEPT: usize = 20;
 
 pub(crate) struct Inner {
@@ -145,6 +148,15 @@ impl Store {
         });
         if res.is_ok() {
             *self.last_written.lock().unwrap() = Some(signature(text.as_bytes()));
+            // A copy of what was just saved, so a data.json damaged later (disk, another
+            // program) comes back without losing anything since the daily backup (REL-04).
+            // Not in a shared data folder: the sync tool would upload it on every save, and
+            // keeps file versions itself.
+            if self.local_settings.is_none() {
+                if let Err(e) = write_atomic(&self.backups_dir().join(LATEST_COPY), text.as_bytes()) {
+                    eprintln!("[store] copy of the last save failed: {e}");
+                }
+            }
         }
         match res {
             Ok(()) => {
@@ -384,9 +396,10 @@ fn newest_valid_backup(dir: &Path) -> Option<(String, Value)> {
         .filter_map(|e| e.ok()?.file_name().into_string().ok())
         .filter(|n| n.ends_with(".json"))
         .collect();
-    // newest first by modification time
+    // newest first by modification time; on a tie (same millisecond) the copy of the last
+    // save, which is never older than the others
     names.sort_by_key(|n| {
-        std::cmp::Reverse(fs::metadata(dir.join(n)).and_then(|m| m.modified()).ok())
+        (std::cmp::Reverse(fs::metadata(dir.join(n)).and_then(|m| m.modified()).ok()), n != LATEST_COPY)
     });
     names.into_iter().find_map(|n| {
         let v: Value = serde_json::from_str(&fs::read_to_string(dir.join(&n)).ok()?).ok()?;
@@ -586,7 +599,7 @@ pub fn backups_list(store: State<'_, Arc<Store>>) -> Vec<BackupInfo> {
                     .duration_since(std::time::UNIX_EPOCH)
                     .ok()?
                     .as_millis() as u64;
-                name.ends_with(".json").then_some(BackupInfo { name, size: meta.len(), modified })
+                (name.ends_with(".json") && name != LATEST_COPY).then_some(BackupInfo { name, size: meta.len(), modified })
             })
             .collect()
         })

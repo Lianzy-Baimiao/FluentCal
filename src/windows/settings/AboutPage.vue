@@ -25,7 +25,7 @@ const libs = [
     <FSettingsGroup title="使用技巧">
       <FSettingsCard icon="help" title="双击日期空白处快速添加任务" description="回车保存后可继续输入下一条，Esc 结束" />
       <FSettingsCard icon="mouse" title="拖动任务改期" description="在月视图中拖到其他日期；在甘特图中拖动任务条、两端或底部圆点调整日期和进度" />
-      <FSettingsCard icon="keyboard" title="键盘" description="方向键选择日期，Enter 添加，PageUp/PageDown 翻页，Home 回到今天，Ctrl+F 搜索" />
+      <FSettingsCard icon="keyboard" title="键盘" description="方向键选择日期，Enter 添加，PageUp/PageDown 翻页，Home 回到今天，Ctrl+F 搜索。嵌入桌面时点日历不会抢走键盘，先按 Ctrl+Alt+D 唤出日历再用" />
     </FSettingsGroup>
     <FSettingsGroup title="开源组件">
       <FSettingsCard v-for="l in libs" :key="l.name" :title="l.name" :description="l.desc">

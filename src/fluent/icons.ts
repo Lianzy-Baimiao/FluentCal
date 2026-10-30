@@ -1,5 +1,6 @@
 // Segoe Fluent Icons codepoints (verified by rendering the installed font), plus two
-// SVG icons the font has no good glyph for.
+// SVG icons the font has no good glyph for. Windows 10 has only Segoe MDL2 Assets (the
+// fallback in --font-icon): `npm run glyphs` lists codepoints it lacks; keep that list empty.
 
 export const GLYPHS = {
   chevronLeft: '\uE76B',
@@ -69,7 +70,6 @@ export const GLYPHS = {
   window: '\uE737',
   desktop: '\uE7F4',
   layers: '\uF156',
-  resize: '\uE9E3',
   tag: '\uE8EC',
   group: '\uE902',
   home: '\uE80F',

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { confirm, FButton, FInfoBar, FSettingsCard, FSettingsExpander, FSettingsGroup, FSettingsRow } from '@/fluent';
 import { call, type DataDirInfo } from '@/api';
-import { doc, exportDoc, put, replaceDoc, taskList } from '@/stores/doc';
+import { doc, exportDoc, patchSettings, put, replaceDoc, taskList } from '@/stores/doc';
+import { clearSampleData, sampleCount } from '@/lib/tasks';
 import { sys } from '@/composables/theme';
 import { parseBackup, planMerge, toCSV, toICS } from '@/lib/export';
 import { today } from '@/lib/date';
@@ -10,6 +11,15 @@ import { today } from '@/lib/date';
 interface Backup { name: string; size: number; modified: number }
 const msg = ref<{ sev: 'success' | 'error' | 'info'; text: string } | null>(null);
 const backups = ref<Backup[]>([]);
+const samples = computed(() => sampleCount());
+
+async function clearSamples() {
+  const r = await confirm({ title: '清除示例数据？', content: '第一次启动时生成的示例任务和示例项目会被删除，你自己添加或改过名称的任务不受影响。', primaryText: '清除' });
+  if (r !== 'primary') return;
+  const n = await clearSampleData();
+  patchSettings({ general: { onboarded: true } });
+  msg.value = { sev: 'success', text: `已删除 ${n} 个示例任务。` };
+}
 const say = (sev: 'success' | 'error' | 'info', text: string) => (msg.value = { sev, text });
 const refresh = async () => (backups.value = await call<Backup[]>('backups_list'));
 const dir = ref<DataDirInfo | null>(null);
@@ -107,6 +117,11 @@ const when = (ms: number) => new Date(ms).toLocaleString('zh-CN');
 <template>
   <div class="page">
     <FInfoBar v-if="msg" :severity="msg.sev" closable @close="msg = null">{{ msg.text }}</FInfoBar>
+    <FSettingsGroup v-if="samples" title="示例数据">
+      <FSettingsCard icon="delete" title="清除示例数据" :description="`第一次启动时生成的示例任务和示例项目，还剩 ${samples} 项。改过名称的不算示例，会保留`">
+        <FButton @click="clearSamples">清除</FButton>
+      </FSettingsCard>
+    </FSettingsGroup>
     <FSettingsGroup title="导出">
       <FSettingsCard icon="save" title="完整备份（JSON）" description="包含任务、分组、日期颜色和设置，可在其他电脑上导入"><FButton @click="exportJSON">导出</FButton></FSettingsCard>
       <FSettingsCard icon="list" title="任务列表（CSV）" description="用 Excel 打开查看或统计"><FButton @click="exportCSV">导出</FButton></FSettingsCard>

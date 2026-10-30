@@ -2,16 +2,19 @@ import type { Group, ISODate, Task } from '@/types';
 import { addDays, weekday } from './date';
 import { uid } from './uid';
 
-/** First-run sample data: a small project for the Gantt view plus two usage hints. */
+/** First-run sample data: a small project for the Gantt view and a weekly task, all marked
+ * `sample` so "清除示例数据" can remove them. How to use the calendar is told by the welcome
+ * bar (DeskApp), not by tasks: a task title that long is cut off in a day cell. */
 export function sampleData(now: ISODate): { groups: Group[]; tasks: Task[] } {
   const ts = Date.now();
-  const g: Group = { id: uid(), name: '示例项目：官网改版', color: 'blue', order: 1 };
+  const g: Group = { id: uid(), name: '示例项目：官网改版', color: 'blue', order: 1, sample: true };
   const base = (p: Partial<Task> & { title: string; start: ISODate }, order: number): Task => ({
     id: uid(),
     end: p.start,
     progress: 0,
     done: false,
     order,
+    sample: true,
     createdAt: ts,
     updatedAt: ts,
     ...p,
@@ -23,7 +26,5 @@ export function sampleData(now: ISODate): { groups: Group[]; tasks: Task[] } {
   const launch = base({ title: '正式上线', start: addDays(now, 22), groupId: g.id, milestone: true, color: 'red', deps: [test.id] }, 5);
   const friday = addDays(now, (5 - weekday(now) + 7) % 7);
   const report = base({ title: '交周报', start: friday, time: '17:00', reminders: [15], repeat: { freq: 'weekly', weekdays: [5] } }, 6);
-  const hint1 = base({ title: '双击日期空白处可快速添加任务', start: now, color: 'green' }, 7);
-  const hint2 = base({ title: '右键任务：完成、改颜色、删除', start: addDays(now, 1), color: 'green' }, 8);
-  return { groups: [g], tasks: [research, design, dev, test, launch, report, hint1, hint2] };
+  return { groups: [g], tasks: [research, design, dev, test, launch, report] };
 }
