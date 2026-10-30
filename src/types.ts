@@ -172,11 +172,10 @@ export interface Settings {
     webdav: { url: string; user: string; folder: string };
     github: { repo: string; branch: string; path: string };
     gitee: { repo: string; branch: string; path: string };
-    gdrive: { clientId: string; email: string };
   };
 }
 
-export type SyncProvider = '' | 'webdav' | 'github' | 'gitee' | 'gdrive' | 'folder';
+export type SyncProvider = '' | 'webdav' | 'github' | 'gitee' | 'folder';
 
 export interface Doc {
   version: number;

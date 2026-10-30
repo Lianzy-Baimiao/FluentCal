@@ -36,7 +36,6 @@ windows-version = "0.1.7"
 # rustls would need ring, which needs a C compiler and assembler (see .cargo/config.toml.example).
 ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no-default", "gzip", "win-system-proxy"] }
 base64 = "0.23.1"
-sha2 = "0.10.9"
 getrandom = "0.3.4"
 # Web view (src/web.rs): a small HTTP/1.1 server without TLS for the local network.
 tiny_http = "0.12.0"

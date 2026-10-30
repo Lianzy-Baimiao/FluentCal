@@ -4,7 +4,7 @@
 
 use super::engine::{self, Mode, SyncState};
 use super::git::{Flavor, Git};
-use super::{cloud_view, gdrive::Drive, http::Http, oauth, secrets, view_sig, webdav::WebDav, ErrKind, Remote, SyncError};
+use super::{cloud_view, http::Http, secrets, view_sig, webdav::WebDav, ErrKind, Remote, SyncError};
 use crate::store::{now_ms, Store};
 use serde::Serialize;
 use serde_json::Value;
@@ -25,7 +25,6 @@ pub const GITEE_API: &str = "https://gitee.com/api/v5";
 pub enum Provider {
     WebDav { url: String, user: String, folder: String },
     Git { site: String, repo: String, branch: String, path: String },
-    Drive { client_id: String },
 }
 
 /// settings.sync, as far as Rust needs it.
@@ -51,7 +50,6 @@ impl Config {
             }
             "github" => Some(git("github")),
             "gitee" => Some(git("gitee")),
-            "gdrive" => Some(Provider::Drive { client_id: str_at("/gdrive/clientId") }),
             _ => None, // "" or "folder" (a shared data folder, handled by sync.rs)
         };
         Config {
@@ -80,13 +78,12 @@ impl Config {
             Some(Provider::WebDav { .. }) => "WebDAV",
             Some(Provider::Git { site, .. }) if site == "gitee" => "Gitee",
             Some(Provider::Git { .. }) => "GitHub",
-            Some(Provider::Drive { .. }) => "Google 云端硬盘",
             None => "",
         }
     }
 }
 
-pub fn make_remote(cfg: &Config, timeout: Duration, location: &Value) -> Result<Box<dyn Remote>, SyncError> {
+pub fn make_remote(cfg: &Config, timeout: Duration) -> Result<Box<dyn Remote>, SyncError> {
     let http = Http::new(&cfg.proxy, timeout)?;
     let missing = |what: &str| SyncError::auth(format!("还没有填写{what}"));
     Ok(match cfg.provider.as_ref().ok_or_else(|| SyncError::config("还没有选择同步方式"))? {
@@ -98,11 +95,6 @@ pub fn make_remote(cfg: &Config, timeout: Duration, location: &Value) -> Result<
             let (flavor, api) = if site == "gitee" { (Flavor::Gitee, GITEE_API) } else { (Flavor::GitHub, GITHUB_API) };
             let token = secrets::get(site).ok_or_else(|| missing(" Token"))?;
             Box::new(Git::new(http, flavor, api, repo, branch, path, &token)?)
-        }
-        Provider::Drive { client_id } => {
-            let secret = secrets::get("google-secret").ok_or_else(|| missing(" Google OAuth 客户端密钥"))?;
-            let refresh = secrets::get("google-refresh").ok_or_else(|| SyncError::auth("还没有登录 Google 账号"))?;
-            Box::new(Drive::new(http, oauth::Endpoints::default(), client_id, &secret, &refresh, location))
         }
     })
 }
@@ -306,7 +298,7 @@ impl Cloud {
         }
         let key = format!("{fp}|{}|{}|{timeout:?}", cfg.proxy, self.secrets_gen.load(Ordering::Relaxed));
         if slot.remote.as_ref().map_or(true, |(k, _)| *k != key) {
-            slot.remote = Some((key, make_remote(cfg, timeout, &slot.state.location)?));
+            slot.remote = Some((key, make_remote(cfg, timeout)?));
         }
         let Slot { remote, state } = slot;
         let remote = &mut remote.as_mut().expect("just built").1;
@@ -371,7 +363,7 @@ impl Cloud {
         self.wake.notify_all();
     }
 
-    /// A password, token or Google login changed: rebuild the remote, retry an auth error.
+    /// A password or token changed: rebuild the remote, retry an auth error.
     pub fn secrets_changed(&self) {
         self.secrets_gen.fetch_add(1, Ordering::Relaxed);
         let mut rt = self.rt.lock().unwrap();
@@ -395,7 +387,7 @@ impl Cloud {
     /// "Test connection" with the current settings (sync may still be off).
     pub fn probe(&self) -> Result<engine::Probe, SyncError> {
         let cfg = self.rt.lock().unwrap().cfg.clone();
-        let mut remote = make_remote(&cfg, TIMEOUT, &Value::Null)?;
+        let mut remote = make_remote(&cfg, TIMEOUT)?;
         engine::probe(remote.as_mut())
     }
 

@@ -275,6 +275,9 @@ await check('web view: access code, phone list, read-only, live update, wrong co
   served.tasks.w3 = task('w3', '电脑上刚加的', plus(0));
   rev = 2;
   await w.getByText('电脑上刚加的').first().waitFor({ timeout: 8000 });
+  // A fresh page with a wrong code. A goto that only changes the #hash doesn't reload, and the
+  // page would notice only at its next 5 s check, racing the wait below.
+  await w.goto('about:blank');
   await w.goto(`${base}/?w=web#k=${'f'.repeat(32)}`);
   await w.getByText(/访问码无效/).waitFor({ timeout: 5000 });
   await wctx.close();

@@ -16,7 +16,7 @@
 - **外观**：浅色/深色/跟随系统，跟随 Windows 强调色或自选；背景色、透明度、亚克力毛玻璃、圆角、字号、间距；5 套预设方案。
 - **数据**：默认保存在本机 `%APPDATA%\com.fluentcal.desktop\data.json`，每天自动备份；导出 JSON / CSV（Excel）/ ICS（Outlook、Google 日历）。数据文件夹可以改到 OneDrive 等同步盘，多台电脑共用：按每个任务的最后修改时间合并，不会互相覆盖；外观和窗口位置等设置留在每台电脑上。
 - **提醒**：Windows 通知和/或屏幕右下角的提醒卡片（完成、10 分钟后再提醒），不抢焦点。
-- **云同步**：多台电脑共用任务。可以同步到坚果云、Nextcloud、群晖等 WebDAV 网盘，GitHub/Gitee 私有仓库（每次上传是一次提交，可查看历史），或 Google 云端硬盘。按任务合并，同时修改不会互相覆盖。密码和 Token 只保存在 Windows 凭据管理器里。
+- **云同步**：多台电脑共用任务。可以同步到坚果云、Nextcloud、群晖等 WebDAV 网盘，GitHub/Gitee 私有仓库（每次上传是一次提交，可查看历史）。按任务合并，同时修改不会互相覆盖。密码和 Token 只保存在 Windows 凭据管理器里。
 - **网页查看**：日历上右键 ›“在浏览器中查看”，在这台电脑的浏览器里查看日历、列表和甘特图。打开“允许局域网内的设备查看”后，同一 Wi-Fi 的手机、平板扫二维码也能看，不需要云同步，也不用装 App。只能查看；电脑上的修改几秒内出现在网页上；链接带随机访问码。
 
 ## 截图
@@ -33,7 +33,7 @@
 
 ![外观设置](docs/screenshots/settings-appearance.png)
 
-同步设置：WebDAV、GitHub/Gitee 私有仓库、Google 云端硬盘，或者 OneDrive 等同步盘里的文件夹：
+同步设置：WebDAV、GitHub/Gitee 私有仓库，或者 OneDrive、Google Drive 等同步盘里的文件夹：
 
 ![同步设置](docs/screenshots/settings-sync.png)
 
@@ -90,7 +90,7 @@ npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（�
 - `http://localhost:1420/?w=settings&page=appearance` 设置
 - `http://localhost:1420/?w=gallery` Fluent 组件库
 
-Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee、Google）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`tests/web.rs` 在本机端口上测试网页查看服务：访问码、返回的数据、304、同一连接上的连续轮询、路径穿越、响应头、监听地址。
+Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`tests/web.rs` 在本机端口上测试网页查看服务：访问码、返回的数据、304、同一连接上的连续轮询、路径穿越、响应头、监听地址。
 
 ### 工具链
 
@@ -111,7 +111,7 @@ src-tauri/src
   store.rs           JSON 存储：原子写入、防抖、每日备份、损坏自动恢复
   merge.rs, sync.rs  多台电脑共用数据文件夹时按条目合并、监视外部修改
   datadir.rs         自定义数据文件夹
-  cloud/             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee）、gdrive.rs + oauth.rs，secrets.rs 凭据管理器
+  cloud/             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee），secrets.rs 凭据管理器
   reminder.rs        提醒调度；reminder_popup.rs 右下角提醒卡片
   web.rs             网页查看：局域网 HTTP 服务（访问码、只读数据、静态文件）；webcmd.rs 开关、端口、本机地址
   tray.rs            托盘菜单
@@ -138,7 +138,7 @@ src
 - **节假日不是最新的？** 设置 › 常规 › 节假日 › 立即检查。国务院通常在每年 11 月公布下一年安排。
 - **两台电脑改了同一个任务？** 取最后修改的一方；不同任务的修改都保留，删除也会同步。开启同步前、用云端数据替换前都会自动备份本机数据（设置 › 数据 › 备份文件）。
 - **同步了哪些内容？** 任务、分组和日期颜色。外观、窗口位置等设置留在每台电脑上；节假日数据每台电脑自己联网获取。
-- **Google 云端硬盘为什么要自己创建 OAuth 客户端？** 开源程序无法内置经过 Google 审核的客户端。按设置页里的步骤创建一次，多台电脑用同一个即可。在国内访问 Google 需要代理（设置 › 同步 › 高级 › 网络代理）。
+- **能同步到 Google 云端硬盘吗？** 装 Google Drive 桌面版，在 设置 › 数据 ›“数据文件夹”里选它同步的文件夹即可，OneDrive、Dropbox 也一样。0.2.0 曾直接支持 Google 云端硬盘，但要自己在 Google Cloud 控制台创建 OAuth 客户端，步骤太多，已移除；从 0.2.0 升级后，原来的 Google 同步会关闭，相关设置和凭据会被删除。
 - **网页查看会多占资源吗？** 没用过“在浏览器中查看”、也没打开局域网开关时，网页服务不运行，不监听任何端口。用过一次后，服务只监听本机（127.0.0.1），直到 FluentCal 退出。实测多 10 个空闲线程、0.6 MB 内存；开着网页时每 5 秒检查一次，没变化时只回一个空的 304，CPU 占用测不出来；网页切到后台时不检查。
 - **手机打不开网页查看的链接？** 手机和电脑要连同一个局域网，电脑上的 FluentCal 要在运行。第一次开启时如果在防火墙询问里点了“取消”，到 Windows 安全中心 › 防火墙和网络保护 ›“允许应用通过防火墙”，给 FluentCal 勾选“专用”。只勾选了“专用”而电脑当前的网络是“公用网络”时也连不上，可在 Windows 设置 › 网络和 Internet 里把它改为“专用网络”。访客 Wi-Fi 通常不允许设备之间互相访问。
 - **网页查看安全吗？** 链接带 128 位随机访问码，只回应局域网内的设备，网页只能查看。局域网内传输没有加密，只在家里、公司等信任的网络中使用。链接不小心发给了别人，点“更换访问码”，旧链接立即失效。

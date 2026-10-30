@@ -173,7 +173,7 @@ impl Remote for Git {
             Some(b) if !b.is_empty() || v.get("size").and_then(Value::as_u64) == Some(0) => b,
             _ => self.raw()?,
         };
-        let rev = Rev { etag: r.header("etag").map(str::to_owned), sha, version: None };
+        let rev = Rev { etag: r.header("etag").map(str::to_owned), sha };
         Ok(Fetched::File(bytes, rev))
     }
 
@@ -204,7 +204,7 @@ impl Remote for Git {
             200 | 201 => {
                 let v = r.json().unwrap_or_default();
                 let sha = v.pointer("/content/sha").and_then(Value::as_str).map(str::to_owned);
-                Ok(Rev { etag: None, sha, version: None })
+                Ok(Rev { etag: None, sha })
             }
             // Stale or missing sha: the file changed (or appeared) since our fetch.
             409 => Err(SyncError::conflict()),

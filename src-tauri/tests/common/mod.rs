@@ -1,5 +1,5 @@
 //! Test helpers: a minimal HTTP/1.1 server on 127.0.0.1 (one request per connection) that
-//! stands in for WebDAV, GitHub, Gitee and Google, plus store helpers.
+//! stands in for WebDAV, GitHub and Gitee, plus store helpers.
 #![allow(dead_code)]
 
 use fluentcal_lib::store::Store;

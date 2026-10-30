@@ -59,7 +59,6 @@ export const DEFAULT_SETTINGS: Settings = {
     webdav: { url: '', user: '', folder: 'FluentCal' },
     github: { repo: '', branch: '', path: '' },
     gitee: { repo: '', branch: '', path: '' },
-    gdrive: { clientId: '', email: '' },
   },
 };
 

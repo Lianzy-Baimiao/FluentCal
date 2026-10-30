@@ -83,7 +83,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &pins,
         ],
     )?;
-    let cloud = matches!(store.setting_str("/sync/provider", "").as_str(), "webdav" | "github" | "gitee" | "gdrive");
+    let cloud = matches!(store.setting_str("/sync/provider", "").as_str(), "webdav" | "github" | "gitee");
     if cloud && store.setting_bool("/sync/enabled", false) {
         menu.insert(&MenuItem::with_id(app, "syncNow", "立即同步", true, None::<&str>)?, 2)?;
     }

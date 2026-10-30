@@ -7,7 +7,9 @@ use windows::Win32::Security::Credentials::{
 };
 
 /// Keys the UI may set (see commands.rs).
-pub const KEYS: [&str; 5] = ["webdav", "github", "gitee", "google-secret", "google-refresh"];
+pub const KEYS: [&str; 3] = ["webdav", "github", "gitee"];
+/// Left in Credential Manager by Google Drive sync (0.2.0); deleted at startup.
+pub const OLD_GOOGLE: [&str; 2] = ["google-secret", "google-refresh"];
 
 fn target(key: &str) -> HSTRING {
     HSTRING::from(format!("FluentCal/sync/{key}"))

@@ -1,14 +1,12 @@
-//! Cloud sync (SYN, 需求文档 4.9 / 7.5): one JSON file on the user's own WebDAV server,
-//! GitHub/Gitee private repository or Google Drive, merged item by item with merge.rs.
-//! `engine` is one sync round (testable without Tauri), `service` schedules rounds, the
-//! providers implement `Remote`.
+//! Cloud sync (SYN, 需求文档 4.9 / 7.5): one JSON file on the user's own WebDAV server or
+//! GitHub/Gitee private repository, merged item by item with merge.rs. `engine` is one sync
+//! round (testable without Tauri), `service` schedules rounds, the providers implement
+//! `Remote`.
 
 pub mod commands;
 pub mod engine;
-pub mod gdrive;
 pub mod git;
 pub mod http;
-pub mod oauth;
 pub mod secrets;
 pub mod service;
 pub mod webdav;
@@ -76,16 +74,13 @@ impl std::fmt::Display for SyncError {
     }
 }
 
-/// Version of the cloud file as the provider knows it: WebDAV ETag, Git blob sha (+ ETag),
-/// Drive version number.
+/// Version of the cloud file as the provider knows it: WebDAV ETag, Git blob sha (+ ETag).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rev {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub etag: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
 }
 
 pub enum Fetched {
@@ -103,10 +98,23 @@ pub trait Remote: Send {
     /// Writes the file if it is still at `base` (None = it must not exist yet). Returns the
     /// new version, or ErrKind::Conflict.
     fn put(&mut self, bytes: &[u8], base: Option<&Rev>) -> Result<Rev, SyncError>;
-    /// Provider-specific ids to remember across restarts (Drive folder and file id).
-    fn location(&self) -> Value {
-        Value::Null
+}
+
+/// Google Drive was a sync provider in 0.2.0 and has been removed. Settings left from it:
+/// turn sync off and drop them (the caller also deletes the Google secrets). None when there
+/// is nothing to clean up.
+pub fn drop_google_drive(settings: &Value) -> Option<Value> {
+    let sync = settings.get("sync")?;
+    let was_provider = sync.get("provider").and_then(Value::as_str) == Some("gdrive");
+    if !was_provider && sync.get("gdrive").is_none() {
+        return None;
     }
+    let mut patch = json!({ "sync": { "gdrive": null } });
+    if was_provider {
+        patch["sync"]["provider"] = json!("");
+        patch["sync"]["enabled"] = json!(false);
+    }
+    Some(patch)
 }
 
 /// The synced part of the document: the collections in SYNCED and their edit times.

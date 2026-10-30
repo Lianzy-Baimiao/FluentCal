@@ -26,9 +26,6 @@ pub struct SyncState {
     pub remote_device: Option<String>,
     #[serde(default)]
     pub remote_saved_at: Option<i64>,
-    /// Provider ids (Drive folder and file).
-    #[serde(default)]
-    pub location: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,7 +72,7 @@ pub fn cycle(store: &Store, remote: &mut dyn Remote, st: &mut SyncState, mode: M
                 let local = cloud_view(&store.snapshot());
                 let sig = view_sig(&local);
                 if Some(sig) == st.synced_sig {
-                    finish(st, remote, None);
+                    finish(st, None);
                     return Ok(out);
                 }
                 // The cloud is still what we synced last time: upload our edits on top.
@@ -116,7 +113,7 @@ pub fn cycle(store: &Store, remote: &mut dyn Remote, st: &mut SyncState, mode: M
         if same || (remote_view.is_none() && !has_data(&merged)) {
             st.rev = rev;
             st.synced_sig = Some(view_sig(&merged));
-            finish(st, remote, None);
+            finish(st, None);
             return Ok(out);
         }
         match upload(remote, &merged, rev.as_ref(), st) {
@@ -138,16 +135,12 @@ fn upload(remote: &mut dyn Remote, view: &Value, base: Option<&Rev>, st: &mut Sy
     st.synced_sig = Some(view_sig(view));
     st.remote_device = Some(super::device_name());
     st.remote_saved_at = Some(now);
-    finish(st, remote, Some(now));
+    finish(st, Some(now));
     Ok(())
 }
 
-fn finish(st: &mut SyncState, remote: &dyn Remote, at: Option<i64>) {
+fn finish(st: &mut SyncState, at: Option<i64>) {
     st.last_sync = Some(at.unwrap_or_else(now_ms));
-    let loc = remote.location();
-    if !loc.is_null() {
-        st.location = loc;
-    }
 }
 
 /// What the cloud holds, for the "test connection" result and the first-sync dialog.

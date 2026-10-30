@@ -561,6 +561,10 @@ pub fn run() {
             let (dir, local_settings, info) = datadir::resolve(&default);
             let store = Store::open_with(dir, local_settings)?;
             store.set_app(handle.clone());
+            if let Some(patch) = cloud::drop_google_drive(&store.snapshot()["settings"]) {
+                store.patch_settings(&patch);
+                cloud::secrets::OLD_GOOGLE.iter().for_each(|k| cloud::secrets::delete(k));
+            }
             // Sync state is per PC: keep it out of a shared data folder.
             app.manage(cloud::service::Cloud::start(store.clone(), Some(handle.clone()), default.join("cloud-state.json")));
             app.manage(webcmd::state());
@@ -585,8 +589,6 @@ pub fn run() {
             cloud::commands::sync_disable,
             cloud::commands::sync_set_secret,
             cloud::commands::sync_secrets,
-            cloud::commands::sync_google_login,
-            cloud::commands::sync_google_logout,
             webcmd::web_info,
             webcmd::web_local_url,
             webcmd::web_reset_token,

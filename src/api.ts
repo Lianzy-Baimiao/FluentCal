@@ -146,7 +146,7 @@ const mock = (() => {
   // Cloud sync stand-in: ?cloud=data pretends the cloud already holds tasks.
   const secrets = new Set<string>();
   const syncStatus: SyncStatus = { enabled: false, provider: '', syncing: false, lastSync: null, error: null, errorKind: null, halted: false, pending: false, remoteDevice: null, remoteSavedAt: null };
-  const PROVIDER_NAMES: Record<string, string> = { webdav: 'WebDAV', github: 'GitHub', gitee: 'Gitee', gdrive: 'Google 云端硬盘' };
+  const PROVIDER_NAMES: Record<string, string> = { webdav: 'WebDAV', github: 'GitHub', gitee: 'Gitee' };
   let seeded = false;
   /** A preview opened with sync already on (screenshots) starts as "synced a moment ago". */
   const seedSync = (d: Json) => {
@@ -155,8 +155,7 @@ const mock = (() => {
     const s = (d.settings as { sync?: { enabled?: boolean; provider?: string } }).sync;
     if (!s?.enabled || !PROVIDER_NAMES[s.provider ?? '']) return;
     Object.assign(syncStatus, { enabled: true, provider: PROVIDER_NAMES[s.provider!], lastSync: Date.now() - 120_000, remoteDevice: 'OFFICE-PC', remoteSavedAt: Date.now() - 3_600_000 });
-    const keys: Record<string, string[]> = { webdav: ['webdav'], github: ['github'], gitee: ['gitee'], gdrive: ['google-secret', 'google-refresh'] };
-    for (const k of keys[s.provider!] ?? []) secrets.add(k);
+    secrets.add(s.provider!); // the secret's key is the provider's name
   };
   const setSyncEnabled = (d: Json, on: boolean) => {
     deepMerge(d.settings as Json, { sync: { enabled: on } });
@@ -320,19 +319,6 @@ const mock = (() => {
         break;
       case 'sync_secrets':
         res = [...secrets];
-        break;
-      case 'sync_google_login':
-        secrets.add('google-refresh');
-        deepMerge(d.settings as Json, { sync: { gdrive: { email: 'me@example.com' } } });
-        save(d);
-        broadcast('store://settings', { origin: 'rust', settings: d.settings });
-        res = 'me@example.com';
-        break;
-      case 'sync_google_logout':
-        secrets.delete('google-refresh');
-        deepMerge(d.settings as Json, { sync: { gdrive: { email: '' } } });
-        save(d);
-        broadcast('store://settings', { origin: 'rust', settings: d.settings });
         break;
       default:
         // desk_ready, desk_summon, desk_hide, reminders_set, app_quit, open_data_dir…

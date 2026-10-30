@@ -24,9 +24,6 @@ impl Resp {
     pub fn json(&self) -> Option<serde_json::Value> {
         serde_json::from_slice(&self.body).ok()
     }
-    pub fn text(&self) -> String {
-        String::from_utf8_lossy(&self.body).into_owned()
-    }
 }
 
 pub struct Http {
@@ -104,7 +101,7 @@ impl Http {
 fn network(e: ureq::Error) -> SyncError {
     let msg = match &e {
         ureq::Error::HostNotFound => "找不到服务器，请检查网络和地址".to_owned(),
-        ureq::Error::Timeout(_) => "连接超时，请检查网络（访问 GitHub、Google 可能需要代理）".to_owned(),
+        ureq::Error::Timeout(_) => "连接超时，请检查网络（访问 GitHub 可能需要代理）".to_owned(),
         ureq::Error::ConnectionFailed => "无法连接服务器，请检查网络和地址".to_owned(),
         ureq::Error::ConnectProxyFailed(_) | ureq::Error::InvalidProxyUrl => "无法通过代理连接".to_owned(),
         ureq::Error::BodyExceedsLimit(_) => "云端文件太大（超过 32 MB）".to_owned(),

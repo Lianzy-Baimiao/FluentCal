@@ -11,7 +11,7 @@ watchSync();
 const nav = inject<(key: string) => void>('settingsNav');
 const s = computed(() => doc.settings.sync);
 const provider = useSetting<SyncProvider>('sync.provider');
-const cloudProvider = computed(() => ['webdav', 'github', 'gitee', 'gdrive'].includes(provider.value));
+const cloudProvider = computed(() => ['webdav', 'github', 'gitee'].includes(provider.value));
 /** Turn sync off before changing where it goes. */
 const locked = computed(() => s.value.enabled && cloudProvider.value);
 const providers = [
@@ -19,14 +19,12 @@ const providers = [
   { value: 'webdav', label: 'WebDAV（坚果云、Nextcloud、群晖…）' },
   { value: 'github', label: 'GitHub 私有仓库' },
   { value: 'gitee', label: 'Gitee 私有仓库' },
-  { value: 'gdrive', label: 'Google 云端硬盘' },
-  { value: 'folder', label: '同步盘文件夹（OneDrive、Dropbox…）' },
+  { value: 'folder', label: '同步盘文件夹（OneDrive、Google Drive…）' },
 ];
 
 const davUrl = useSetting<string>('sync.webdav.url');
 const davUser = useSetting<string>('sync.webdav.user');
 const davFolder = useSetting<string>('sync.webdav.folder');
-const clientId = useSetting<string>('sync.gdrive.clientId');
 const interval = useSetting<number>('sync.interval');
 const proxy = useSetting<string>('sync.proxy');
 const gitKey = computed(() => (provider.value === 'gitee' ? 'gitee' : 'github'));
@@ -42,7 +40,6 @@ const path = gitField('path');
 // Passwords and tokens: typed here, saved to Windows Credential Manager, never shown again.
 const saved = ref<string[]>([]);
 const secretInput = ref('');
-const googleSecret = ref('');
 const secretKey = computed(() => (provider.value === 'webdav' ? 'webdav' : gitKey.value));
 const loadSecrets = async () => (saved.value = (await call<string[]>('sync_secrets')) ?? []);
 async function saveSecret(key: string, value: string) {
@@ -58,10 +55,6 @@ async function saveSecret(key: string, value: string) {
 async function saveTyped() {
   await saveSecret(secretKey.value, secretInput.value);
   secretInput.value = '';
-}
-async function saveGoogleSecret() {
-  await saveSecret('google-secret', googleSecret.value);
-  googleSecret.value = '';
 }
 const secretHint = (key: string) => (saved.value.includes(key) ? '已保存（输入新值可替换）' : '');
 
@@ -124,25 +117,6 @@ async function disable() {
   say('info', '已关闭同步。本机数据保留，云端文件也不会删除。');
 }
 
-async function googleLogin() {
-  busy.value = true;
-  say('info', '已在浏览器中打开 Google 登录页面，完成后回到这里。');
-  try {
-    const email = await call<string | null>('sync_google_login');
-    await loadSecrets();
-    say('success', `已登录 ${email ?? 'Google 账号'}`);
-  } catch (e) {
-    say('error', String(e));
-  } finally {
-    busy.value = false;
-  }
-}
-
-async function googleLogout() {
-  await call('sync_google_logout');
-  await loadSecrets();
-}
-
 const PROXIES = [
   { value: 'system', label: '使用系统代理' },
   { value: 'direct', label: '不使用代理' },
@@ -199,19 +173,6 @@ onMounted(loadSecrets);
       <FSettingsCard title="文件路径" description="留空为 fluentcal-data.json"><FTextBox v-model="path" :width="300" :disabled="locked" label="文件路径" /></FSettingsCard>
     </FSettingsGroup>
 
-    <FSettingsGroup v-if="provider === 'gdrive'" title="Google 云端硬盘">
-      <FSettingsCard title="OAuth 客户端 ID" description="在 Google Cloud 控制台创建，类型选“桌面应用”（见下方帮助）">
-        <FTextBox v-model="clientId" :width="300" :disabled="locked" placeholder="….apps.googleusercontent.com" label="OAuth 客户端 ID" />
-      </FSettingsCard>
-      <FSettingsCard title="客户端密钥" :description="secretHint('google-secret')">
-        <FTextBox v-model="googleSecret" type="password" :width="300" :placeholder="saved.includes('google-secret') ? '••••••••' : ''" label="客户端密钥" @enter="saveGoogleSecret" @blur="saveGoogleSecret" />
-      </FSettingsCard>
-      <FSettingsCard title="Google 账号" :description="s.gdrive.email ? `已登录 ${s.gdrive.email}` : saved.includes('google-refresh') ? '已登录' : '未登录'">
-        <FButton v-if="saved.includes('google-refresh')" @click="googleLogout">退出登录</FButton>
-        <FButton v-else variant="accent" :disabled="busy || !clientId || !saved.includes('google-secret')" @click="googleLogin">在浏览器中登录</FButton>
-      </FSettingsCard>
-    </FSettingsGroup>
-
     <FSettingsGroup v-if="provider === 'folder'" title="同步盘文件夹">
       <FSettingsCard icon="folder" title="把数据文件夹放到同步盘" description="在“数据”页把数据文件夹改到 OneDrive、Dropbox 或 Google Drive 桌面版的文件夹里，由它们负责同步。各电脑同时修改时按任务合并">
         <FButton @click="nav?.('data')">去设置</FButton>
@@ -248,18 +209,6 @@ onMounted(loadSecrets);
             <FSettingsRow title="2. 设置 › 私人令牌 › 生成新令牌，勾选 projects">
               <FButton size="small" variant="subtle" icon="link" @click="open('https://gitee.com/profile/personal_access_tokens')">打开</FButton>
             </FSettingsRow>
-          </template>
-        </FSettingsExpander>
-        <FSettingsExpander v-if="provider === 'gdrive'" icon="help" title="怎样创建 Google OAuth 客户端">
-          <template #items>
-            <FSettingsRow title="1. 在 Google Cloud 控制台新建项目，启用 Google Drive API">
-              <FButton size="small" variant="subtle" icon="link" @click="open('https://console.cloud.google.com/apis/library/drive.googleapis.com')">打开</FButton>
-            </FSettingsRow>
-            <FSettingsRow title="2. OAuth 同意屏幕：用户类型选“外部”，然后“发布应用”。保持“测试”状态的话，登录 7 天后就会失效" />
-            <FSettingsRow title="3. 凭据 › 创建凭据 › OAuth 客户端 ID，应用类型选“桌面应用”，把客户端 ID 和密钥填到上面">
-              <FButton size="small" variant="subtle" icon="link" @click="open('https://console.cloud.google.com/apis/credentials')">打开</FButton>
-            </FSettingsRow>
-            <FSettingsRow title="多台电脑要用同一个客户端：FluentCal 只申请“只能访问本程序创建的文件”的权限，不同客户端互相看不到对方的文件。在国内访问 Google 需要代理（见下方“网络”）。" />
           </template>
         </FSettingsExpander>
       </FSettingsGroup>
