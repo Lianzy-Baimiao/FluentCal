@@ -253,12 +253,26 @@ unsafe extern "system" fn subclass_proc(
             }
         }
         WM_DISPLAYCHANGE => {
-            // A screen was added, removed or rearranged; let Windows settle, then check.
+            // A screen was added, removed or rearranged. Windows itself moves windows around
+            // afterwards (screen waking up, "remember window locations"), so check twice.
             std::thread::spawn(|| {
-                std::thread::sleep(Duration::from_millis(800));
+                for wait in [1000, 3000] {
+                    std::thread::sleep(Duration::from_millis(wait));
+                    if let Some(app) = APP.get() {
+                        let handle = app.clone();
+                        let _ = app.run_on_main_thread(move || crate::screens::on_display_change(&handle));
+                    }
+                }
+            });
+        }
+        WM_EXITSIZEMOVE => {
+            // End of a drag or resize by the user (also through startDragging): the new home.
+            // Saved outside this window procedure, which tao is still running.
+            std::thread::spawn(|| {
+                std::thread::sleep(Duration::from_millis(50));
                 if let Some(app) = APP.get() {
                     let handle = app.clone();
-                    let _ = app.run_on_main_thread(move || crate::screens::on_display_change(&handle));
+                    let _ = app.run_on_main_thread(move || crate::screens::save_home(&handle));
                 }
             });
         }

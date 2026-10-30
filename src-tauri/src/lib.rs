@@ -2,6 +2,7 @@ pub mod cloud;
 mod datadir;
 mod desktop;
 mod reminder;
+pub mod layout;
 mod reminder_popup;
 mod screens;
 pub mod merge;
@@ -17,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use store::Store;
 use tauri::{
-    AppHandle, Emitter, Manager, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, Theme, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 use tauri::utils::config::{Color, WindowEffectsConfig};
 use tauri::window::Effect;
@@ -60,16 +61,15 @@ fn create_desk(app: &AppHandle) -> tauri::Result<()> {
         .min_inner_size(360.0, 280.0)
         .inner_size(760.0, 560.0)
         .build()?;
-    restore_bounds(app, &win);
+    screens::apply_layout(app, true);
     desktop::install(app, &win);
     apply_desk_settings(app);
 
     let handle = app.clone();
     win.on_window_event(move |event| match event {
-        WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
-            save_bounds(&handle);
-            screens::note_moved(&handle);
-        }
+        // Not saved here: Windows moves the window too (a screen turned off). The user's own
+        // moves are saved at the end of the drag (desktop.rs, WM_EXITSIZEMOVE).
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) => screens::note_moved(&handle),
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             if let Some(w) = handle.get_webview_window("desk") {
@@ -115,40 +115,6 @@ fn reveal_desk(app: &AppHandle) {
         apply_desk_settings(app);
         tray::refresh(app);
     }
-}
-
-fn restore_bounds(app: &AppHandle, win: &WebviewWindow) {
-    let store = app.state::<Arc<Store>>();
-    let num = |k: &str| store.setting(&format!("/desk/bounds/{k}")).and_then(|v| v.as_f64());
-    let monitors = win.available_monitors().unwrap_or_default();
-    if let (Some(x), Some(y), Some(w), Some(h)) = (num("x"), num("y"), num("w"), num("h")) {
-        let (x, y, w, h) = (x as i32, y as i32, w.max(300.0) as u32, h.max(240.0) as u32);
-        // Require the top strip (title bar) to be on some monitor, so it can be dragged back.
-        if screens::title_visible(&monitors, x, y, w) {
-            screens::place(win, x, y, w, h);
-            return;
-        }
-    }
-    // First run (or its screen is gone): top-right corner of the primary work area.
-    if let Ok(Some(m)) = win.primary_monitor() {
-        screens::place_default(win, &m);
-    }
-}
-
-fn save_bounds(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("desk") else { return };
-    if !win.is_visible().unwrap_or(false) || win.is_minimized().unwrap_or(false) {
-        return;
-    }
-    let (Ok(p), Ok(s)) = (win.outer_position(), win.outer_size()) else { return };
-    if p.x < -20000 || p.y < -20000 || s.width < 100 || s.height < 100 {
-        return;
-    }
-    let store = app.state::<Arc<Store>>();
-    store::patch_settings_silent(
-        &store,
-        json!({ "desk": { "bounds": { "x": p.x, "y": p.y, "w": s.width, "h": s.height } } }),
-    );
 }
 
 /// Applies layer mode, lock, click-through and acrylic from settings to the desk window.

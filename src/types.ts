@@ -115,7 +115,9 @@ export interface Settings {
     restBgColor: string;
     holidayTextColor: string;
     termTextColor: string;
-    bounds?: { x: number; y: number; w: number; h: number };
+    /** Where the user put the calendar (physical px) and the screen it was on, written by
+     * Rust (layout.rs): [device name, screen rect, scale]. */
+    bounds?: { x: number; y: number; w: number; h: number; monitor?: [string, { x: number; y: number; w: number; h: number }, number] | null };
   };
   calendar: {
     view: CalendarView;
