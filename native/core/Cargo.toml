@@ -27,3 +27,4 @@ windows = { version = "0.62.2", features = [
     "Win32_Security_Credentials",
     "Win32_System_SystemInformation",
 ] }
+tyme4rs = "1.5.0"
