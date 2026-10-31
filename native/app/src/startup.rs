@@ -1,0 +1,209 @@
+//! Program start and exit (0.2's lib.rs run()).
+
+use crate::app::{self, install, post, run, App};
+use crate::desk::{live::DeskLive, vm::DeskUi};
+use crate::platform::{autostart, desk as pd, msgwin, sysinfo, toast, tray, window};
+use crate::reminders::{Reminders, Style};
+use crate::shell::{self, events};
+use crate::DeskWindow;
+use fluentcal_core::cloud::{self, service::Cloud};
+use fluentcal_core::store::Store;
+use fluentcal_core::tasks::{Doc, Edit};
+use slint::ComponentHandle;
+use std::path::PathBuf;
+use std::time::Duration;
+
+/// The per-PC folder: %APPDATA%\<instance id> (0.2's app data folder for the installed
+/// program); FLUENTCAL_DATA_DIR overrides (tests, development).
+fn local_dir(id: &str) -> PathBuf {
+    if let Some(d) = std::env::var_os("FLUENTCAL_DATA_DIR") {
+        return PathBuf::from(d);
+    }
+    PathBuf::from(std::env::var_os("APPDATA").unwrap_or_default()).join(id)
+}
+
+fn fatal(text: &str) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR};
+    unsafe {
+        MessageBoxW(None, &HSTRING::from(text), &HSTRING::from("FluentCal"), MB_ICONERROR);
+    }
+}
+
+pub fn main() {
+    let id = msgwin::instance_id();
+    if !msgwin::claim(&id) {
+        return; // the running instance opens its settings
+    }
+    if let Err(e) = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("software".into()).with_winit_window_attributes_hook(window::attributes).select() {
+        return fatal(&format!("无法初始化界面：{e}"));
+    }
+    crate::fonts::setup();
+    let local = local_dir(&id);
+    let _ = std::fs::create_dir_all(&local);
+    let (dir, local_settings, data_dir) = fluentcal_core::datadir::resolve(&local);
+    let store = match Store::open_with(dir, local_settings) {
+        Ok(s) => s,
+        Err(e) => return fatal(&format!("无法打开数据文件夹：{e}")),
+    };
+    if let Some(patch) = cloud::drop_google_drive(&store.snapshot()["settings"]) {
+        store.patch_settings(&patch);
+        cloud::secrets::OLD_GOOGLE.iter().for_each(|k| cloud::secrets::delete(k));
+    }
+    store.listen(|e| {
+        let e = e.clone();
+        post(move |app| app.on_store_event(e));
+    });
+    // Sync state is per PC: kept out of a shared data folder.
+    let on_status: fluentcal_core::cloud::service::StatusListener = Box::new(|s| {
+        let s = s.clone();
+        post(move |app| {
+            app.sync = s;
+            app.desk_refresh_status();
+        });
+    });
+    let cloud = Cloud::start(store.clone(), Some(on_status), local.join("cloud-state.json"));
+    let reminders = Reminders::start(&local, |due, style| {
+        if style != Style::Popup {
+            for r in due {
+                if let Err(e) = toast::show(&r.title, &r.body) {
+                    eprintln!("[reminder] notification failed: {e}");
+                }
+            }
+        }
+        if style == Style::Popup {
+            // No toast means no sound from Windows; play the standard notification sound.
+            unsafe {
+                let _ = windows::Win32::System::Diagnostics::Debug::MessageBeep(windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION);
+            }
+        }
+        post(|app| {
+            app.reminder_cards_changed();
+            app.schedule_reminders();
+        });
+    });
+    let icon = local.join("fluentcal.png");
+    if !icon.exists() {
+        let _ = std::fs::write(&icon, include_bytes!("../res/icon-128.png"));
+    }
+    toast::register(Some(&icon));
+
+    let doc = Doc::from_value(&store.snapshot());
+    let today = fluentcal_core::date::local_of_ms(fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes()).0;
+    window::next(window::Kind::Desk);
+    let w = match DeskWindow::new() {
+        Ok(w) => w,
+        Err(e) => return fatal(&format!("无法创建日历窗口：{e}")),
+    };
+    crate::desk::wire::wire(&w);
+    let sys = sysinfo::system_info();
+    let tokens = fluentcal_core::theme::tokens(sys.dark, "#0078D4", None);
+    let style = fluentcal_core::theme::desk_style(&doc.settings.desk, &tokens);
+    let ui = DeskUi::new(&doc, &today);
+    install(App {
+        store,
+        cloud,
+        sync: Default::default(),
+        doc,
+        sys,
+        tokens,
+        style,
+        desk: DeskLive::new(w, ui),
+        history: Default::default(),
+        reminders,
+        local_dir: local,
+        data_dir,
+        save_error: None,
+        hotkey_errors: Vec::new(),
+        timers: Vec::new(),
+        reminder_timer: Default::default(),
+        theme_timer: Default::default(),
+        last_monitor: None,
+        day: today,
+    });
+    run(move |app| start(app, &id));
+    if let Err(e) = slint::run_event_loop_until_quit() {
+        eprintln!("[app] event loop: {e}");
+    }
+    if let Some(app) = app::uninstall() {
+        app.cloud.quit_flush();
+        app.store.flush();
+    }
+    tray::remove();
+}
+
+fn start(app: &mut App, id: &str) {
+    app.load_holidays();
+    app.sync = app.cloud.status();
+    app.recompute_theme();
+    app.desk_refresh();
+    // Sized before it is shown; moved into place once it is on the desktop layer.
+    shell::apply_layout(app, true);
+    app.desk.window.window().on_close_requested(|| {
+        // Alt+F4 on the calendar hides it; the program stays in the tray.
+        run(|app| {
+            let _ = app.desk.window.hide();
+            shell::tray_refresh(app);
+        });
+        slint::CloseRequestResponse::KeepWindowShown
+    });
+    let _ = app.desk.window.show();
+    window::when_created(app.desk.window.as_weak(), |hwnd| {
+        pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
+        pd::install(hwnd);
+        run(|app| {
+            shell::apply_desk_platform(app);
+            shell::apply_layout(app, false);
+            app.desk_apply_theme(); // the window's real scale factor
+            app.last_monitor = shell::current_screen(app);
+            shell::tray_refresh(app);
+        });
+    });
+    msgwin::create(id, |e| post(move |app| events::on_msg(app, e)));
+    if let Some(h) = msgwin::hwnd() {
+        let tip = if cfg!(debug_assertions) { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
+        tray::create(h, tip, |e| post(move |app| shell::tray::on_tray(app, e)));
+    }
+    events::register_hotkeys(app);
+    autostart::sync(app.doc.settings.general.autostart);
+    seed_if_first_run(app);
+    events::auto_postpone(app);
+    events::update_holidays(app, false);
+    app.schedule_reminders();
+    let every = |ms: u64, f: fn(&mut App)| {
+        let t = slint::Timer::default();
+        t.start(slint::TimerMode::Repeated, Duration::from_millis(ms), move || run(f));
+        t
+    };
+    app.timers = vec![
+        every(30_000, events::tick),
+        every(30 * 60_000, |app| app.schedule_reminders()),
+        every(6 * 3_600_000, |app| events::update_holidays(app, false)),
+    ];
+    // Tests and measurements: FLUENTCAL_TEST_QUIT=seconds quits normally (tray icon removed,
+    // data saved), as "退出" does.
+    if let Some(s) = std::env::var("FLUENTCAL_TEST_QUIT").ok().and_then(|s| s.parse::<f64>().ok()) {
+        slint::Timer::single_shot(Duration::from_secs_f64(s), || run(quit));
+    }
+}
+
+/// First start with an empty document: sample tasks so the calendar isn't blank (REL-03; the
+/// welcome bar offers to remove them). Not undoable.
+fn seed_if_first_run(app: &mut App) {
+    if app.doc.settings.general.seeded {
+        return;
+    }
+    if app.doc.tasks.is_empty() && app.doc.groups.is_empty() {
+        let (groups, tasks) = fluentcal_core::seed::sample_data(&app.today(), fluentcal_core::date::now_ms());
+        let mut edit = Edit::default();
+        groups.iter().for_each(|g| edit.put("groups", &g.id, g.to_value()));
+        tasks.iter().for_each(|t| edit.put_task(t));
+        app.apply(edit, false);
+    }
+    app.patch_settings(serde_json::json!({ "general": { "seeded": true } }));
+}
+
+/// "退出" (tray, menu).
+pub fn quit(_app: &mut App) {
+    let _ = slint::quit_event_loop();
+}

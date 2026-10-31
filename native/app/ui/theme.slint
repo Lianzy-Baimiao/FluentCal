@@ -94,22 +94,22 @@ export component BoxShadow {
     property <int> pcy: round(cy / 1phx / k);
     visible: shadow.image.width > 0;
     // Top row: corner, stretched edge, corner.
-    Image { x: -l; y: -t; width: l + cx; height: t + cy; image-fit: fill; source: shadow.image;
+    Image { x: -l; y: -t; width: l + cx; height: t + cy; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: 0; source-clip-y: 0; source-clip-width: shadow.left + pcx; source-clip-height: shadow.top + pcy; }
-    Image { x: cx; y: -t; width: root.width - 2 * cx; height: t + cy; image-fit: fill; source: shadow.image;
+    Image { x: cx; y: -t; width: root.width - 2 * cx; height: t + cy; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: shadow.left + shadow.corner; source-clip-y: 0; source-clip-width: 1; source-clip-height: shadow.top + pcy; }
-    Image { x: root.width - cx; y: -t; width: cx + r; height: t + cy; image-fit: fill; source: shadow.image;
+    Image { x: root.width - cx; y: -t; width: cx + r; height: t + cy; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: iw - shadow.right - pcx; source-clip-y: 0; source-clip-width: shadow.right + pcx; source-clip-height: shadow.top + pcy; }
     // Middle row: the side edges (the box interior has no shadow).
-    Image { x: -l; y: cy; width: l + cx; height: root.height - 2 * cy; image-fit: fill; source: shadow.image;
+    Image { x: -l; y: cy; width: l + cx; height: root.height - 2 * cy; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: 0; source-clip-y: shadow.top + shadow.corner; source-clip-width: shadow.left + pcx; source-clip-height: 1; }
-    Image { x: root.width - cx; y: cy; width: cx + r; height: root.height - 2 * cy; image-fit: fill; source: shadow.image;
+    Image { x: root.width - cx; y: cy; width: cx + r; height: root.height - 2 * cy; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: iw - shadow.right - pcx; source-clip-y: shadow.top + shadow.corner; source-clip-width: shadow.right + pcx; source-clip-height: 1; }
     // Bottom row.
-    Image { x: -l; y: root.height - cy; width: l + cx; height: cy + b; image-fit: fill; source: shadow.image;
+    Image { x: -l; y: root.height - cy; width: l + cx; height: cy + b; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: 0; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: shadow.left + pcx; source-clip-height: shadow.bottom + pcy; }
-    Image { x: cx; y: root.height - cy; width: root.width - 2 * cx; height: cy + b; image-fit: fill; source: shadow.image;
+    Image { x: cx; y: root.height - cy; width: root.width - 2 * cx; height: cy + b; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: shadow.left + shadow.corner; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: 1; source-clip-height: shadow.bottom + pcy; }
-    Image { x: root.width - cx; y: root.height - cy; width: cx + r; height: cy + b; image-fit: fill; source: shadow.image;
+    Image { x: root.width - cx; y: root.height - cy; width: cx + r; height: cy + b; image-fit: fill; source: shadow.image; accessible-role: none;
         source-clip-x: iw - shadow.right - pcx; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: shadow.right + pcx; source-clip-height: shadow.bottom + pcy; }
 }

@@ -76,7 +76,7 @@ component TaskChip inherits Rectangle {
     callback menu(length, length);
     callback press(length, length);
     callback drag-move(length, length);
-    callback release();
+    callback release(length, length);
     property <float> fs: Theme.desk.fs;
     property <bool> bar: chip.multi-day;
     property <bool> hover: ta.has-hover;
@@ -104,7 +104,7 @@ component TaskChip inherits Rectangle {
             } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
                 root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
             } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
-                root.release();
+                root.release(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
             }
         }
         moved => { root.drag-move(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
@@ -302,15 +302,21 @@ component WeekRow inherits Rectangle {
     in property <string> flash-date;
     in property <string> dragging-key;
     in property <bool> read-only;
+    // Quick add: the day with the inline box (0.2's ui.quickAdd), and the box's text.
+    in property <string> quick-add-date;
+    in-out property <string> quick-add-text;
     callback select(string);
     callback quick-add(string);
+    callback quick-add-submit(string);
+    callback quick-add-close();
+    callback quick-add-focus();
     callback cell-menu(string, length, length);
     callback chip-toggle(ChipData);
     callback chip-open(ChipData);
     callback chip-menu(ChipData, length, length);
     callback chip-press(ChipData, length, length);
     callback chip-move(length, length);
-    callback chip-release();
+    callback chip-release(length, length);
     callback more(string, length, length, length, length);
     property <length> gap: Theme.desk.cell-gap;
     property <float> fs: Theme.desk.fs;
@@ -357,7 +363,7 @@ component WeekRow inherits Rectangle {
         menu(x, y) => { root.chip-menu(ch, x, y); }
         press(x, y) => { root.chip-press(ch, x, y); }
         drag-move(x, y) => { root.chip-move(x, y); }
-        release => { root.chip-release(); }
+        release(x, y) => { root.chip-release(x, y); }
     }
     for n[i] in week.more: Rectangle {
         x: area-x + i * (cell-w + gap) + 2px;
@@ -383,13 +389,71 @@ component WeekRow inherits Rectangle {
             double-clicked => { }
         }
     }
+    // Quick add: an inline box at the bottom of the day cell; stays open for the next entry.
+    for c[i] in week.cells: Rectangle {
+        x: area-x + i * (cell-w + gap) + 1px;
+        y: root.height - self.height - 3px;
+        width: cell-w - 2px;
+        height: chip-h + 6px;
+        visible: c.date == root.quick-add-date;
+        if c.date == root.quick-add-date: Rectangle {
+            BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+            Rectangle {
+                border-radius: 4px;
+                background: Theme.c.solid-base;
+                border-width: 1px;
+                border-color: Theme.c.control-stroke;
+            }
+            Rectangle {
+                y: parent.height - 2px;
+                height: 2px;
+                background: Theme.c.accent-fill;
+            }
+            if qa.text == "": Text {
+                x: 7px;
+                width: parent.width - 14px;
+                height: parent.height;
+                text: "添加任务，回车保存";
+                font-size: 12px * fs;
+                color: Theme.c.text-tertiary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            qa := TextInput {
+                x: 7px;
+                width: parent.width - 14px;
+                height: parent.height;
+                text <=> root.quick-add-text;
+                font-size: 12px * fs;
+                color: Theme.c.text-primary;
+                selection-background-color: Theme.c.accent-fill;
+                selection-foreground-color: Theme.c.text-on-accent;
+                vertical-alignment: center;
+                single-line: true;
+                accessible-label: "快速添加任务";
+                init => { self.focus(); }
+                accepted => {
+                    if self.text != "" { root.quick-add-submit(self.text); }
+                }
+                key-pressed(e) => {
+                    if e.text == Key.Escape { root.quick-add-close(); return accept; }
+                    reject
+                }
+                changed has-focus => {
+                    if self.has-focus { root.quick-add-focus(); } else { root.quick-add-close(); }
+                }
+            }
+        }
+    }
 }
 
 export struct WeekdayHead { label: string, rest: bool }
 
 // Month view and multi-week view: weekday header and week rows. `capacity` (task lanes that fit
-// in a row) goes back to Rust, which lays the chips out for it.
-component MonthView inherits Rectangle {
+// in a row) goes back to Rust, which lays the chips out for it. A TouchArea so that the wheel
+// over any day pages (scroll events the cells don't take come up here).
+component MonthView inherits TouchArea {
     in property <[WeekData]> weeks;
     in property <[WeekdayHead]> heads;
     in property <bool> show-week-no;
@@ -409,18 +473,34 @@ component MonthView inherits Rectangle {
     property <int> n: max(1, weeks.length);
     property <length> row-h: (grid-h - gap * (n - 1)) / n;
     out property <int> capacity: max(0, floor((row-h - head-h - 3px + Theme.desk.line-gap) / lane-h));
+    // Grid geometry in window coordinates, for finding the day under the pointer (drag).
+    out property <length> grid-abs-x: self.absolute-position.x + area-x;
+    out property <length> grid-abs-y: self.absolute-position.y + grid-y;
+    out property <length> cell-w: col-w;
+    out property <length> cell-h: row-h;
+    out property <length> cell-gap: gap;
+    in property <string> quick-add-date;
+    in-out property <string> quick-add-text;
+    callback wheel(length, bool);
     callback select(string);
     callback quick-add(string);
+    callback quick-add-submit(string);
+    callback quick-add-close();
+    callback quick-add-focus();
     callback cell-menu(string, length, length);
     callback chip-toggle(ChipData);
     callback chip-open(ChipData);
     callback chip-menu(ChipData, length, length);
     callback chip-press(ChipData, length, length);
     callback chip-move(length, length);
-    callback chip-release();
+    callback chip-release(length, length);
     callback more(string, length, length, length, length);
     property <length> area-x: show-week-no ? 18px + gap : 0;
     property <length> col-w: (root.width - area-x - 6 * gap) / 7;
+    scroll-event(e) => {
+        root.wheel(e.delta-y, e.modifiers.control);
+        accept
+    }
     if show-week-no: GText {
         x: 0;
         y: 0;
@@ -456,15 +536,20 @@ component MonthView inherits Rectangle {
         flash-date: root.flash-date;
         dragging-key: root.dragging-key;
         read-only: root.read-only;
+        quick-add-date: root.quick-add-date;
+        quick-add-text <=> root.quick-add-text;
         select(d) => { root.select(d); }
         quick-add(d) => { root.quick-add(d); }
+        quick-add-submit(t) => { root.quick-add-submit(t); }
+        quick-add-close => { root.quick-add-close(); }
+        quick-add-focus => { root.quick-add-focus(); }
         cell-menu(d, x, y) => { root.cell-menu(d, x, y); }
         chip-toggle(c) => { root.chip-toggle(c); }
         chip-open(c) => { root.chip-open(c); }
         chip-menu(c, x, y) => { root.chip-menu(c, x, y); }
         chip-press(c, x, y) => { root.chip-press(c, x, y); }
         chip-move(x, y) => { root.chip-move(x, y); }
-        chip-release => { root.chip-release(); }
+        chip-release(x, y) => { root.chip-release(x, y); }
         more(d, x, y, w, h) => { root.more(d, x, y, w, h); }
     }
 }
@@ -489,11 +574,20 @@ component TitleBar inherits Rectangle {
     callback toggle-lock();
     callback settings();
     callback more-menu(length, length, length, length);
+    // Adjust mode: a press on the empty title bar moves the window.
+    callback start-move();
     // 0.2's container queries measure the content box (padding 0 2px 0 4px).
     property <bool> wide: root.width - 6px > 520px;
     property <bool> mid: root.width - 6px > 430px;
     property <float> fs: Theme.desk.fs;
     height: 36px;
+    TouchArea {
+        enabled: !root.locked;
+        mouse-cursor: move;
+        pointer-event(e) => {
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.start-move(); }
+        }
+    }
     HorizontalLayout {
         padding-left: 4px;
         padding-right: 2px;
@@ -668,6 +762,28 @@ component CountdownBar inherits Rectangle {
     }
 }
 
+// Adjust mode outline: CSS `outline: 2px dashed` (dash = twice the width).
+component DashedOutline {
+    in property <brush> color;
+    property <length> t: 2px;
+    property <int> nx: max(1, floor(root.width / (2 * t)));
+    property <int> ny: max(1, floor(root.height / (2 * t)));
+    for i in nx: Rectangle { x: i * root.width / nx; y: 0; width: root.width / nx / 2; height: t; background: root.color; }
+    for i in nx: Rectangle { x: i * root.width / nx; y: root.height - t; width: root.width / nx / 2; height: t; background: root.color; }
+    for i in ny: Rectangle { x: 0; y: i * root.height / ny; width: t; height: root.height / ny / 2; background: root.color; }
+    for i in ny: Rectangle { x: root.width - t; y: i * root.height / ny; width: t; height: root.height / ny / 2; background: root.color; }
+}
+
+// Resize grip of the adjust mode (the .grip elements of 0.2): `edge` is the winit
+// ResizeDirection name.
+component Grip inherits TouchArea {
+    in property <string> edge;
+    callback resize(string);
+    pointer-event(e) => {
+        if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.resize(root.edge); }
+    }
+}
+
 // The desk window: transparent, the calendar card inset by `pad` so its shadow has room.
 export component DeskWindow inherits Window {
     in property <string> title-text;
@@ -685,74 +801,227 @@ export component DeskWindow inherits Window {
     in property <bool> sync-busy;
     in property <bool> sync-failed;
     in property <string> sync-tip;
+    in property <string> quick-add-date;
+    in-out property <string> quick-add-text;
+    // Dragging a chip onto another day: the ghost label follows the pointer.
+    in property <bool> drag-active;
+    in property <string> drag-label;
+    in property <length> drag-x;
+    in property <length> drag-y;
+    in property <string> drop-date;
+    in property <string> dragging-key;
+    // Transient message at the bottom, optionally with 撤销.
+    in property <string> toast-text;
+    in property <bool> toast-undo;
     out property <int> capacity: month.capacity;
+    out property <length> grid-x: month.grid-abs-x;
+    out property <length> grid-y: month.grid-abs-y;
+    out property <length> cell-w: month.cell-w;
+    out property <length> cell-h: month.cell-h;
+    out property <length> cell-gap: month.cell-gap;
     callback capacity-changed(int);
     callback page(int);
     callback go-today();
     callback set-view(string);
     callback select(string);
     callback quick-add(string);
+    callback quick-add-submit(string);
+    callback quick-add-close();
+    callback quick-add-focus();
     callback jump(string);
     callback chip-toggle(ChipData);
     callback chip-open(ChipData);
+    callback chip-menu(ChipData, length, length);
+    callback chip-press(ChipData, length, length);
+    callback chip-move(length, length);
+    callback chip-release(length, length);
+    callback cell-menu(string, length, length);
+    callback more(string, length, length, length, length);
+    callback wheel(length, bool);
+    callback search();
+    callback sync-now();
+    callback toggle-lock();
+    callback settings();
+    callback more-menu(length, length, length, length);
+    callback pick-month(length, length, length, length);
+    callback start-move();
+    callback start-resize(string);
+    callback toast-undo-clicked();
+    callback toast-close();
+    // Keys not taken by a text box: (text, ctrl, shift, alt) → handled.
+    callback key(string, bool, bool, bool) -> bool;
+    public function focus-root() { keys.focus(); }
     title: "FluentCal";
     no-frame: true;
     background: transparent;
     default-font-family: Theme.font-ui;
     default-font-size: 14px;
+    min-width: 360px;
+    min-height: 280px;
     property <length> pad: Theme.desk.pad;
-    card := Rectangle {
-        x: pad;
-        y: pad;
-        width: root.width - 2 * pad;
-        height: root.height - 2 * pad;
-        BoxShadow {
-            width: parent.width;
-            height: parent.height;
-            shadow: Theme.shadow-desk;
+    keys := FocusScope {
+        init => { self.focus(); }
+        key-pressed(e) => {
+            if root.key(e.text, e.modifiers.control, e.modifiers.shift, e.modifiers.alt) { return accept; }
+            reject
         }
-        Rectangle {
-            border-radius: Theme.desk.radius;
-            background: Theme.desk.bg;
-            border-width: 1px;
-            border-color: Theme.desk.stroke;
+        card := Rectangle {
+            x: pad;
+            y: pad;
+            width: root.width - 2 * pad;
+            height: root.height - 2 * pad;
+            BoxShadow {
+                width: parent.width;
+                height: parent.height;
+                shadow: Theme.shadow-desk;
+            }
+            Rectangle {
+                border-radius: Theme.desk.radius;
+                background: Theme.desk.bg;
+                border-width: 1px;
+                border-color: Theme.desk.stroke;
+            }
+            VerticalLayout {
+                padding-top: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-bottom: 8px;
+                spacing: 4px;
+                tb := TitleBar {
+                    title: root.title-text;
+                    view: root.view;
+                    locked: root.locked;
+                    sync-enabled: root.sync-enabled;
+                    sync-busy: root.sync-busy;
+                    sync-failed: root.sync-failed;
+                    sync-tip: root.sync-tip;
+                    today-tip: root.today-tip;
+                    page(d) => { root.page(d); }
+                    go-today => { root.go-today(); }
+                    set-view(v) => { root.set-view(v); }
+                    search => { root.search(); }
+                    sync-now => { root.sync-now(); }
+                    toggle-lock => { root.toggle-lock(); }
+                    settings => { root.settings(); }
+                    more-menu(x, y, w, h) => { root.more-menu(x, y, w, h); }
+                    pick-month(x, y, w, h) => { root.pick-month(x, y, w, h); }
+                    start-move => { root.start-move(); }
+                }
+                month := MonthView {
+                    vertical-stretch: 1;
+                    weeks: root.weeks;
+                    heads: root.heads;
+                    show-week-no: root.show-week-no;
+                    selected: root.selected;
+                    flash-date: root.flash-date;
+                    drop-date: root.drop-date;
+                    dragging-key: root.dragging-key;
+                    read-only: root.read-only;
+                    quick-add-date: root.quick-add-date;
+                    quick-add-text <=> root.quick-add-text;
+                    select(d) => { root.select(d); }
+                    quick-add(d) => { root.quick-add(d); }
+                    quick-add-submit(t) => { root.quick-add-submit(t); }
+                    quick-add-close => { root.quick-add-close(); }
+                    quick-add-focus => { root.quick-add-focus(); }
+                    chip-toggle(c) => { root.chip-toggle(c); }
+                    chip-open(c) => { root.chip-open(c); }
+                    chip-menu(c, x, y) => { root.chip-menu(c, x, y); }
+                    chip-press(c, x, y) => { root.chip-press(c, x, y); }
+                    chip-move(x, y) => { root.chip-move(x, y); }
+                    chip-release(x, y) => { root.chip-release(x, y); }
+                    cell-menu(d, x, y) => { root.cell-menu(d, x, y); }
+                    more(d, x, y, w, h) => { root.more(d, x, y, w, h); }
+                    wheel(dy, ctrl) => { root.wheel(dy, ctrl); }
+                    changed capacity => { root.capacity-changed(self.capacity); }
+                }
+                if root.countdowns.length > 0: CountdownBar {
+                    items: root.countdowns;
+                    jump(d) => { root.jump(d); }
+                }
+            }
+            // Adjust mode: the calendar ignores the mouse; a press anywhere below the title
+            // bar moves the window (in 0.2 everything but the title bar, bars and grips).
+            if !root.locked: TouchArea {
+                y: tb.y + tb.height;
+                height: parent.height - self.y;
+                mouse-cursor: move;
+                pointer-event(e) => {
+                    if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { root.start-move(); }
+                }
+            }
+            if !root.locked: DashedOutline {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+                color: Theme.c.accent-fill;
+            }
+            if !root.locked: Grip { x: 8px; y: 0; width: parent.width - 16px; height: 8px; edge: "North"; mouse-cursor: ns-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: 8px; y: parent.height - 8px; width: parent.width - 16px; height: 8px; edge: "South"; mouse-cursor: ns-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: parent.width - 8px; y: 8px; width: 8px; height: parent.height - 16px; edge: "East"; mouse-cursor: ew-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: 0; y: 8px; width: 8px; height: parent.height - 16px; edge: "West"; mouse-cursor: ew-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: parent.width - 16px; y: 0; width: 16px; height: 16px; edge: "NorthEast"; mouse-cursor: nesw-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: 0; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthWest"; mouse-cursor: nesw-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: 0; y: 0; width: 16px; height: 16px; edge: "NorthWest"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
+            if !root.locked: Grip { x: parent.width - 16px; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthEast"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
+            // Toast (the .toast of 0.2): bottom centre of the card.
+            if root.toast-text != "": Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: parent.height - 14px - self.height;
+                width: tl.preferred-width;
+                height: tl.preferred-height;
+                BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+                Rectangle {
+                    border-radius: 8px;
+                    background: Theme.c.flyout-fill;
+                    border-width: 1px;
+                    border-color: Theme.c.card-stroke;
+                }
+                tl := HorizontalLayout {
+                    padding-left: 15px;
+                    padding-right: 5px;
+                    padding-top: 5px;
+                    padding-bottom: 5px;
+                    spacing: 8px;
+                    cross-axis-alignment: center;
+                    Text {
+                        text: root.toast-text;
+                        font-size: 13px;
+                        color: Theme.c.text-primary;
+                    }
+                    if root.toast-undo: Button {
+                        size: ButtonSize.small;
+                        variant: ButtonVariant.accent;
+                        text: "撤销";
+                        clicked => { root.toast-undo-clicked(); }
+                    }
+                    Button {
+                        size: ButtonSize.icon;
+                        variant: ButtonVariant.subtle;
+                        icon: Glyph.close;
+                        accessible-label: "关闭";
+                        clicked => { root.toast-close(); }
+                    }
+                }
+            }
         }
-        VerticalLayout {
-            padding-top: 6px;
-            padding-left: 8px;
-            padding-right: 8px;
-            padding-bottom: 8px;
-            spacing: 4px;
-            TitleBar {
-                title: root.title-text;
-                view: root.view;
-                locked: root.locked;
-                sync-enabled: root.sync-enabled;
-                sync-busy: root.sync-busy;
-                sync-failed: root.sync-failed;
-                sync-tip: root.sync-tip;
-                today-tip: root.today-tip;
-                page(d) => { root.page(d); }
-                go-today => { root.go-today(); }
-                set-view(v) => { root.set-view(v); }
-            }
-            month := MonthView {
-                vertical-stretch: 1;
-                weeks: root.weeks;
-                heads: root.heads;
-                show-week-no: root.show-week-no;
-                selected: root.selected;
-                flash-date: root.flash-date;
-                read-only: root.read-only;
-                select(d) => { root.select(d); }
-                quick-add(d) => { root.quick-add(d); }
-                chip-toggle(c) => { root.chip-toggle(c); }
-                chip-open(c) => { root.chip-open(c); }
-                changed capacity => { root.capacity-changed(self.capacity); }
-            }
-            if root.countdowns.length > 0: CountdownBar {
-                items: root.countdowns;
-                jump(d) => { root.jump(d); }
+        // Drag ghost (the .ghost of 0.2), in window coordinates.
+        if root.drag-active: Rectangle {
+            x: root.drag-x + 12px;
+            y: root.drag-y + 10px;
+            width: min(220px, gl.preferred-width + 16px);
+            height: 22px;
+            BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+            Rectangle { border-radius: 4px; background: Theme.c.accent-fill; }
+            gl := Text {
+                x: 8px;
+                width: parent.width - 16px;
+                text: root.drag-label;
+                font-size: 12px;
+                color: Theme.c.text-on-accent;
+                vertical-alignment: center;
+                overflow: elide;
             }
         }
     }

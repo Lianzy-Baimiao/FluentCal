@@ -3,7 +3,14 @@
 
 slint::include_modules!();
 
+pub mod app;
 pub mod desk;
 pub mod fonts;
+pub mod platform;
+pub mod reminders;
 pub mod shadow;
+pub mod shell;
+pub mod startup;
 pub mod theme;
+pub mod webcmd;
+pub mod windows;

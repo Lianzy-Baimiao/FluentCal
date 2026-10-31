@@ -24,11 +24,36 @@ pub struct DeskUi {
     pub selected: String,
     /// Day highlighted briefly after a jump.
     pub flash: String,
+    /// Arrow keys move the selected day (a day was clicked; 0.2: a focused cell).
+    pub grid_focus: bool,
+    /// Day with the inline quick-add box.
+    pub quick_add: Option<String>,
+    /// Wheel paging: accumulated delta and the time of the last page (ms).
+    pub wheel_acc: f32,
+    pub wheel_at: i64,
 }
 
 impl DeskUi {
     pub fn new(doc: &Doc, today: &str) -> DeskUi {
-        DeskUi { cursor: start_of_month(today), weeks_start: default_weeks_start(doc, today), selected: today.to_owned(), flash: String::new() }
+        DeskUi {
+            cursor: start_of_month(today),
+            weeks_start: default_weeks_start(doc, today),
+            selected: today.to_owned(),
+            ..Default::default()
+        }
+    }
+}
+
+/// First and last day shown (month view: whole weeks around the month).
+pub fn shown_range(doc: &Doc, ui: &DeskUi) -> (String, String) {
+    let c = &doc.settings.calendar;
+    if c.view == "weeks" {
+        let n = c.weeks_rows.clamp(2, 10) as i32;
+        (ui.weeks_start.clone(), add_days(&ui.weeks_start, n * 7 - 1))
+    } else {
+        let (y, m, _) = parts(&ui.cursor);
+        let w = month_weeks(y, m, c.week_start, c.month_rows == "six");
+        (w[0].clone(), add_days(w.last().unwrap(), 6))
     }
 }
 

@@ -15,3 +15,6 @@ native/.cargo/config.toml
 
 # native/: visual parity renderings (scripts/parity.mjs)
 native/.parity/
+
+# agent worktrees
+.claude/worktrees/

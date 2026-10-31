@@ -1,0 +1,190 @@
+//! What the desk window's buttons, cells and chips do (0.2's desk/state.ts and the handlers
+//! of TitleBar, MonthView, WeekRow and TaskChip). Keyboard, wheel, drag: input.rs.
+
+use super::vm::{self, shown_range};
+use crate::app::App;
+use fluentcal_core::date::{add_days, now_ms, start_of_month, start_of_week};
+use fluentcal_core::model::Task;
+use fluentcal_core::tasks;
+use serde_json::json;
+use slint::Model;
+use std::time::Duration;
+
+impl App {
+    pub fn desk_page(&mut self, delta: i32) {
+        vm::page(&self.doc, &mut self.desk.ui, delta);
+        self.desk_refresh_view();
+    }
+
+    pub fn desk_go_today(&mut self) {
+        let today = self.today();
+        let ui = &mut self.desk.ui;
+        ui.cursor = start_of_month(&today);
+        ui.weeks_start = vm::default_weeks_start(&self.doc, &today);
+        ui.selected = today.clone();
+        self.desk_flash(&today);
+        self.desk_refresh_view();
+    }
+
+    /// Shows `date` (switching away from the Gantt view) and highlights it.
+    pub fn desk_jump(&mut self, date: &str) {
+        if self.doc.settings.calendar.view == "gantt" {
+            self.patch_settings(json!({ "calendar": { "view": "month" } }));
+        }
+        let c = &self.doc.settings.calendar;
+        let ui = &mut self.desk.ui;
+        ui.cursor = start_of_month(date);
+        ui.weeks_start = add_days(&start_of_week(date, c.week_start), -7 * c.weeks_past as i32);
+        ui.selected = date.to_owned();
+        self.desk_flash(date);
+        self.desk_refresh_view();
+    }
+
+    pub fn desk_set_view(&mut self, view: &str) {
+        self.history.boundary();
+        self.patch_settings(json!({ "calendar": { "view": view } }));
+    }
+
+    pub fn desk_flash(&mut self, date: &str) {
+        self.desk.ui.flash = date.to_owned();
+        self.desk.window.set_flash_date(date.into());
+        self.desk.flash_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(1600), || {
+            crate::app::run(|app| {
+                app.desk.ui.flash.clear();
+                app.desk.window.set_flash_date("".into());
+            })
+        });
+    }
+
+    /// A click on a day: selects it (arrow keys move from there).
+    pub fn desk_select(&mut self, date: &str) {
+        self.desk.ui.selected = date.to_owned();
+        self.desk.ui.grid_focus = true;
+        self.desk.window.set_selected(date.into());
+        self.desk.window.invoke_focus_root();
+    }
+
+    /// Keyboard: selects `date`, paging when it is outside the shown days.
+    pub fn desk_select_key(&mut self, date: &str) {
+        let (first, last) = shown_range(&self.doc, &self.desk.ui);
+        let ui = &mut self.desk.ui;
+        ui.selected = date.to_owned();
+        if self.doc.settings.calendar.view == "weeks" {
+            if date < first.as_str() {
+                ui.weeks_start = add_days(&ui.weeks_start, -7);
+            } else if date > last.as_str() {
+                ui.weeks_start = add_days(&ui.weeks_start, 7);
+            }
+        } else if date < first.as_str() || date > last.as_str() {
+            ui.cursor = start_of_month(date);
+        }
+        self.desk_refresh_view();
+    }
+
+    /// Transient message at the bottom of the calendar (0.2's notify).
+    pub fn notify(&mut self, text: &str, undo: bool) {
+        let w = &self.desk.window;
+        w.set_toast_text(text.into());
+        w.set_toast_undo(undo && self.history.can_undo());
+        let ms = if undo { 6000 } else { 2500 };
+        self.desk.toast_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(ms), || {
+            crate::app::run(|app| app.desk.window.set_toast_text("".into()))
+        });
+    }
+
+    pub fn desk_close_toast(&mut self) {
+        self.desk.toast_timer.stop();
+        self.desk.window.set_toast_text("".into());
+    }
+
+    // ------------------------------------------------------------- quick add
+
+    pub fn desk_quick_add(&mut self, date: &str) {
+        if self.desk.window.get_read_only() {
+            return;
+        }
+        self.desk.ui.quick_add = Some(date.to_owned());
+        self.desk.window.set_quick_add_text("".into());
+        self.desk.window.set_quick_add_date(date.into());
+    }
+
+    pub fn desk_quick_add_close(&mut self) {
+        self.desk.ui.quick_add = None;
+        self.desk.window.set_quick_add_date("".into());
+        self.desk.window.invoke_focus_root();
+    }
+
+    /// The box got the focus: the calendar (which normally doesn't activate) takes the keyboard.
+    pub fn desk_wants_keyboard(&mut self) {
+        if crate::platform::desk::allow_keyboard() {
+            crate::platform::desk::focus();
+        }
+    }
+
+    pub fn desk_quick_add_submit(&mut self, text: &str) {
+        let title = text.trim().to_owned();
+        let Some(date) = self.desk.ui.quick_add.clone() else { return };
+        if title.is_empty() {
+            return;
+        }
+        self.history.boundary();
+        self.desk.window.set_quick_add_text("".into());
+        let (edit, _) = tasks::add_task(&self.doc, Task { title: title.clone(), start: date.clone(), ..Default::default() }, None, now_ms());
+        self.apply(edit, true);
+        // Stays open for the next entry; tell when the new task went behind "+N".
+        if let Some(n) = self.desk_overflow_on(&date).filter(|n| *n > 0) {
+            self.notify(&format!("已添加“{title}”（点 +{n} 查看）"), false);
+        }
+    }
+
+    /// "+N" count of a shown day.
+    fn desk_overflow_on(&self, date: &str) -> Option<i32> {
+        let weeks = self.desk.window.get_weeks();
+        for w in weeks.iter() {
+            if let Some(i) = w.cells.iter().position(|c| c.date == date) {
+                return w.more.row_data(i);
+            }
+        }
+        None
+    }
+
+    // ------------------------------------------------------------- chips
+
+    pub fn desk_chip_toggle(&mut self, task_id: &str, date: &str, done: bool) {
+        if self.desk.window.get_read_only() {
+            return;
+        }
+        self.history.boundary();
+        let Some(t) = self.doc.tasks.get(task_id).cloned() else { return };
+        let edit = tasks::set_occurrence_done(&self.doc, &t, date, !done, now_ms());
+        self.apply(edit, true);
+    }
+
+    pub fn desk_undo(&mut self, from_toast: bool) {
+        self.history.boundary();
+        let doc = &self.doc;
+        let r = self.history.undo(|c, id| doc.raw(c, id));
+        self.replayed(r, "撤销", from_toast);
+    }
+
+    pub fn desk_redo(&mut self) {
+        self.history.boundary();
+        let doc = &self.doc;
+        let r = self.history.redo(|c, id| doc.raw(c, id));
+        self.replayed(r, "重做", false);
+    }
+
+    fn replayed(&mut self, r: fluentcal_core::history::Replay, verb: &str, quiet: bool) {
+        let (done, skipped) = (r.done, r.skipped);
+        self.apply(r.edit, false);
+        if quiet {
+            self.desk_close_toast();
+        } else if !done {
+            self.notify(&format!("没有可{verb}的操作"), false);
+        } else if skipped > 0 {
+            self.notify(&format!("已{verb}（{skipped} 项已在其他窗口修改，保持不变）"), false);
+        } else {
+            self.notify(&format!("已{verb}"), false);
+        }
+    }
+}

@@ -1,6 +1,12 @@
-//! The desk calendar window.
+//! The desk calendar window: view models (vm), the live window (live, wire, actions) and an
+//! offscreen helper for the parity snapshots (`Desk`).
 
+pub mod actions;
+pub mod input;
+pub mod live;
+pub mod popups;
 pub mod vm;
+pub mod wire;
 
 use crate::DeskWindow;
 use fluentcal_core::tasks::Doc;
@@ -8,7 +14,32 @@ use fluentcal_core::theme::Tokens;
 use slint::ComponentHandle;
 use vm::DeskUi;
 
-/// The desk window's data: the document, the window's own state and the theme.
+/// Sets everything the window shows that comes from the document and the view state.
+pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
+    let c = &doc.settings.calendar;
+    w.set_view(c.view.clone().into());
+    w.set_locked(doc.settings.desk.locked);
+    w.set_title_text(vm::view_title(doc, ui, today).into());
+    w.set_today_tip(vm::today_tip(today).into());
+    w.set_heads(vm::weekday_heads(doc));
+    w.set_show_week_no(c.show_week_numbers);
+    w.set_selected(ui.selected.clone().into());
+    w.set_flash_date(ui.flash.clone().into());
+    push_weeks(w, doc, ui, today, capacity, t);
+}
+
+/// The week rows and the countdowns (the parts that follow tasks).
+pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
+    w.set_weeks(vm::weeks(doc, ui, today, capacity, t));
+    w.set_countdowns(vm::countdown_items(doc, today));
+}
+
+/// Lane capacity the window's layout gives now.
+pub fn capacity_of(w: &DeskWindow) -> Option<usize> {
+    Some(w.get_capacity().max(0) as usize)
+}
+
+/// The desk window drawn offscreen with fixed data (examples/snapshot.rs).
 pub struct Desk {
     pub window: DeskWindow,
     pub doc: Doc,
@@ -25,30 +56,17 @@ impl Desk {
         Desk { window, doc, ui, today, tokens, capacity: None }
     }
 
-    /// Pushes everything to the window.
     pub fn refresh(&mut self) {
-        let w = &self.window;
-        let c = &self.doc.settings.calendar;
-        w.set_view(c.view.clone().into());
-        w.set_locked(self.doc.settings.desk.locked);
-        w.set_title_text(vm::view_title(&self.doc, &self.ui, &self.today).into());
-        w.set_today_tip(vm::today_tip(&self.today).into());
-        w.set_heads(vm::weekday_heads(&self.doc));
-        w.set_show_week_no(c.show_week_numbers);
-        w.set_selected(self.ui.selected.clone().into());
-        w.set_flash_date(self.ui.flash.clone().into());
-        w.set_countdowns(vm::countdown_items(&self.doc, &self.today));
-        self.refresh_weeks();
+        push_all(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
     }
 
     pub fn refresh_weeks(&mut self) {
-        let weeks = vm::weeks(&self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
-        self.window.set_weeks(weeks);
+        push_weeks(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
     }
 
     /// Re-lays the chips out if the lane capacity changed; true when it did.
     pub fn sync_capacity(&mut self) -> bool {
-        let cap = Some(self.window.get_capacity().max(0) as usize);
+        let cap = capacity_of(&self.window);
         if cap == self.capacity {
             return false;
         }
