@@ -3,6 +3,7 @@
 
 pub mod actions;
 pub mod drag;
+pub mod export;
 pub mod geom;
 pub mod keys;
 pub mod model;

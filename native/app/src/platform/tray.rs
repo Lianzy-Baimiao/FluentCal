@@ -127,10 +127,17 @@ pub fn on_message(hwnd: HWND, lparam: usize) {
 
 fn show_menu(hwnd: HWND) -> Option<String> {
     let items = STATE.lock().unwrap().items.clone();
+    track(hwnd, &items)
+}
+
+/// A Win32 popup menu at the cursor, owned by `hwnd` (which comes to the foreground so the
+/// menu closes on a click elsewhere). The chosen item's id.
+pub fn track(hwnd: HWND, items: &[Item]) -> Option<String> {
+    allow_dark_menus();
     let mut ids = Vec::new();
     unsafe {
         let menu = CreatePopupMenu().ok()?;
-        build(menu, &items, &mut ids);
+        build(menu, items, &mut ids);
         let mut pt = POINT::default();
         let _ = GetCursorPos(&mut pt);
         // Required so the menu closes when the user clicks elsewhere (KB Q135788).

@@ -1,0 +1,96 @@
+// Reminder cards (0.2's src/windows/reminder, REM-03): newest first, stacked at the bottom of
+// a small topmost window in the bottom-right corner; it never takes the focus.
+
+import { Theme, BoxShadow } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+
+export struct ReminderCard { key: string, title: string, body: string }
+
+component Card inherits Rectangle {
+    in property <ReminderCard> r;
+    callback done();
+    callback snooze(int);
+    callback dismiss();
+    callback later(length, length, length, length);
+    accessible-role: groupbox;
+    accessible-label: r.title;
+    BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+    Rectangle { border-radius: 8px; background: Theme.c.solid-base.transparentize(0.03); border-width: 1px; border-color: Theme.c.card-stroke; }
+    VerticalLayout {
+        padding-top: 11px;
+        padding-left: 13px;
+        padding-right: 13px;
+        padding-bottom: 13px;
+        HorizontalLayout {
+            height: 24px;
+            spacing: 6px;
+            cross-axis-alignment: center;
+            Icon { glyph: Glyph.alarm; size: 14px; color: Theme.c.accent-text; }
+            Text { horizontal-stretch: 1; text: "FluentCal 提醒"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+            Rectangle {
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                background: xt.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: button;
+                accessible-label: "关闭提醒";
+                Icon { glyph: Glyph.close; size: 10px; color: Theme.c.text-secondary; }
+                xt := TouchArea { clicked => { root.dismiss(); } }
+            }
+        }
+        Rectangle { height: 6px; }
+        Text { height: 20px; text: r.title; font-size: 14px; font-weight: 600; color: Theme.c.text-primary; vertical-alignment: center; overflow: elide; }
+        Rectangle { height: 2px; }
+        Text { height: 20px; text: r.body; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; overflow: elide; }
+        Rectangle { height: 10px; }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Button { variant: ButtonVariant.accent; size: ButtonSize.small; icon: Glyph.check-mark; text: "完成"; clicked => { root.done(); } }
+            Button { size: ButtonSize.small; text: "10 分钟后提醒"; clicked => { root.snooze(10); } }
+            lt := Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.small;
+                icon: Glyph.chevron-down;
+                accessible-label: "选择稍后提醒的时间";
+                clicked => { root.later(lt.absolute-position.x, lt.absolute-position.y, lt.width, lt.height); }
+            }
+        }
+    }
+}
+
+export component ReminderWindow inherits Window {
+    in property <[ReminderCard]> items;
+    callback done(string);
+    callback snooze(string, int);
+    callback dismiss(string);
+    callback later(string, length, length, length, length);
+    title: "FluentCal 提醒";
+    no-frame: true;
+    background: transparent;
+    default-font-family: Theme.font-ui;
+    default-font-size: 14px;
+    accessible-role: groupbox;
+    accessible-label: "任务提醒";
+    Flickable {
+        x: 4px;
+        y: 4px;
+        width: parent.width - 8px;
+        height: parent.height - 8px;
+        content-height: max(self.height, stack.preferred-height);
+        // Stacked at the bottom; more than fit scroll.
+        stack := VerticalLayout {
+            y: max(0px, parent.height - self.preferred-height);
+            height: self.preferred-height;
+            spacing: 8px;
+            for r in root.items: Card {
+                r: r;
+                done => { root.done(r.key); }
+                snooze(m) => { root.snooze(r.key, m); }
+                dismiss => { root.dismiss(r.key); }
+                later(x, y, w, h) => { root.later(r.key, x, y, w, h); }
+            }
+        }
+    }
+}

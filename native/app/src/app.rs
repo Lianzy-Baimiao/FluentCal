@@ -42,6 +42,7 @@ pub struct App {
     /// The date the clock last saw (a new day moves the calendar along).
     pub day: String,
     pub web: crate::webcmd::WebState,
+    pub reminder_win: Option<crate::ReminderWindow>,
 }
 
 thread_local! {

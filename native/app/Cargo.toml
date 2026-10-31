@@ -17,6 +17,8 @@ path = "src/main.rs"
 fluentcal-core = { path = "../core" }
 getrandom = "0.3.4"
 raw-window-handle = "0.6"
+# Gantt PNG export: rasterises the exported SVG (as 0.2 drew it on a canvas).
+resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts", "memmap-fonts"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 # Software renderer only (4.6 MB idle; femtovg/OpenGL costs about 96 MB, 需求文档 7.7).
@@ -41,6 +43,7 @@ windows = { version = "0.62.2", features = [
     "Win32_NetworkManagement_Ndis",
     "Win32_Networking_WinSock",
     "Win32_Security",
+    "Win32_System_Com",
     "Win32_System_DataExchange",
     "Win32_System_Diagnostics_Debug",
     "Win32_System_LibraryLoader",
@@ -49,6 +52,7 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
 ] }
 windows-version = "0.1.7"

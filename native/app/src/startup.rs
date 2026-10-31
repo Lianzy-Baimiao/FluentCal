@@ -124,6 +124,7 @@ pub fn main() {
         last_monitor: None,
         day: today,
         web: Default::default(),
+        reminder_win: None,
     });
     run(move |app| start(app, &id));
     if let Err(e) = slint::run_event_loop_until_quit() {

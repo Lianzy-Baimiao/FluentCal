@@ -3,6 +3,7 @@
 
 pub mod autostart;
 pub mod desk;
+pub mod dialog;
 pub mod msgwin;
 pub mod net;
 pub mod screens;
