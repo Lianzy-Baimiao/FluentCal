@@ -105,6 +105,26 @@ Windows 上 Rust 默认用 MSVC 工具链，需要 Visual Studio Build Tools（�
 2. 链接器用 rustc 自带的 rust-lld（做一个名为 `ld.exe` 的硬链接），因为 GNU ld 会把 LLVM 导入库链接错。
 3. 项目路径含中文时，把构建目录（`target-dir`）设到纯英文路径下，因为 GNU 工具打不开中文路径下的文件。
 
+### 原生版（native/，开发中）
+
+0.3 起改为 Rust 原生界面（[Slint](https://slint.dev)，软件渲染），不再需要 WebView2：空闲内存约 10 MB（0.2 约 104 MB）。
+0.2 的 Tauri 版保留在仓库中，原生版功能齐全前仍以它为准。原生版同样用 GNU 工具链，把 `src-tauri/.cargo/config.toml`
+复制到 `native/.cargo/config.toml`（改一个构建目录）。
+
+```bash
+cd native
+cargo run -p fluentcal-native        # 开发运行：测试数据在 %APPDATA%\com.fluentcal.native.dev，与已安装的版本互不影响
+cargo test -p fluentcal-core         # 日历逻辑、存储、云同步、网页服务、主题（与 0.2 的测试对应）
+cargo test -p fluentcal-native       # 端到端：真实程序 + Slint 无头测试后端，模拟点击、拖动、按键
+cd ..
+npm run parity && scripts/parity-native.sh   # 与 0.2 逐像素对比（同一示例数据、同一时刻，125% 缩放）
+scripts/build-native.sh              # 发布版 + GitHub 安装包（NSIS）
+scripts/build-msix.sh                # Microsoft Store 包（MSIX）
+```
+
+`native/vendor/i-slint-renderer-software` 是打了一处补丁的 Slint 软件渲染器（字形 hinting 和覆盖率校正，使文字粗细与
+WebView2 一致），说明见其中的 README。
+
 ## 目录
 
 ```
@@ -132,6 +152,7 @@ src
 - 农历、节气、宜忌：[tyme4ts](https://github.com/6tail/tyme4ts)（MIT）
 - 框架：[Tauri](https://tauri.app)（MIT / Apache-2.0）、[Vue](https://vuejs.org)（MIT）
 - 二维码：[uqr](https://github.com/unjs/uqr)（MIT）
+- 原生界面：[Slint](https://slint.dev)（免版税许可证，需在“关于”中注明）、[resvg](https://github.com/linebender/resvg)（甘特图导出 PNG，Apache-2.0 / MIT）
 - 图标：Windows 自带的 Segoe Fluent Icons 字体（不随程序分发）
 
 ## 常见问题
