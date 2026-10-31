@@ -30,6 +30,9 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
     if old.general.autostart != new.general.autostart {
         autostart::sync(new.general.autostart);
     }
+    if old.web != new.web {
+        app.web_apply();
+    }
     // The saved place (bounds) is written without telling anyone; it isn't appearance.
     let look = |d: &fluentcal_core::settings::Desk| fluentcal_core::settings::Desk { bounds: None, ..d.clone() };
     if old.theme != new.theme || look(o) != look(n) {

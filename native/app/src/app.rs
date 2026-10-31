@@ -41,6 +41,7 @@ pub struct App {
     pub last_monitor: Option<usize>,
     /// The date the clock last saw (a new day moves the calendar along).
     pub day: String,
+    pub web: crate::webcmd::WebState,
 }
 
 thread_local! {

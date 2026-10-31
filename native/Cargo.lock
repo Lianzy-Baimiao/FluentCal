@@ -1237,6 +1237,7 @@ name = "fluentcal-native"
 version = "0.3.0"
 dependencies = [
  "fluentcal-core",
+ "getrandom 0.3.4",
  "png",
  "raw-window-handle",
  "serde",

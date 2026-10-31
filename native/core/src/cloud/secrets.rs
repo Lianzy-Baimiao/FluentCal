@@ -11,8 +11,18 @@ pub const KEYS: [&str; 3] = ["webdav", "github", "gitee"];
 /// Left in Credential Manager by Google Drive sync (0.2.0); deleted at startup.
 pub const OLD_GOOGLE: [&str; 2] = ["google-secret", "google-refresh"];
 
+static NAMESPACE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Credentials are stored as "<namespace>/sync/<key>"; the installed program uses "FluentCal"
+/// (shared with 0.2). Development builds set another one at startup so they never read or
+/// overwrite the user's passwords.
+pub fn set_namespace(ns: &str) {
+    let _ = NAMESPACE.set(ns.to_owned());
+}
+
 fn target(key: &str) -> HSTRING {
-    HSTRING::from(format!("FluentCal/sync/{key}"))
+    let ns = NAMESPACE.get().map_or("FluentCal", String::as_str);
+    HSTRING::from(format!("{ns}/sync/{key}"))
 }
 
 pub fn set(key: &str, value: &str) -> Result<(), String> {

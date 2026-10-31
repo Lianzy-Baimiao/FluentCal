@@ -4,6 +4,7 @@
 pub mod autostart;
 pub mod desk;
 pub mod msgwin;
+pub mod net;
 pub mod screens;
 pub mod sysinfo;
 pub mod toast;

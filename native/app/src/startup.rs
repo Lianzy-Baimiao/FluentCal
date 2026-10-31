@@ -39,6 +39,9 @@ pub fn main() {
         return fatal(&format!("无法初始化界面：{e}"));
     }
     crate::fonts::setup();
+    if cfg!(debug_assertions) {
+        cloud::secrets::set_namespace("FluentCal-dev");
+    }
     let local = local_dir(&id);
     let _ = std::fs::create_dir_all(&local);
     let (dir, local_settings, data_dir) = fluentcal_core::datadir::resolve(&local);
@@ -120,6 +123,7 @@ pub fn main() {
         theme_timer: Default::default(),
         last_monitor: None,
         day: today,
+        web: Default::default(),
     });
     run(move |app| start(app, &id));
     if let Err(e) = slint::run_event_loop_until_quit() {
@@ -166,6 +170,7 @@ fn start(app: &mut App, id: &str) {
     }
     events::register_hotkeys(app);
     autostart::sync(app.doc.settings.general.autostart);
+    app.web_apply();
     seed_if_first_run(app);
     events::auto_postpone(app);
     events::update_holidays(app, false);
