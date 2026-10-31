@@ -38,6 +38,12 @@ pub fn on_msg(app: &mut App, e: MsgEvent) {
             app.open_editor_new(None);
         }
         MsgEvent::Hotkey(_) => {}
+        // Progman comes back a little later; the calendar may have gone with the old one.
+        MsgEvent::TaskbarCreated => {
+            for ms in [1500u64, 5000] {
+                slint::Timer::single_shot(Duration::from_millis(ms), || crate::app::run(crate::startup::ensure_desk_window));
+            }
+        }
     }
 }
 
@@ -95,6 +101,7 @@ impl App {
 /// Every 30 s. A new day: a calendar left on the desktop overnight follows the date unless the
 /// user paged away; overdue tasks move on; reminders are rescheduled.
 pub fn tick(app: &mut App) {
+    crate::startup::ensure_desk_window(app);
     let today = app.today();
     if today == app.day {
         return;

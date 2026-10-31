@@ -145,29 +145,8 @@ fn start(app: &mut App, id: &str) {
         let today = app.today();
         app.desk.gantt.center = Some((today, 0.3));
     }
-    app.desk_refresh();
-    // Sized before it is shown; moved into place once it is on the desktop layer.
-    shell::apply_layout(app, true);
-    app.desk.window.window().on_close_requested(|| {
-        // Alt+F4 on the calendar hides it; the program stays in the tray.
-        run(|app| {
-            let _ = app.desk.window.hide();
-            shell::tray_refresh(app);
-        });
-        slint::CloseRequestResponse::KeepWindowShown
-    });
-    let _ = app.desk.window.show();
-    window::when_created(app.desk.window.as_weak(), |hwnd| {
-        pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
-        pd::install(hwnd);
-        run(|app| {
-            shell::apply_desk_platform(app);
-            shell::apply_layout(app, false);
-            app.desk_apply_theme(); // the window's real scale factor
-            app.last_monitor = shell::current_screen(app);
-            shell::tray_refresh(app);
-        });
-    });
+    pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
+    show_desk_window(app);
     msgwin::create(id, |e| post(move |app| events::on_msg(app, e)));
     if let Some(h) = msgwin::hwnd() {
         let tip = if cfg!(debug_assertions) { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
@@ -195,6 +174,48 @@ fn start(app: &mut App, id: &str) {
     if let Some(s) = std::env::var("FLUENTCAL_TEST_QUIT").ok().and_then(|s| s.parse::<f64>().ok()) {
         slint::Timer::single_shot(Duration::from_secs_f64(s), || run(quit));
     }
+}
+
+/// Shows the (new) desk window: sized first, then pinned and moved into place once it exists.
+fn show_desk_window(app: &mut App) {
+    app.desk_refresh();
+    shell::apply_layout(app, true);
+    app.desk.window.window().on_close_requested(|| {
+        // Alt+F4 on the calendar hides it; the program stays in the tray.
+        run(|app| {
+            let _ = app.desk.window.hide();
+            shell::tray_refresh(app);
+        });
+        slint::CloseRequestResponse::KeepWindowShown
+    });
+    let _ = app.desk.window.show();
+    window::when_created(app.desk.window.as_weak(), |hwnd| {
+        pd::install(hwnd);
+        run(|app| {
+            shell::apply_desk_platform(app);
+            shell::apply_layout(app, false);
+            app.desk_apply_theme(); // the window's real scale factor
+            app.last_monitor = shell::current_screen(app);
+            shell::tray_refresh(app);
+        });
+    });
+}
+
+/// Explorer restarts can take the calendar down with Progman (its owner): build a new one
+/// (0.2's recreate_desk_later). The view state (month, selection) carries over.
+pub fn ensure_desk_window(app: &mut App) {
+    let gone = pd::desk_hwnd().is_some_and(|h| unsafe { !windows::Win32::UI::WindowsAndMessaging::IsWindow(Some(h)).as_bool() });
+    if !gone {
+        return;
+    }
+    pd::uninstall();
+    window::next(window::Kind::Desk);
+    let Ok(w) = DeskWindow::new() else { return };
+    crate::desk::wire::wire(&w);
+    let ui = std::mem::take(&mut app.desk.ui);
+    app.desk = DeskLive::new(w, ui);
+    app.recompute_theme();
+    show_desk_window(app);
 }
 
 /// First start with an empty document: sample tasks so the calendar isn't blank (REL-03; the

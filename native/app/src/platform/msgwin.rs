@@ -18,6 +18,8 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 pub enum MsgEvent {
     /// Another start of the program (its command line arguments).
     SecondInstance(Vec<String>),
+    /// Explorer (the taskbar) started again.
+    TaskbarCreated,
     /// A registered hotkey (its id).
     Hotkey(i32),
 }
@@ -147,6 +149,9 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
         }
         m if m != 0 && m == MSG_TASKBAR_CREATED.load(std::sync::atomic::Ordering::Relaxed) => {
             super::tray::readd();
+            if let Some(f) = ON_EVENT.get() {
+                f(MsgEvent::TaskbarCreated);
+            }
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wp, lp),
