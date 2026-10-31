@@ -27,10 +27,14 @@ pub fn is_enabled() -> bool {
     read_run().is_some()
 }
 
-/// Makes the Run value match the setting (the installed program only, never a test run).
+/// Makes the Run value (or, from the Store package, the startup task) match the setting.
+/// The installed program only, never a test run.
 pub fn sync(want: bool) {
     if super::isolated() {
         return;
+    }
+    if super::package::is_packaged() {
+        return super::package::sync_startup_task(want);
     }
     let Some(cmd) = command() else { return };
     unsafe {

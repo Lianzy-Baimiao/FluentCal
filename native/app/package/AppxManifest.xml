@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft Store package of FluentCal (需求文档 7.7). Filled in by scripts/build-msix.sh:
+     $VERSION (x.y.z.0); the identity ($IDENTITY_NAME, $PUBLISHER, $PUBLISHER_NAME) comes from
+     Partner Center once the app name is reserved (placeholders until then). -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap5 desktop rescap">
+  <Identity Name="$IDENTITY_NAME" Publisher="$PUBLISHER" Version="$VERSION" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>FluentCal 桌面日历</DisplayName>
+    <PublisherDisplayName>$PUBLISHER_NAME</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="zh-CN" />
+  </Resources>
+  <Applications>
+    <Application Id="FluentCal" Executable="fluentcal.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="FluentCal 桌面日历"
+        Description="钉在桌面上的 Windows 11 风格日历与甘特图"
+        BackgroundColor="transparent"
+        Square150x150Logo="assets\Square150x150Logo.png"
+        Square44x44Logo="assets\Square44x44Logo.png" />
+      <Extensions>
+        <!-- Start with Windows (settings › 常规 › 开机启动): platform/package.rs -->
+        <uap5:Extension Category="windows.startupTask" Executable="fluentcal.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask TaskId="FluentCalStartup" Enabled="true" DisplayName="FluentCal 桌面日历" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

@@ -5,12 +5,18 @@
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::System::Registry::*;
 
-pub fn app_id() -> &'static str {
-    if super::isolated() { "com.fluentcal.native.dev" } else { "com.fluentcal.desktop" }
+pub fn app_id() -> String {
+    if let Some(id) = super::package::app_user_model_id() {
+        return id; // the Store package's own identity
+    }
+    if super::isolated() { "com.fluentcal.native.dev".into() } else { "com.fluentcal.desktop".into() }
 }
 
 /// Display name and icon for the AppUserModelID (HKCU\Software\Classes\AppUserModelId\<id>).
 pub fn register(icon_png: Option<&std::path::Path>) {
+    if super::package::is_packaged() {
+        return; // the package's manifest names the app
+    }
     let key = HSTRING::from(format!(r"Software\Classes\AppUserModelId\{}", app_id()));
     let name = if super::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
     let set = |value: PCWSTR, text: &str| unsafe {
@@ -24,5 +30,5 @@ pub fn register(icon_png: Option<&std::path::Path>) {
 }
 
 pub fn show(title: &str, body: &str) -> Result<(), String> {
-    tauri_winrt_notification::Toast::new(app_id()).title(title).text1(body).show().map_err(|e| e.to_string())
+    tauri_winrt_notification::Toast::new(&app_id()).title(title).text1(body).show().map_err(|e| e.to_string())
 }

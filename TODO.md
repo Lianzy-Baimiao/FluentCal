@@ -160,7 +160,11 @@
 - [ ] 测试：0.2 的 e2e / a11y 用例改为原生版（离屏渲染 + 事件注入）
 - [ ] 打包
   - [x] GitHub 安装包（NSIS，scripts/build-native.sh）：与 0.2 同一安装位置和卸载项，原地升级
-  - [ ] MSIX（商店）：本机没有 Windows SDK（makeappx）；清单与打包脚本
+  - [x] MSIX（商店）：清单 native/app/package/AppxManifest.xml、scripts/build-msix.sh（makeappx 取自微软的
+        SDK BuildTools NuGet 包，不装 SDK），7.1 MB，未签名（商店签名）。包内运行时：开机启动走 StartupTask，
+        通知用包的身份，%APPDATA% 写时复制到包的私有目录（首次启动读到 0.2 的数据）
+  - [ ] 本机安装测试 MSIX：需要受信任的签名证书或开发者模式旁加载，由用户决定；商店身份（名称、发布者）
+        要在合作伙伴中心预留名称后填入
   - [ ] GitHub 版自带更新
 - [ ] Slint 免版税许可证要求：“关于”页显示 AboutSlint，或在下载页放 Made with Slint 标志
 - [ ] 上架 Microsoft Store（需要用户本人注册合作伙伴中心账号）
