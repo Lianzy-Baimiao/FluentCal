@@ -148,6 +148,19 @@ impl App {
         None
     }
 
+    /// Deletes a task (or one occurrence of a repeating one) and offers undo (0.2's removeTask).
+    pub fn desk_remove_task(&mut self, t: &Task, occurrence: Option<(&str, tasks::DeleteMode)>) {
+        self.history.boundary();
+        let edit = match occurrence.filter(|_| t.repeat.is_some()) {
+            Some((date, mode)) => tasks::delete_occurrence(&self.doc, t, date, mode, now_ms()),
+            None => tasks::delete_task(&self.doc, &t.id, now_ms()),
+        };
+        self.apply(edit, true);
+        let short: String = t.title.chars().take(16).collect();
+        let name = if t.title.chars().count() > 16 { format!("{short}…") } else { short };
+        self.notify(&format!("已删除“{name}”"), true);
+    }
+
     // ------------------------------------------------------------- chips
 
     pub fn desk_chip_toggle(&mut self, task_id: &str, date: &str, done: bool) {

@@ -1,0 +1,240 @@
+// The Gantt view of the desk window (0.2's GanttView.vue + gantt.css): toolbar, a header and
+// a task table that stay in place while the chart scrolls under them.
+
+import { Theme, BoxShadow } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize, Segmented } from "controls.slint";
+import { GanttData } from "gantt_types.slint";
+import { GBarItem, GMilestone, GSummaryItem, GLinkItem } from "gantt_parts.slint";
+import { GTableRow } from "gantt_table.slint";
+
+export { GanttData }
+
+export component GanttView inherits Rectangle {
+    property <length> rh: 32px;
+    property <length> head: 44px;
+    property <color> grid: Theme.c.text-primary.transparentize(0.93);
+    property <color> rowline: Theme.c.text-primary.transparentize(0.95);
+    property <length> tw: GanttData.table-w;
+    // Visible chart size (for Rust: scrolling to a date, virtualising).
+    out property <length> chart-view-w: chart.width;
+    out property <length> chart-view-h: chart.height;
+    // Where the chart's (0, 0) is in this view, for the floating drag label.
+    out property <length> chart-origin-x: area.x + chart.x;
+    out property <length> chart-origin-y: area.y + chart.y;
+    VerticalLayout {
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 4px;
+            cross-axis-alignment: center;
+            HorizontalLayout {
+                padding-left: 4px;
+                min-width: 84px;
+                horizontal-stretch: 0;
+                Text { text: GanttData.label; font-size: 12px; font-weight: 600; color: Theme.c.text-primary; vertical-alignment: center; }
+            }
+            Segmented {
+                horizontal-stretch: 0;
+                small: true;
+                value: GanttData.scale;
+                options: [{ value: "day", label: "日" }, { value: "week", label: "周" }, { value: "month", label: "月" }];
+                selected(v) => { GanttData.set-scale(v); }
+            }
+            Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.today; text: "今天"; clicked => { GanttData.go-today(); } }
+            Rectangle { horizontal-stretch: 1; }
+            if !GanttData.read-only: Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.add; text: "新建分组"; clicked => { GanttData.new-group(); } }
+            opt := Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.filter;
+                accessible-label: "显示选项";
+                clicked => { GanttData.options(opt.absolute-position.x, opt.absolute-position.y, opt.width, opt.height); }
+            }
+        }
+        area := Rectangle {
+            vertical-stretch: 1;
+            border-radius: 6px;
+            background: Theme.desk.cell-bg;
+            clip: true;
+            accessible-role: table;
+            accessible-label: "甘特图";
+            chart := Flickable {
+                x: tw;
+                y: head;
+                width: parent.width - tw;
+                height: parent.height - head;
+                content-width: max(GanttData.chart-w, self.width);
+                content-height: max(GanttData.body-h, self.height);
+                content-x <=> GanttData.scroll-x;
+                content-y <=> GanttData.scroll-y;
+                mouse-drag-pan-enabled: false;
+                changed content-x => { GanttData.scrolled(); }
+                changed content-y => { GanttData.scrolled(); }
+                changed width => { GanttData.scrolled(); }
+                TouchArea {
+                    x: 0;
+                    y: 0;
+                    width: GanttData.chart-w;
+                    height: GanttData.body-h;
+                    pointer-event(e) => { if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { GanttData.chart-down(); } }
+                    scroll-event(e) => {
+                        if e.modifiers.control { GanttData.zoom(e.delta-y > 0 ? 1 : -1); return accept; }
+                        reject
+                    }
+                    for x in GanttData.week-lines: Rectangle { x: x; width: 1px; background: grid; }
+                    for x in GanttData.month-lines: Rectangle { x: x; width: 1px; background: Theme.c.divider; }
+                    for s in GanttData.stripes: Rectangle { x: s.x; width: s.w; background: s.holiday ? Theme.desk.holiday-text.transparentize(0.92) : Theme.desk.rest-tint; }
+                    for r[i] in GanttData.rows: Rectangle {
+                        y: i * rh;
+                        height: rh;
+                        background: r.kind == "group" ? Theme.c.subtle-fill-pressed : r.kind == "task" && r.id == GanttData.selected ? Theme.c.accent-fill.transparentize(0.9) : r.kind == "add" && za.has-hover ? Theme.c.accent-fill.transparentize(0.95) : transparent;
+                        za := TouchArea {
+                            enabled: r.kind == "add" && !GanttData.read-only;
+                            mouse-cursor: r.kind == "add" ? crosshair : default;
+                            pointer-event(e) => {
+                                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { GanttData.zone-down(r.id, i, self.mouse-x); }
+                                if e.button == PointerEventButton.left && e.kind == PointerEventKind.up { GanttData.zone-up(); }
+                            }
+                            moved => { GanttData.zone-move(self.mouse-x); }
+                        }
+                    }
+                    for r[i] in GanttData.rows: Rectangle { y: i * rh + rh - 1px; height: 1px; background: rowline; }
+                    for l in GanttData.links: GLinkItem { l: l; }
+                    if GanttData.rubber-show: GLinkItem { l: GanttData.rubber; rubber: true; ok: !GanttData.rubber.late; }
+                    Rectangle { x: GanttData.today-x - 1px; width: 2px; background: Theme.c.accent-fill; opacity: 0.8; }
+                    for s in GanttData.summaries: GSummaryItem { s: s; rh: rh; }
+                    for b in GanttData.bars: GBarItem { b: b; rh: rh; }
+                    for b in GanttData.milestones: GMilestone { b: b; rh: rh; }
+                    if GanttData.ghost-show: Rectangle {
+                        x: GanttData.ghost-x;
+                        y: GanttData.ghost-row * rh + 6px;
+                        width: GanttData.ghost-w;
+                        height: 20px;
+                        border-radius: 4px;
+                        border-width: 1.5px;
+                        border-color: Theme.c.accent-fill;
+                        background: Theme.c.accent-fill.transparentize(0.82);
+                    }
+                }
+            }
+            // Task table: scrolls with the chart vertically, stays put horizontally.
+            if tw > 0: Rectangle {
+                x: 0;
+                y: head;
+                width: tw;
+                height: parent.height - head;
+                clip: true;
+                Rectangle { y: GanttData.scroll-y; height: GanttData.rows.length * rh; background: Theme.desk.panel-bg; }
+                Rectangle { x: parent.width - 1px; y: 0; width: 1px; height: min(parent.height, GanttData.rows.length * rh + GanttData.scroll-y); background: Theme.c.divider; }
+                // The wheel over the table scrolls the chart (rows inside, so their wheel comes up here).
+                TouchArea {
+                    scroll-event(e) => {
+                        GanttData.scroll-y = max(min(0px, chart.height - chart.content-height), min(0px, GanttData.scroll-y + e.delta-y));
+                        accept
+                    }
+                    for r[i] in GanttData.rows: GTableRow { x: 0; y: GanttData.scroll-y + i * rh; width: tw - 1px; r: r; }
+                }
+            }
+            // Header: month (or year) tier with labels that stay in view, day/week/month tier.
+            Rectangle {
+                x: tw;
+                y: 0;
+                width: parent.width - tw;
+                height: head;
+                background: Theme.desk.panel-bg;
+                clip: true;
+                for c in GanttData.top: Rectangle {
+                    x: GanttData.scroll-x + c.x;
+                    y: 0;
+                    width: c.w;
+                    height: 22px;
+                    clip: true;
+                    Rectangle { x: 0; width: 1px; background: Theme.c.divider; }
+                    // The label (padding 6) sticks 6 px from the chart's left edge, within its cell.
+                    Text {
+                        x: min(max(6px, 12px - (GanttData.scroll-x + c.x)), c.w - self.width - 6px);
+                        text: c.label;
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: Theme.c.text-primary;
+                        vertical-alignment: center;
+                    }
+                }
+                for c in GanttData.bottom: Rectangle {
+                    x: GanttData.scroll-x + c.x;
+                    y: 22px;
+                    width: c.w;
+                    height: 21px;
+                    clip: true;
+                    if GanttData.scale != "day": Rectangle { x: 0; width: 1px; background: Theme.c.divider; }
+                    // Today: a pill in every scale (the span's own style wins over the cell's colour).
+                    if c.today: Rectangle {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - 18px) / 2;
+                        width: max(18px, dl.preferred-width + 8px);
+                        height: 18px;
+                        border-radius: 9px;
+                        background: Theme.c.accent-fill;
+                    }
+                    dl := Text {
+                        text: c.label;
+                        font-size: 12px;
+                        font-weight: c.today ? 600 : 400;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        color: c.today ? Theme.c.text-on-accent : c.rest ? Theme.desk.holiday-text : Theme.c.text-secondary;
+                    }
+                }
+                Rectangle { y: head - 1px; height: 1px; background: Theme.c.divider; }
+                TouchArea {
+                    scroll-event(e) => {
+                        GanttData.scroll-x = max(min(0px, chart.width - chart.content-width), min(0px, GanttData.scroll-x + (e.delta-x != 0 ? e.delta-x : e.delta-y)));
+                        accept
+                    }
+                }
+            }
+            if tw > 0: Rectangle {
+                x: 0;
+                y: 0;
+                width: tw;
+                height: head;
+                background: Theme.desk.panel-bg;
+                Text { x: 10px; y: head - 6px - 20px; height: 20px; text: "任务"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+                Rectangle { y: head - 1px; height: 1px; background: Theme.c.divider; }
+                Rectangle { x: tw - 1px; width: 1px; background: Theme.c.divider; }
+            }
+            if tw > 0: sp := TouchArea {
+                x: tw - 3px;
+                width: 6px;
+                mouse-cursor: col-resize;
+                Rectangle { background: sp.has-hover ? Theme.c.accent-fill.transparentize(0.6) : transparent; }
+                pointer-event(e) => {
+                    if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { GanttData.split-down(self.absolute-position.x + self.mouse-x); }
+                    if e.button == PointerEventButton.left && e.kind == PointerEventKind.up { GanttData.split-up(); }
+                }
+                moved => { GanttData.split-move(self.absolute-position.x + self.mouse-x); }
+            }
+            if GanttData.rows.length == 0: VerticalLayout {
+                y: head;
+                height: parent.height - head;
+                alignment: center;
+                spacing: 8px;
+                Text { text: "还没有可显示的任务。"; font-size: 12px; color: Theme.c.text-secondary; horizontal-alignment: center; }
+                if !GanttData.read-only: HorizontalLayout {
+                    alignment: center;
+                    Button { variant: ButtonVariant.accent; icon: Glyph.add; text: "新建分组"; clicked => { GanttData.new-group(); } }
+                }
+            }
+        }
+    }
+    // Floating label while dragging (dates or percentage): chart-local position, scrolled.
+    if GanttData.tip-show: Rectangle {
+        x: root.chart-origin-x + GanttData.scroll-x + GanttData.tip-x + 14px;
+        y: root.chart-origin-y + GanttData.scroll-y + GanttData.tip-y + 16px;
+        width: tt.preferred-width + 16px;
+        height: tt.preferred-height + 8px;
+        BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+        Rectangle { border-radius: 4px; background: Theme.c.flyout-fill; border-width: 1px; border-color: Theme.c.card-stroke; }
+        tt := Text { x: 8px; y: 4px; text: GanttData.tip-text; font-size: 12px; color: Theme.c.text-primary; }
+    }
+}

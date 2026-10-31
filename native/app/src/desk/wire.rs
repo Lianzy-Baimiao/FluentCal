@@ -4,6 +4,7 @@ use crate::app::{run, with};
 use crate::DeskWindow;
 
 pub fn wire(w: &DeskWindow) {
+    super::gantt::keys::wire(w);
     w.on_capacity_changed(|_| run(|a| a.desk_sync_capacity()));
     w.on_page(|d| run(move |a| a.desk_page(d)));
     w.on_go_today(|| run(|a| a.desk_go_today()));

@@ -1,0 +1,135 @@
+// Gantt view data (0.2's gantt/model.ts computeds), set by src/desk/gantt; callbacks go back
+// there. Coordinates are chart-local: x from the chart's first day, y from the first row.
+
+import { ShadowImage } from "theme.slint";
+
+// A table row: a group (with its summary), a task or the "添加任务" row.
+export struct GRow {
+    // "group" | "task" | "add"
+    kind: string,
+    key: string,
+    // Group and add row: the group id (__ungrouped__ for 未分组). Task: the task id.
+    id: string,
+    name: string,
+    // Group: dot colour. Task: the check's fill (the task colour).
+    color: color,
+    // Task check border: color-mix(bar 70 %, text-secondary).
+    check-ring: color,
+    collapsed: bool,
+    // Group: task count. Task: "10/9–10/11" (shown when the table is wide enough).
+    meta: string,
+    meta-tip: string,
+    pct: string,
+    checked: bool,
+    // Done and not repeating: struck through.
+    done: bool,
+    repeat: bool,
+    milestone: bool,
+    // A group the user made (未分组 can't be renamed).
+    real: bool,
+}
+
+export struct GBar {
+    key: string,
+    task-id: string,
+    date: string,
+    row: int,
+    x: length,
+    w: length,
+    progress: float,
+    done: bool,
+    rep: bool,
+    milestone: bool,
+    title: string,
+    // The title fits inside the bar; else it goes to the right.
+    inside: bool,
+    bar: color,
+    on-bar: color,
+    text: color,
+    rep-outline: color,
+    tip: string,
+}
+
+export struct GSummary { key: string, row: int, x: length, w: length, progress: float, color: color }
+
+// A dependency arrow in its own box; `path` and the arrow head are relative to the box.
+export struct GLink { key: string, x: length, y: length, w: length, h: length, path: string, arrow: string, late: bool }
+
+export struct GCell { key: string, label: string, x: length, w: length, today: bool, rest: bool }
+
+export struct GStripe { x: length, w: length, holiday: bool }
+
+export global GanttData {
+    in property <[GRow]> rows;
+    in property <[GBar]> bars;
+    in property <[GBar]> milestones;
+    in property <[GSummary]> summaries;
+    in property <[GLink]> links;
+    in property <[GCell]> top;
+    in property <[GCell]> bottom;
+    in property <[GStripe]> stripes;
+    in property <[length]> month-lines;
+    in property <[length]> week-lines;
+    in property <string> scale: "day";
+    in property <length> dw: 32px;
+    in property <length> table-w: 220px;
+    in property <length> chart-w;
+    in property <length> body-h;
+    in property <length> today-x;
+    in property <bool> show-dates;
+    in property <bool> show-pct: true;
+    // Year and month at 30 % of the chart, for the toolbar.
+    in property <string> label;
+    in property <string> selected;
+    in property <bool> read-only;
+    // Inline rename: the row key ("" = none) and the text.
+    in property <string> renaming;
+    in-out property <string> rename-text;
+    // Drag feedback: the dashed bar on an add row, the link rubber band, the floating label.
+    in property <bool> ghost-show;
+    in property <int> ghost-row;
+    in property <length> ghost-x;
+    in property <length> ghost-w;
+    in property <bool> rubber-show;
+    // The rubber band as a dashed path in its own box; `late` = can't link here.
+    in property <GLink> rubber;
+    in property <bool> tip-show;
+    in property <string> tip-text;
+    in property <length> tip-x;
+    in property <length> tip-y;
+    // The chart's scroll position (viewport offsets, ≤ 0).
+    in-out property <length> scroll-x;
+    in-out property <length> scroll-y;
+    in property <ShadowImage> bar-shadow;
+    callback set-scale(string);
+    callback go-today();
+    callback new-group();
+    callback options(length, length, length, length);
+    callback scrolled();
+    callback zoom(int);
+    callback row-click(GRow);
+    callback row-dbl(GRow);
+    callback row-menu(GRow, length, length);
+    callback row-check(GRow);
+    callback row-chevron(GRow);
+    callback row-rename(GRow);
+    callback add-task(string);
+    callback rename-commit();
+    callback rename-cancel();
+    callback rename-focus();
+    callback split-down(length);
+    callback split-move(length);
+    callback split-up();
+    callback chart-down();
+    callback bar-down(GBar, string, length, length);
+    callback bar-move(length, length);
+    callback bar-up();
+    callback bar-dbl(GBar);
+    callback bar-menu(GBar, length, length);
+    callback zone-down(string, int, length);
+    callback zone-move(length);
+    callback zone-up();
+    callback link-down(GBar, length, length);
+    callback link-move(length, length);
+    callback link-up(length, length);
+}

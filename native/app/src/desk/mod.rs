@@ -2,6 +2,7 @@
 //! offscreen helper for the parity snapshots (`Desk`).
 
 pub mod actions;
+pub mod gantt;
 pub mod input;
 pub mod live;
 pub mod popups;
@@ -48,24 +49,38 @@ pub struct Desk {
     pub tokens: Tokens,
     /// Task lanes that fit in a week row (from the window's layout).
     pub capacity: Option<usize>,
+    pub gantt: gantt::GanttUi,
 }
 
 impl Desk {
     pub fn new(window: DeskWindow, doc: Doc, today: String, tokens: Tokens) -> Desk {
         let ui = DeskUi::new(&doc, &today);
-        Desk { window, doc, ui, today, tokens, capacity: None }
+        let gantt = gantt::GanttUi { center: Some((today.clone(), 0.3)), ..Default::default() };
+        Desk { window, doc, ui, today, tokens, capacity: None, gantt }
+    }
+
+    fn gantt_view(&mut self) -> gantt::View<'_> {
+        gantt::View { window: &self.window, doc: &self.doc, tokens: &self.tokens, today: &self.today, g: &mut self.gantt }
     }
 
     pub fn refresh(&mut self) {
         push_all(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
+        if self.doc.settings.calendar.view == "gantt" {
+            self.gantt_view().push();
+        }
     }
 
     pub fn refresh_weeks(&mut self) {
         push_weeks(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
     }
 
-    /// Re-lays the chips out if the lane capacity changed; true when it did.
+    /// Re-lays the chips out if the lane capacity changed; true when it did. (Also applies the
+    /// Gantt view's first scroll, which needs the laid-out size.)
     pub fn sync_capacity(&mut self) -> bool {
+        if self.doc.settings.calendar.view == "gantt" && self.gantt.center.is_some() {
+            self.gantt_view().scrolled();
+            return true;
+        }
         let cap = capacity_of(&self.window);
         if cap == self.capacity {
             return false;

@@ -39,6 +39,18 @@ impl App {
         self.notify(PENDING, false);
     }
 
+    pub fn gantt_options(&mut self, _anchor: (f32, f32, f32, f32)) {
+        self.notify(PENDING, false);
+    }
+
+    pub fn gantt_row_menu(&mut self, _row: &crate::GRow, _x: f32, _y: f32) {
+        self.notify(PENDING, false);
+    }
+
+    pub fn gantt_bar_menu(&mut self, _bar: &crate::GBar, _x: f32, _y: f32) {
+        self.notify(PENDING, false);
+    }
+
     pub fn desk_toggle_lock(&mut self) {
         self.history.boundary();
         let locked = !self.doc.settings.desk.locked;

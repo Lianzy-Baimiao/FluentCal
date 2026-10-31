@@ -42,6 +42,10 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
         let today = app.today();
         app.desk.ui.weeks_start = crate::desk::vm::default_weeks_start(&app.doc, &today);
     }
+    if old.calendar.view != new.calendar.view && new.calendar.view == "gantt" {
+        let today = app.today();
+        app.gantt_scroll_to(&today, 0.3);
+    }
     app.desk_refresh();
     tray_refresh(app);
     if old.reminders != new.reminders || old.tasks != new.tasks {

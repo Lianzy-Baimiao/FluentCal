@@ -203,16 +203,26 @@ pub fn week_label(iso: &str) -> String {
     format!("第 {} 周", iso_week(iso))
 }
 
-/// SVG path for a finish-to-start dependency arrow between two bars.
-pub fn dep_path(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> String {
+/// The corners of a finish-to-start dependency arrow between two bars, first to last.
+pub fn dep_points(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> Vec<(f64, f64)> {
     let gap = 8.0;
     if to_x - from_x >= gap * 2.0 {
         let mid = from_x + gap;
-        return format!("M{from_x},{from_y} H{mid} V{to_y} H{to_x}");
+        return vec![(from_x, from_y), (mid, from_y), (mid, to_y), (to_x, to_y)];
     }
     // Successor starts before the predecessor ends: route around below the source bar.
     let down = from_y + if to_y > from_y { 1.0 } else { -1.0 } * (ROW_HEIGHT / 2.0);
-    format!("M{from_x},{from_y} H{} V{down} H{} V{to_y} H{to_x}", from_x + gap, to_x - gap)
+    vec![(from_x, from_y), (from_x + gap, from_y), (from_x + gap, down), (to_x - gap, down), (to_x - gap, to_y), (to_x, to_y)]
+}
+
+/// SVG path for a finish-to-start dependency arrow between two bars.
+pub fn dep_path(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> String {
+    let p = dep_points(from_x, from_y, to_x, to_y);
+    let mut out = format!("M{},{}", p[0].0, p[0].1);
+    for w in p.windows(2) {
+        out += &if w[0].1 == w[1].1 { format!(" H{}", w[1].0) } else { format!(" V{}", w[1].1) };
+    }
+    out
 }
 
 /// True when `to` already (transitively) depends on `from`, i.e. adding from → to would loop.

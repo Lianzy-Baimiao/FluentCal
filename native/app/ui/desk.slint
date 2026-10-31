@@ -4,6 +4,7 @@
 import { Theme, BoxShadow } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
 import { GText, Button, ButtonVariant, ButtonSize, Segmented, SegOption } from "controls.slint";
+import { GanttView } from "gantt.slint";
 
 export struct CellData {
     date: string,
@@ -819,6 +820,8 @@ export component DeskWindow inherits Window {
     out property <length> cell-w: month.cell-w;
     out property <length> cell-h: month.cell-h;
     out property <length> cell-gap: month.cell-gap;
+    out property <length> gantt-view-w: gantt.chart-view-w;
+    out property <length> gantt-view-h: gantt.chart-view-h;
     callback capacity-changed(int);
     callback page(int);
     callback go-today();
@@ -907,8 +910,10 @@ export component DeskWindow inherits Window {
                     pick-month(x, y, w, h) => { root.pick-month(x, y, w, h); }
                     start-move => { root.start-move(); }
                 }
+                Rectangle {
+                vertical-stretch: 1;
                 month := MonthView {
-                    vertical-stretch: 1;
+                    visible: root.view != "gantt";
                     weeks: root.weeks;
                     heads: root.heads;
                     show-week-no: root.show-week-no;
@@ -935,7 +940,9 @@ export component DeskWindow inherits Window {
                     wheel(dy, ctrl) => { root.wheel(dy, ctrl); }
                     changed capacity => { root.capacity-changed(self.capacity); }
                 }
-                if root.countdowns.length > 0: CountdownBar {
+                gantt := GanttView { visible: root.view == "gantt"; }
+                }
+                if root.countdowns.length > 0 && root.view != "gantt": CountdownBar {
                     items: root.countdowns;
                     jump(d) => { root.jump(d); }
                 }

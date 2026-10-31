@@ -140,6 +140,10 @@ fn start(app: &mut App, id: &str) {
     app.load_holidays();
     app.sync = app.cloud.status();
     app.recompute_theme();
+    if app.doc.settings.calendar.view == "gantt" {
+        let today = app.today();
+        app.desk.gantt.center = Some((today, 0.3));
+    }
     app.desk_refresh();
     // Sized before it is shown; moved into place once it is on the desktop layer.
     shell::apply_layout(app, true);

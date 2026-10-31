@@ -1,0 +1,147 @@
+// The Gantt task table (0.2's GanttTable.vue): group rows with collapse, count and progress;
+// task rows with check, title, dates and progress; the "添加任务" rows.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { GRow, GanttData } from "gantt_types.slint";
+
+export component GTableRow inherits Rectangle {
+    in property <GRow> r;
+    property <bool> group: r.kind == "group";
+    property <bool> task: r.kind == "task";
+    property <bool> add: r.kind == "add";
+    property <bool> sel: task && GanttData.selected == r.id;
+    property <bool> editing: GanttData.renaming == r.key;
+    height: 32px;
+    // Cascade of gantt.css: hover < group < selected; the add row never shows hover.
+    background: sel ? Theme.c.accent-fill.transparentize(0.86)
+        : group ? Theme.c.subtle-fill-pressed
+        : add ? transparent
+        : ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    accessible-role: list-item;
+    accessible-label: r.name;
+    accessible-item-selected: sel;
+    ta := TouchArea {
+        clicked => { if group { GanttData.row-chevron(r); } else if task { GanttData.row-click(r); } }
+        double-clicked => { if task { GanttData.row-dbl(r); } }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up && !add {
+                GanttData.row-menu(r, root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.c.text-primary.transparentize(0.95); }
+    if !add: HorizontalLayout {
+        padding-left: group ? 6px : 26px;
+        padding-right: 8px;
+        spacing: 6px;
+        cross-axis-alignment: center;
+        if group: Rectangle {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            background: cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            Icon { glyph: r.collapsed ? Glyph.chevron-right : Glyph.chevron-down; size: 10px; color: Theme.c.text-secondary; }
+            cta := TouchArea { clicked => { GanttData.row-chevron(r); } }
+            accessible-role: button;
+            accessible-label: (r.collapsed ? "展开分组 " : "折叠分组 ") + r.name;
+        }
+        if group: Rectangle { width: 8px; height: 8px; border-radius: 2px; background: r.color; }
+        if task && !r.repeat: Rectangle {
+            width: 14px;
+            height: 14px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: r.checked ? r.color : r.check-ring;
+            background: r.checked ? r.color : transparent;
+            if r.checked: Icon { glyph: Glyph.check-mark; size: 9px; color: white; }
+            TouchArea { clicked => { if !GanttData.read-only { GanttData.row-check(r); } } double-clicked => { } }
+            accessible-role: checkbox;
+            accessible-checked: r.checked;
+            accessible-label: "完成 " + r.name;
+        }
+        if task && r.repeat: Icon { glyph: Glyph.repeat; size: 11px; color: Theme.c.text-secondary; }
+        if task && r.milestone: Path {
+            width: 10px;
+            height: 10px;
+            viewbox-width: 16;
+            viewbox-height: 16;
+            commands: "M8 1.7 14.3 8 8 14.3 1.7 8z";
+            stroke: Theme.c.text-secondary;
+            stroke-width: 1px;
+            fill: transparent;
+        }
+        name := Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0;
+            height: 32px;
+            nt := Text {
+                visible: !editing;
+                width: 100%;
+                text: r.name;
+                font-size: 13px;
+                font-weight: group ? 600 : 400;
+                color: r.done ? Theme.c.text-secondary : Theme.c.text-primary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if !editing && r.done: Rectangle {
+                x: 0;
+                y: round((parent.height / 2 + 1px) / 1phx) * 1phx;
+                width: min(parent.width, nt.preferred-width);
+                height: 1px;
+                background: Theme.c.text-secondary;
+            }
+            if !editing: TouchArea {
+                clicked => { if group { GanttData.row-chevron(r); } else { GanttData.row-click(r); } }
+                double-clicked => { if task || r.real { GanttData.row-rename(r); } }
+            }
+            if editing: Rectangle {
+                y: 4px;
+                height: 24px;
+                border-radius: 4px;
+                background: Theme.c.control-fill-input-active;
+                border-width: 1px;
+                border-color: Theme.c.control-stroke;
+                Rectangle { y: parent.height - 2px; height: 2px; background: Theme.c.accent-fill; }
+                TextInput {
+                    x: 6px;
+                    width: parent.width - 12px;
+                    text <=> GanttData.rename-text;
+                    font-size: 13px;
+                    color: Theme.c.text-primary;
+                    selection-background-color: Theme.c.accent-fill;
+                    selection-foreground-color: Theme.c.text-on-accent;
+                    vertical-alignment: center;
+                    single-line: true;
+                    init => { self.focus(); self.select-all(); }
+                    accepted => { GanttData.rename-commit(); }
+                    key-pressed(e) => { if e.text == Key.Escape { GanttData.rename-cancel(); return accept; } reject }
+                    changed has-focus => { if self.has-focus { GanttData.rename-focus(); } else { GanttData.rename-commit(); } }
+                }
+            }
+        }
+        if (group || GanttData.show-dates) && r.meta != "": Text { text: r.meta; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+        if GanttData.show-pct && r.pct != "": Text { min-width: 30px; text: r.pct; font-size: 12px; color: Theme.c.text-secondary; horizontal-alignment: right; vertical-alignment: center; }
+    }
+    if add && !GanttData.read-only: Rectangle {
+        x: 22px;
+        y: 4px;
+        width: al.preferred-width;
+        height: 24px;
+        border-radius: 4px;
+        background: ata.has-hover ? Theme.c.subtle-fill-hover : transparent;
+        al := HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 6px;
+            spacing: 4px;
+            cross-axis-alignment: center;
+            Icon { glyph: Glyph.add; size: 11px; color: ata.has-hover ? Theme.c.accent-text : Theme.c.text-secondary; }
+            Text { text: "添加任务"; font-size: 12px; color: ata.has-hover ? Theme.c.accent-text : Theme.c.text-secondary; vertical-alignment: center; }
+        }
+        ata := TouchArea { clicked => { GanttData.add-task(r.id); } }
+        accessible-role: button;
+        accessible-label: "添加任务";
+    }
+}

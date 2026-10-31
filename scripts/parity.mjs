@@ -23,6 +23,8 @@ const SCENES = [
   { name: 'month-dark', url: '?w=desk&theme=dark&accent=%238764B8', accent: '#8764B8', size: month, dark: true, settings: { theme: { mode: 'dark', accent: '#8764B8' }, desk: glass } },
   { name: 'weeks-light', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, calendar: { view: 'weeks' } } },
   { name: 'month-small', url: '?w=desk&theme=light', size: { width: 560, height: 430 }, settings: { theme: { mode: 'light' }, calendar: { showWeekNumbers: true } } },
+  { name: 'gantt-light', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } } },
+  { name: 'gantt-dark', url: '?w=desk&theme=dark', size: { width: 1040, height: 548 }, dark: true, settings: { theme: { mode: 'dark' }, calendar: { view: 'gantt' }, gantt: { scale: 'week' } } },
 ];
 const only = process.argv.slice(2);
 // 125 % is this PC's scaling (both screens); PARITY_SCALE=1 / 1.5 / 2 for others.

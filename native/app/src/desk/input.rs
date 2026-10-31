@@ -30,6 +30,9 @@ impl App {
             self.desk_undo(false);
         } else if ctrl && (letter('y') || (shift && letter('z'))) {
             self.desk_redo();
+        } else if is(text, Key::Escape) && self.gantt_dragging() {
+            self.gantt_cancel_drag();
+        } else if gantt && self.gantt_key(text) {
         } else if is(text, Key::Escape) {
             if self.desk.drag.is_some() {
                 self.desk_drag_end();

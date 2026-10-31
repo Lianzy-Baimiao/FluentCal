@@ -31,11 +31,12 @@ pub struct DeskLive {
     pub flash_timer: slint::Timer,
     /// Scale factor the theme images (shadows) were rendered for.
     pub scale: f32,
+    pub gantt: super::gantt::GanttUi,
 }
 
 impl DeskLive {
     pub fn new(window: DeskWindow, ui: DeskUi) -> DeskLive {
-        DeskLive { window, ui, capacity: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0 }
+        DeskLive { window, ui, capacity: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default() }
     }
 }
 
@@ -46,6 +47,7 @@ impl App {
         let d = &self.desk;
         super::push_all(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
         self.desk_refresh_status();
+        self.gantt_refresh();
     }
 
     /// The parts that follow tasks (week rows, countdowns).
@@ -53,6 +55,7 @@ impl App {
         let today = self.today();
         let d = &self.desk;
         super::push_weeks(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
+        self.gantt_refresh();
     }
 
     /// Title, paging and selection (after paging or a view switch).
@@ -92,6 +95,9 @@ impl App {
             scale,
         };
         apply(&self.desk.window, &look);
+        // Gantt bars: 0 1px 2px rgba(0,0,0,.12).
+        let bar = [fluentcal_core::theme::Shadow { x: 0.0, y: 1.0, blur: 2.0, color: fluentcal_core::theme::Rgba::new(0.0, 0.0, 0.0, 0.12) }];
+        slint::ComponentHandle::global::<crate::GanttData>(&self.desk.window).set_bar_shadow(crate::shadow::render(&bar, 4.0, scale));
         self.desk_refresh_data();
     }
 
