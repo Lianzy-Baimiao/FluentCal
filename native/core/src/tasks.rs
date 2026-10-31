@@ -378,3 +378,30 @@ pub fn set_day_mark(date: &str, color: Option<&str>) -> Edit {
     }
     e
 }
+
+/// Three-way merge of an edited task (0.2's lib/merge.ts mergeEdit): fields the user changed
+/// (`draft` vs `base`, the task as the editor opened it) win; every other field keeps the
+/// current stored value, so edits made elsewhere meanwhile (ticked done, dragged in the
+/// Gantt chart) survive.
+pub fn merge_edit(base: &Task, draft: &Task, current: &Task) -> Task {
+    let (b, d, c) = (base.to_value(), draft.to_value(), current.to_value());
+    let empty = Map::new();
+    let (bm, dm) = (b.as_object().unwrap_or(&empty), d.as_object().unwrap_or(&empty));
+    let mut out = c.as_object().cloned().unwrap_or_default();
+    let keys: BTreeSet<&String> = bm.keys().chain(dm.keys()).collect();
+    for k in keys {
+        let (dv, bv) = (dm.get(k).unwrap_or(&Value::Null), bm.get(k).unwrap_or(&Value::Null));
+        if dv != bv {
+            if dv.is_null() {
+                out.remove(k);
+            } else {
+                out.insert(k.clone(), dv.clone());
+            }
+        }
+    }
+    let mut t: Task = serde_json::from_value(Value::Object(out)).unwrap_or_else(|_| draft.clone());
+    if t.is_milestone() || t.end < t.start {
+        t.end = t.start.clone();
+    }
+    t
+}

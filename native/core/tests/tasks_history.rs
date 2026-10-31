@@ -118,3 +118,30 @@ fn undo_redo_batches_and_skips_items_changed_since() {
     assert!(doc.tasks.contains_key(&added.id));
     let _: Value = doc.raw("tasks", "nope");
 }
+
+#[test]
+fn merge_edit_keeps_changes_made_elsewhere() {
+    use fluentcal_core::tasks::merge_edit;
+    let base: Task = serde_json::from_value(serde_json::json!({ "id": "a", "title": "写报告", "start": "2026-10-10", "end": "2026-10-12", "progress": 0, "done": false, "order": 1 })).unwrap();
+    // The editor changed the title and cleared the end; meanwhile the task was ticked done and
+    // moved in the Gantt chart.
+    let mut draft = base.clone();
+    draft.title = "写年度报告".into();
+    let mut current = base.clone();
+    current.done = true;
+    current.start = "2026-10-11".into();
+    current.end = "2026-10-13".into();
+    let m = merge_edit(&base, &draft, &current);
+    assert_eq!(m.title, "写年度报告");
+    assert!(m.done);
+    assert_eq!((m.start.as_str(), m.end.as_str()), ("2026-10-11", "2026-10-13"));
+    // A field the editor removed is removed; a milestone ends where it starts.
+    let mut base2 = base.clone();
+    base2.notes = Some("带上 U 盘".into());
+    let mut draft2 = base2.clone();
+    draft2.notes = None;
+    draft2.milestone = Some(true);
+    let m2 = merge_edit(&base2, &draft2, &base2);
+    assert_eq!(m2.notes, None);
+    assert_eq!(m2.end, m2.start);
+}
