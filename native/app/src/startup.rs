@@ -39,15 +39,36 @@ pub fn main() {
         return fatal(&format!("无法初始化界面：{e}"));
     }
     crate::fonts::setup();
+    let app = match build(local_dir(&id)) {
+        Ok(a) => a,
+        Err(e) => return fatal(&e),
+    };
+    install(app);
+    run(move |app| {
+        init(app, false);
+        start_platform(app, &id);
+    });
+    if let Err(e) = slint::run_event_loop_until_quit() {
+        eprintln!("[app] event loop: {e}");
+    }
+    if let Some(app) = app::uninstall() {
+        app.cloud.quit_flush();
+        app.store.flush();
+    }
+    tray::remove();
+}
+
+
+/// The app with its data, background threads and desk window (not shown yet).
+pub fn build(local: PathBuf) -> Result<App, String> {
     if crate::platform::isolated() {
         cloud::secrets::set_namespace("FluentCal-dev");
     }
-    let local = local_dir(&id);
     let _ = std::fs::create_dir_all(&local);
     let (dir, local_settings, data_dir) = fluentcal_core::datadir::resolve(&local);
     let store = match Store::open_with(dir, local_settings) {
         Ok(s) => s,
-        Err(e) => return fatal(&format!("无法打开数据文件夹：{e}")),
+        Err(e) => return Err(format!("无法打开数据文件夹：{e}")),
     };
     if let Some(patch) = cloud::drop_google_drive(&store.snapshot()["settings"]) {
         store.patch_settings(&patch);
@@ -85,25 +106,20 @@ pub fn main() {
             app.schedule_reminders();
         });
     });
-    let icon = local.join("fluentcal.png");
-    if !icon.exists() {
-        let _ = std::fs::write(&icon, include_bytes!("../res/icon-128.png"));
-    }
-    toast::register(Some(&icon));
 
     let doc = Doc::from_value(&store.snapshot());
     let today = fluentcal_core::date::local_of_ms(fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes()).0;
     window::next(window::Kind::Desk);
     let w = match DeskWindow::new() {
         Ok(w) => w,
-        Err(e) => return fatal(&format!("无法创建日历窗口：{e}")),
+        Err(e) => return Err(format!("无法创建日历窗口：{e}")),
     };
     crate::desk::wire::wire(&w);
     let sys = sysinfo::system_info();
     let tokens = fluentcal_core::theme::tokens(sys.dark, "#0078D4", None);
     let style = fluentcal_core::theme::desk_style(&doc.settings.desk, &tokens);
     let ui = DeskUi::new(&doc, &today);
-    install(App {
+    Ok(App {
         store,
         cloud,
         sync: Default::default(),
@@ -125,19 +141,12 @@ pub fn main() {
         day: today,
         web: Default::default(),
         reminder_win: None,
-    });
-    run(move |app| start(app, &id));
-    if let Err(e) = slint::run_event_loop_until_quit() {
-        eprintln!("[app] event loop: {e}");
-    }
-    if let Some(app) = app::uninstall() {
-        app.cloud.quit_flush();
-        app.store.flush();
-    }
-    tray::remove();
+    })
 }
 
-fn start(app: &mut App, id: &str) {
+/// What every start does: theme, the calendar shown, first-run data, overdue tasks moved on.
+/// `headless`: the testing backend (no real window to pin).
+pub fn init(app: &mut App, headless: bool) {
     app.load_holidays();
     app.sync = app.cloud.status();
     app.recompute_theme();
@@ -145,8 +154,26 @@ fn start(app: &mut App, id: &str) {
         let today = app.today();
         app.desk.gantt.center = Some((today, 0.3));
     }
-    pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
-    show_desk_window(app);
+    if headless {
+        app.desk_refresh();
+        let _ = app.desk.window.show();
+    } else {
+        pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
+        show_desk_window(app);
+    }
+    seed_if_first_run(app);
+    events::auto_postpone(app);
+    app.schedule_reminders();
+}
+
+/// The parts that touch Windows: tray, hotkeys, notifications' name, autostart, the web
+/// server, holiday updates, the clock.
+fn start_platform(app: &mut App, id: &str) {
+    let icon = app.local_dir.join("fluentcal.png");
+    if !icon.exists() {
+        let _ = std::fs::write(&icon, include_bytes!("../res/icon-128.png"));
+    }
+    toast::register(Some(&icon));
     msgwin::create(id, |e| post(move |app| events::on_msg(app, e)));
     if let Some(h) = msgwin::hwnd() {
         let tip = if crate::platform::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
@@ -155,10 +182,7 @@ fn start(app: &mut App, id: &str) {
     events::register_hotkeys(app);
     autostart::sync(app.doc.settings.general.autostart);
     app.web_apply();
-    seed_if_first_run(app);
-    events::auto_postpone(app);
     events::update_holidays(app, false);
-    app.schedule_reminders();
     let every = |ms: u64, f: fn(&mut App)| {
         let t = slint::Timer::default();
         t.start(slint::TimerMode::Repeated, Duration::from_millis(ms), move || run(f));
@@ -238,3 +262,17 @@ fn seed_if_first_run(app: &mut App) {
 pub fn quit(_app: &mut App) {
     let _ = slint::quit_event_loop();
 }
+
+/// Integration tests (Slint's testing backend, set up by the caller): the app on a test data
+/// folder, its desk window `w`×`h` logical px, nothing registered with Windows.
+pub fn test_app(local: PathBuf, w: f32, h: f32) -> Result<DeskWindow, String> {
+    crate::fonts::setup();
+    cloud::secrets::set_namespace("FluentCal-test");
+    let app = build(local)?;
+    let win = app.desk.window.clone_strong();
+    win.window().set_size(slint::LogicalSize::new(w, h));
+    install(app);
+    run(|app| init(app, true));
+    Ok(win)
+}
+

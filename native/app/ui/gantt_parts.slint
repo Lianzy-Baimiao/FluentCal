@@ -15,6 +15,10 @@ export component GBarItem {
     y: b.row * rh + 6px;
     width: max(4px, b.w - 2px);
     height: 20px;
+    accessible-role: list-item;
+    accessible-label: b.title;
+    accessible-description: b.tip;
+    accessible-item-selected: sel;
     if !b.done: BoxShadow { width: parent.width; height: parent.height; shadow: GanttData.bar-shadow; }
     if sel: Rectangle {
         x: -3px;
@@ -149,6 +153,10 @@ export component GMilestone {
     y: b.row * rh + rh / 2 - 11px;
     width: 22px;
     height: 22px;
+    accessible-role: list-item;
+    accessible-label: b.title;
+    accessible-description: b.tip;
+    accessible-item-selected: sel;
     if sel: Path {
         x: -3px; y: -3px; width: 28px; height: 28px;
         viewbox-width: 28; viewbox-height: 28;

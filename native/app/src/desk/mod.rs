@@ -6,6 +6,7 @@ pub mod gantt;
 pub mod input;
 pub mod live;
 pub mod popups;
+pub mod sync;
 pub mod vm;
 pub mod wire;
 
@@ -31,8 +32,11 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: O
 
 /// The week rows and the countdowns (the parts that follow tasks).
 pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
-    w.set_weeks(vm::weeks(doc, ui, today, capacity, t));
-    w.set_countdowns(vm::countdown_items(doc, today));
+    use slint::Model;
+    let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, capacity, t).iter().collect();
+    sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
+    let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
+    sync::rows(&w.get_countdowns(), cds, |m| w.set_countdowns(m));
 }
 
 /// Lane capacity the window's layout gives now.

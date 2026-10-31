@@ -1,5 +1,9 @@
 fn main() {
-    slint_build::compile("ui/main.slint").expect("Slint build failed");
+    // Debug builds carry element names for the end-to-end tests' element search (tests/e2e.rs);
+    // release builds don't need them.
+    let debug = std::env::var("PROFILE").is_ok_and(|p| p == "debug");
+    let config = slint_build::CompilerConfiguration::new().with_debug_info(debug);
+    slint_build::compile_with_config("ui/main.slint", config).expect("Slint build failed");
     resources();
     web_assets();
 }

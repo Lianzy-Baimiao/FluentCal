@@ -57,5 +57,9 @@ windows = { version = "0.62.2", features = [
 ] }
 windows-version = "0.1.7"
 
+[dev-dependencies]
+# Native end-to-end tests (tests/e2e.rs): Slint's headless testing backend.
+i-slint-backend-testing = "=1.18.1"
+
 [build-dependencies]
 slint-build = "1.18.1"
