@@ -39,7 +39,7 @@ pub fn main() {
         return fatal(&format!("无法初始化界面：{e}"));
     }
     crate::fonts::setup();
-    if cfg!(debug_assertions) {
+    if crate::platform::isolated() {
         cloud::secrets::set_namespace("FluentCal-dev");
     }
     let local = local_dir(&id);
@@ -149,7 +149,7 @@ fn start(app: &mut App, id: &str) {
     show_desk_window(app);
     msgwin::create(id, |e| post(move |app| events::on_msg(app, e)));
     if let Some(h) = msgwin::hwnd() {
-        let tip = if cfg!(debug_assertions) { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
+        let tip = if crate::platform::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
         tray::create(h, tip, |e| post(move |app| shell::tray::on_tray(app, e)));
     }
     events::register_hotkeys(app);

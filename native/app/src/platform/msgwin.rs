@@ -20,6 +20,8 @@ pub enum MsgEvent {
     SecondInstance(Vec<String>),
     /// Explorer (the taskbar) started again.
     TaskbarCreated,
+    /// The installer (or Windows shutting down) asks the program to exit.
+    Quit,
     /// A registered hotkey (its id).
     Hotkey(i32),
 }
@@ -35,7 +37,7 @@ const COPYDATA_PIPE: usize = 1542;
 /// their own name, so they run next to the installed program; FLUENTCAL_INSTANCE overrides.
 pub fn instance_id() -> String {
     std::env::var("FLUENTCAL_INSTANCE").unwrap_or_else(|_| {
-        if cfg!(debug_assertions) { "com.fluentcal.native.dev".into() } else { "com.fluentcal.desktop".into() }
+        if super::isolated() { "com.fluentcal.native.dev".into() } else { "com.fluentcal.desktop".into() }
     })
 }
 
@@ -136,6 +138,12 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
                 f(MsgEvent::SecondInstance(args));
             }
             LRESULT(1)
+        }
+        WM_CLOSE | WM_ENDSESSION if msg == WM_CLOSE || wp.0 != 0 => {
+            if let Some(f) = ON_EVENT.get() {
+                f(MsgEvent::Quit);
+            }
+            LRESULT(0)
         }
         WM_HOTKEY => {
             if let Some(f) = ON_EVENT.get() {

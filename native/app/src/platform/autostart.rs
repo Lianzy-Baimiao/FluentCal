@@ -27,9 +27,9 @@ pub fn is_enabled() -> bool {
     read_run().is_some()
 }
 
-/// Makes the Run value match the setting (release builds only).
+/// Makes the Run value match the setting (the installed program only, never a test run).
 pub fn sync(want: bool) {
-    if cfg!(debug_assertions) {
+    if super::isolated() {
         return;
     }
     let Some(cmd) = command() else { return };

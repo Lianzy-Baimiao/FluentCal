@@ -38,6 +38,7 @@ pub fn on_msg(app: &mut App, e: MsgEvent) {
             app.open_editor_new(None);
         }
         MsgEvent::Hotkey(_) => {}
+        MsgEvent::Quit => crate::startup::quit(app),
         // Progman comes back a little later; the calendar may have gone with the old one.
         MsgEvent::TaskbarCreated => {
             for ms in [1500u64, 5000] {

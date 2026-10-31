@@ -6,13 +6,13 @@ use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::System::Registry::*;
 
 pub fn app_id() -> &'static str {
-    if cfg!(debug_assertions) { "com.fluentcal.native.dev" } else { "com.fluentcal.desktop" }
+    if super::isolated() { "com.fluentcal.native.dev" } else { "com.fluentcal.desktop" }
 }
 
 /// Display name and icon for the AppUserModelID (HKCU\Software\Classes\AppUserModelId\<id>).
 pub fn register(icon_png: Option<&std::path::Path>) {
     let key = HSTRING::from(format!(r"Software\Classes\AppUserModelId\{}", app_id()));
-    let name = if cfg!(debug_assertions) { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
+    let name = if super::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
     let set = |value: PCWSTR, text: &str| unsafe {
         let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
         let _ = RegSetKeyValueW(HKEY_CURRENT_USER, &key, value, REG_SZ.0, Some(wide.as_ptr() as *const _), (wide.len() * 2) as u32);
