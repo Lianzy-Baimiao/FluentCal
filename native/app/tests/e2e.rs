@@ -297,6 +297,39 @@ fn every_control_has_a_name() {
     assert!(unnamed.is_empty(), "unnamed controls: {unnamed:?}");
 }
 
+/// 0.2's "delete via context menu, then undo"; day colour; group order (the menus' actions).
+#[test]
+fn menu_actions_and_undo() {
+    use fluentcal_app::desk::menus::Target;
+    let today = fluentcal_core::date::today();
+    let mut doc = doc_with(&[json!({ "id": "x", "title": "看牙", "start": today }), json!({ "id": "r", "title": "跑步", "start": today, "repeat": { "freq": "daily" } })], json!({}));
+    doc["groups"] = json!({ "a": { "id": "a", "name": "甲", "color": "blue", "order": 1 }, "b": { "id": "b", "name": "乙", "color": "red", "order": 2 } });
+    let t = start("menus", Some(doc));
+    with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "delete:all")).unwrap();
+    settle();
+    assert!(t.tasks().iter().all(|x| x["id"] != "x"));
+    assert!(t.w.get_toast_text().starts_with("已删除“看牙”"));
+    assert!(t.w.get_toast_undo(), "the toast offers undo");
+    t.click_at(t.at(&t.find("撤销"), 10.0, 10.0));
+    assert_eq!(t.task("看牙")["id"], "x");
+    // One occurrence of a repeating task.
+    with(|a| a.menu_act(&Target::Task("r".into(), today.clone()), "delete:this")).unwrap();
+    assert_eq!(t.task("跑步")["exDates"], json!([today]));
+    // Day colour, then cleared.
+    with(|a| a.menu_act(&Target::Day(today.clone()), "mark:green")).unwrap();
+    assert_eq!(with(|a| a.store.snapshot()["dayMarks"][&today]["color"].clone()).unwrap(), "green");
+    with(|a| a.menu_act(&Target::Day(today.clone()), "unmark")).unwrap();
+    assert!(with(|a| a.store.snapshot()["dayMarks"].get(&today).is_none()).unwrap());
+    // Group order: 乙 up swaps the orders.
+    with(|a| a.menu_act(&Target::Group("b".into()), "up")).unwrap();
+    let g = with(|a| a.store.snapshot()["groups"].clone()).unwrap();
+    assert!(g["b"]["order"].as_f64() < g["a"]["order"].as_f64());
+    // Countdown and colour on a task.
+    with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "countdown")).unwrap();
+    with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "color:purple")).unwrap();
+    assert_eq!((t.task("看牙")["countdown"].clone(), t.task("看牙")["color"].clone()), (json!(true), json!("purple")));
+}
+
 #[test]
 #[ignore]
 fn dump_labels() {
