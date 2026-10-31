@@ -1,0 +1,119 @@
+// Segoe Fluent Icons code points (0.2's src/fluent/icons.ts), plus Icon: one glyph at a size.
+
+import { Theme } from "theme.slint";
+
+export global Glyph {
+    out property <string> chevron-left: "\u{E76B}";
+    out property <string> chevron-right: "\u{E76C}";
+    out property <string> chevron-up: "\u{E70E}";
+    out property <string> chevron-down: "\u{E70D}";
+    out property <string> add: "\u{E710}";
+    out property <string> remove: "\u{E738}";
+    out property <string> delete: "\u{E74D}";
+    out property <string> edit: "\u{E70F}";
+    out property <string> settings: "\u{E713}";
+    out property <string> search: "\u{E721}";
+    out property <string> calendar: "\u{E787}";
+    out property <string> calendar-day: "\u{E8BF}";
+    out property <string> calendar-week: "\u{E8C0}";
+    out property <string> pin: "\u{E718}";
+    out property <string> unpin: "\u{E77A}";
+    out property <string> lock: "\u{E72E}";
+    out property <string> unlock: "\u{E785}";
+    out property <string> more: "\u{E712}";
+    out property <string> close: "\u{E711}";
+    out property <string> check-mark: "\u{E73E}";
+    out property <string> clock: "\u{E823}";
+    out property <string> alarm: "\u{EA8F}";
+    out property <string> alarm-off: "\u{E7ED}";
+    out property <string> notification: "\u{EA8F}";
+    out property <string> repeat: "\u{E8EE}";
+    out property <string> flag: "\u{E7C1}";
+    out property <string> color: "\u{E790}";
+    out property <string> palette: "\u{E790}";
+    out property <string> today: "\u{E8D1}";
+    out property <string> filter: "\u{E71C}";
+    out property <string> sync: "\u{E895}";
+    out property <string> cloud: "\u{E753}";
+    out property <string> key: "\u{E8D7}";
+    out property <string> save: "\u{E74E}";
+    out property <string> folder: "\u{E8B7}";
+    out property <string> open-file: "\u{E8E5}";
+    out property <string> download: "\u{E896}";
+    out property <string> upload: "\u{E898}";
+    out property <string> info: "\u{E946}";
+    out property <string> about: "\u{E946}";
+    out property <string> warning: "\u{E7BA}";
+    out property <string> error: "\u{E783}";
+    out property <string> completed: "\u{E930}";
+    out property <string> link: "\u{E71B}";
+    out property <string> dependency: "\u{E71B}";
+    out property <string> list: "\u{E8FD}";
+    out property <string> checklist: "\u{E9D5}";
+    out property <string> eye: "\u{E7B3}";
+    out property <string> eye-off: "\u{ED1A}";
+    out property <string> brightness: "\u{E706}";
+    out property <string> sun: "\u{E706}";
+    out property <string> moon: "\u{E708}";
+    out property <string> contrast: "\u{E793}";
+    out property <string> back: "\u{E72B}";
+    out property <string> forward: "\u{E72A}";
+    out property <string> copy: "\u{E8C8}";
+    out property <string> cut: "\u{E8C6}";
+    out property <string> paste: "\u{E77F}";
+    out property <string> undo: "\u{E7A7}";
+    out property <string> redo: "\u{E7A6}";
+    out property <string> zoom-in: "\u{E8A3}";
+    out property <string> zoom-out: "\u{E71F}";
+    out property <string> keyboard: "\u{E765}";
+    out property <string> power: "\u{E7E8}";
+    out property <string> window: "\u{E737}";
+    out property <string> desktop: "\u{E7F4}";
+    out property <string> layers: "\u{F156}";
+    out property <string> tag: "\u{E8EC}";
+    out property <string> group: "\u{E902}";
+    out property <string> home: "\u{E80F}";
+    out property <string> help: "\u{E897}";
+    out property <string> font: "\u{E8D2}";
+    out property <string> mouse: "\u{E962}";
+    out property <string> data: "\u{EE94}";
+    out property <string> history: "\u{E81C}";
+    out property <string> timer: "\u{E916}";
+    out property <string> sliders: "\u{E9E9}";
+    out property <string> chart: "\u{E9D2}";
+    out property <string> globe: "\u{E909}";
+    out property <string> sort: "\u{E8CB}";
+    out property <string> switch-arrows: "\u{E8AB}";
+    out property <string> star: "\u{E734}";
+    out property <string> star-fill: "\u{E735}";
+    out property <string> checkbox-empty: "\u{E739}";
+    out property <string> checkbox-fill: "\u{E73B}";
+    out property <string> status-circle: "\u{F136}";
+    out property <string> status-circle-inner: "\u{F137}";
+    out property <string> status-circle-ring: "\u{F138}";
+    out property <string> status-info: "\u{F13F}";
+    out property <string> status-check: "\u{F13E}";
+    out property <string> status-exclamation: "\u{F13C}";
+    out property <string> status-x: "\u{F13D}";
+    out property <string> status-triangle: "\u{F13A}";
+}
+
+// A font glyph, `size` px square, centred (0.2's FIcon).
+export component Icon {
+    in property <string> glyph;
+    in property <length> size: 16px;
+    in property <brush> color: Theme.c.text-primary;
+    width: size;
+    height: size;
+    Text {
+        width: 100%;
+        height: 100%;
+        text: glyph;
+        font-family: Theme.font-icon;
+        font-size: size;
+        color: root.color;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+}

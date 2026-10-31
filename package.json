@@ -15,7 +15,8 @@
     "readme-shots": "vite build && node scripts/readme-shots.mjs",
     "glyphs": "python scripts/glyph-coverage.py src/fluent/icons.ts",
     "e2e": "vite build && node scripts/e2e.mjs",
-    "a11y": "vite build && node scripts/a11y.mjs"
+    "a11y": "vite build && node scripts/a11y.mjs",
+    "parity": "vite build && node scripts/parity.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",

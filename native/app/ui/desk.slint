@@ -1,0 +1,759 @@
+// The desk calendar (0.2's src/windows/desk): title bar, month / multi-week view with task chips
+// and multi-day bars, countdown bar. View models come from Rust (src/desk/vm.rs).
+
+import { Theme, BoxShadow } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { GText, Button, ButtonVariant, ButtonSize, Segmented, SegOption } from "controls.slint";
+
+export struct CellData {
+    date: string,
+    label: string,
+    lunar: string,
+    // "lunar" | "month" | "term" | "festival"
+    lunar-kind: string,
+    // "休" | "班" | ""
+    badge: string,
+    rest: bool,
+    today: bool,
+    dim: bool,
+    marked: bool,
+    mark: color,
+    tip: string,
+    aria: string,
+}
+
+export struct ChipData {
+    key: string,
+    task-id: string,
+    date: string,
+    title: string,
+    time: string,
+    col: int,
+    span: int,
+    lane: int,
+    cont-left: bool,
+    cont-right: bool,
+    multi-day: bool,
+    done: bool,
+    milestone: bool,
+    repeat: bool,
+    // Task colour resolved for the theme: bar fill, text off the bar, text on the bar.
+    bar: color,
+    text: color,
+    on-bar: color,
+    // Pre-mixed CSS color-mix() values.
+    bar-hover: color,
+    check-ring: color,
+    tip: string,
+}
+
+export struct WeekData {
+    cells: [CellData],
+    chips: [ChipData],
+    // "+N" per column (0 = none) and the lane it sits in.
+    more: [int],
+    more-lane: [int],
+    week-no: int,
+}
+
+export struct CountdownData {
+    key: string,
+    label: string,
+    date: string,
+    days: int,
+    // A task's countdown (flag icon) or the next holiday (calendar icon).
+    task: bool,
+    tip: string,
+}
+
+// One task occurrence in a week row: a chip (single day) or a bar (multi-day).
+component TaskChip inherits Rectangle {
+    in property <ChipData> chip;
+    in property <bool> dragging;
+    in property <bool> read-only;
+    callback toggle();
+    callback open();
+    callback menu(length, length);
+    callback press(length, length);
+    callback drag-move(length, length);
+    callback release();
+    property <float> fs: Theme.desk.fs;
+    property <bool> bar: chip.multi-day;
+    property <bool> hover: ta.has-hover;
+    property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.c.text-primary : chip.text;
+    property <length> l-radius: chip.cont-left ? 0 : 4px;
+    property <length> r-radius: chip.cont-right ? 0 : 4px;
+    border-top-left-radius: l-radius;
+    border-bottom-left-radius: l-radius;
+    border-top-right-radius: r-radius;
+    border-bottom-right-radius: r-radius;
+    background: bar && chip.done ? chip.bar.transparentize(0.68)
+        : bar ? (hover ? chip.bar-hover : chip.bar)
+        : hover ? Theme.c.subtle-fill-hover : transparent;
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    opacity: dragging ? 0.35 : 1;
+    clip: true;
+    accessible-role: groupbox;
+    accessible-label: chip.title + (chip.done ? "，已完成" : "");
+    ta := TouchArea {
+        double-clicked => { root.open(); }
+        clicked => { if root.read-only { root.open(); } }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.release();
+            }
+        }
+        moved => { root.drag-move(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
+        HorizontalLayout {
+            width: parent.width;
+            height: parent.height;
+            padding-left: bar ? 4px : 3px;
+            padding-right: 4px;
+            spacing: 4px;
+            alignment: start;
+            cross-axis-alignment: center;
+            check := Rectangle {
+                property <length> s: 12px * fs;
+                width: s;
+                height: s;
+                border-radius: s / 2;
+                border-width: 1px;
+                border-color: bar ? chip.on-bar : chip.check-ring;
+                background: cta.has-hover ? chip.bar.transparentize(0.75) : chip.done ? chip.bar : transparent;
+                if chip.done: Path {
+                    x: 1px;
+                    y: 1px;
+                    width: check.s - 2px;
+                    height: check.s - 2px;
+                    viewbox-width: 12;
+                    viewbox-height: 12;
+                    commands: "M2.6 6.2 5 8.5l4.4-4.9";
+                    stroke: chip.on-bar;
+                    stroke-width: 1.6px * (check.s - 2px) / 12px;
+                    fill: transparent;
+                }
+                cta := TouchArea {
+                    clicked => { if !root.read-only { root.toggle(); } }
+                    double-clicked => { }
+                }
+            }
+            if chip.time != "" && !chip.cont-left: GText {
+                text: chip.time;
+                color: fg;
+                font-size: 12px * fs;
+                opacity: 0.8;
+                glow: Theme.desk.glow && !bar;
+            }
+            title-box := Rectangle {
+                height: root.height;
+                min-width: 0;
+                horizontal-stretch: 1;
+                preferred-width: title-row.preferred-width;
+                opacity: chip.done ? (bar ? 0.7 : 0.6) : 1;
+                title-row := HorizontalLayout {
+                    if chip.milestone: GText {
+                        text: "◆ ";
+                        color: bar ? fg : chip.bar;
+                        font-size: 12px * fs;
+                        glow: Theme.desk.glow && !bar;
+                    }
+                    title := GText {
+                        text: chip.title;
+                        color: fg;
+                        font-size: 12px * fs;
+                        overflow: elide;
+                        glow: Theme.desk.glow && !bar;
+                    }
+                }
+                if chip.done: Rectangle {
+                    x: 0;
+                    y: round((parent.height / 2 + 0.8px * fs) / 1phx) * 1phx;
+                    width: min(parent.width, title-row.preferred-width);
+                    height: max(1px, round(0.9px * fs / 1phx) * 1phx);
+                    background: fg;
+                }
+            }
+            if chip.repeat: Icon {
+                glyph: Glyph.repeat;
+                size: 10px;
+                color: fg.transparentize(0.3);
+            }
+        }
+    }
+}
+
+// A day cell: date number, lunar text, 休/班 badge; tinted for rest days, marks and today.
+component DayCell inherits Rectangle {
+    in property <CellData> cell;
+    in property <length> head-h;
+    in property <bool> selected;
+    in property <bool> drop;
+    in property <bool> flash;
+    callback select();
+    callback quick-add();
+    callback menu(length, length);
+    out property <bool> head-hover: ta.has-hover && ta.mouse-y < head-h;
+    property <float> fs: Theme.desk.fs;
+    border-radius: 4px;
+    background: cell.dim ? Theme.desk.cell-bg.transparentize(0.45) : Theme.desk.cell-bg;
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    accessible-role: list-item;
+    accessible-label: cell.aria;
+    accessible-item-selected: selected;
+    // background-image layer: today beats a day mark beats the rest-day tint.
+    Rectangle {
+        border-radius: 4px;
+        background: cell.today ? Theme.desk.today.transparentize(0.88)
+            : cell.marked ? cell.mark.transparentize(0.7)
+            : cell.rest ? Theme.desk.rest-tint : transparent;
+    }
+    if cell.today && !drop: Rectangle {
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: Theme.desk.today.transparentize(0.45);
+    }
+    if drop || flash: Rectangle {
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: Theme.c.accent-fill;
+    }
+    ta := TouchArea {
+        clicked => { root.select(); }
+        double-clicked => { root.quick-add(); }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+    HorizontalLayout {
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.head-h;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 4px;
+        alignment: start;
+        cross-axis-alignment: center;
+        num := Rectangle {
+            property <bool> today: cell.today;
+            property <color> c: cell.dim ? (cell.rest ? Theme.desk.holiday-text : Theme.c.text-secondary)
+                : today ? Theme.c.text-on-accent
+                : cell.rest ? Theme.desk.holiday-text : Theme.c.text-primary;
+            width: max(18px * fs, n.preferred-width + (today ? 8px : 0));
+            height: 18px * fs;
+            border-radius: 9px;
+            background: today ? Theme.desk.today : transparent;
+            n := GText {
+                width: 100%;
+                height: 100%;
+                text: cell.label;
+                color: num.c;
+                font-size: 13px * fs;
+                font-weight: cell.dim ? 400 : 600;
+                horizontal-alignment: center;
+                glow: Theme.desk.glow && !num.today;
+            }
+        }
+        if cell.lunar != "": GText {
+            min-width: 0;
+            text: cell.lunar;
+            font-size: 11px * fs;
+            overflow: elide;
+            color: cell.dim ? Theme.c.text-secondary
+                : cell.lunar-kind == "festival" || cell.lunar-kind == "term" ? Theme.desk.term-text
+                : cell.lunar-kind == "month" ? Theme.c.text-primary
+                : Theme.c.text-secondary;
+        }
+    }
+    if cell.badge != "": Rectangle {
+        x: parent.width - self.width - 2px;
+        y: 2px;
+        width: b.preferred-width + 4px;
+        height: 14px * fs;
+        border-radius: 3px;
+        background: cell.badge == "休" ? Theme.desk.holiday-text.transparentize(0.86) : Theme.c.subtle-fill-hover;
+        b := Text {
+            text: cell.badge;
+            font-size: 10px * fs;
+            font-weight: 600;
+            color: cell.badge == "休" ? Theme.desk.holiday-text : Theme.c.text-secondary;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// One week: day cells, then the chips over them (a bar starts in its first day's cell and
+// stretches over the following ones), then the "+N" buttons.
+component WeekRow inherits Rectangle {
+    in property <WeekData> week;
+    in property <bool> show-week-no;
+    in property <length> head-h;
+    in property <length> chip-h;
+    in property <length> lane-h;
+    in property <string> selected;
+    in property <string> drop-date;
+    in property <string> flash-date;
+    in property <string> dragging-key;
+    in property <bool> read-only;
+    callback select(string);
+    callback quick-add(string);
+    callback cell-menu(string, length, length);
+    callback chip-toggle(ChipData);
+    callback chip-open(ChipData);
+    callback chip-menu(ChipData, length, length);
+    callback chip-press(ChipData, length, length);
+    callback chip-move(length, length);
+    callback chip-release();
+    callback more(string, length, length, length, length);
+    property <length> gap: Theme.desk.cell-gap;
+    property <float> fs: Theme.desk.fs;
+    property <length> area-x: show-week-no ? 18px + gap : 0;
+    property <length> area-w: root.width - area-x;
+    property <length> cell-w: (area-w - 6 * gap) / 7;
+    if show-week-no: GText {
+        x: 0;
+        y: 4px;
+        width: 18px;
+        height: 16px * fs;
+        text: week.week-no;
+        font-size: 10px * fs;
+        color: Theme.c.text-tertiary;
+        horizontal-alignment: center;
+        vertical-alignment: top;
+    }
+    for c[i] in week.cells: DayCell {
+        x: area-x + i * (cell-w + gap);
+        y: 0;
+        width: cell-w;
+        height: root.height;
+        cell: c;
+        head-h: root.head-h;
+        selected: c.date == root.selected;
+        drop: c.date == root.drop-date;
+        flash: c.date == root.flash-date;
+        select => { root.select(c.date); }
+        quick-add => { root.quick-add(c.date); }
+        menu(x, y) => { root.cell-menu(c.date, x, y); }
+    }
+    for ch in week.chips: TaskChip {
+        property <length> l: ch.cont-left ? 0 : 2px;
+        property <length> r: ch.cont-right ? 0 : 2px;
+        x: area-x + ch.col * (cell-w + gap) + l;
+        y: head-h + ch.lane * lane-h;
+        width: ch.span * cell-w + (ch.span - 1) * gap - l - r;
+        height: chip-h;
+        chip: ch;
+        read-only: root.read-only;
+        dragging: ch.key == root.dragging-key;
+        toggle => { root.chip-toggle(ch); }
+        open => { root.chip-open(ch); }
+        menu(x, y) => { root.chip-menu(ch, x, y); }
+        press(x, y) => { root.chip-press(ch, x, y); }
+        drag-move(x, y) => { root.chip-move(x, y); }
+        release => { root.chip-release(); }
+    }
+    for n[i] in week.more: Rectangle {
+        x: area-x + i * (cell-w + gap) + 2px;
+        y: head-h + week.more-lane[i] * lane-h;
+        width: cell-w - 4px;
+        height: chip-h;
+        visible: n > 0;
+        border-radius: 4px;
+        background: mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+        accessible-role: button;
+        accessible-label: "还有 \{n} 项";
+        GText {
+            x: 4px;
+            width: parent.width - 8px;
+            height: parent.height;
+            text: "+\{n}";
+            font-size: 11px * fs;
+            color: mta.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+        }
+        mta := TouchArea {
+            enabled: n > 0;
+            clicked => { root.more(week.cells[i].date, parent.absolute-position.x, parent.absolute-position.y, parent.width, parent.height); }
+            double-clicked => { }
+        }
+    }
+}
+
+export struct WeekdayHead { label: string, rest: bool }
+
+// Month view and multi-week view: weekday header and week rows. `capacity` (task lanes that fit
+// in a row) goes back to Rust, which lays the chips out for it.
+component MonthView inherits Rectangle {
+    in property <[WeekData]> weeks;
+    in property <[WeekdayHead]> heads;
+    in property <bool> show-week-no;
+    in property <string> selected;
+    in property <string> drop-date;
+    in property <string> flash-date;
+    in property <string> dragging-key;
+    in property <bool> read-only;
+    property <float> fs: Theme.desk.fs;
+    property <length> gap: Theme.desk.cell-gap;
+    property <length> head-h: round(22 * fs) * 1px;
+    property <length> chip-h: round(17 * fs) * 1px;
+    property <length> lane-h: chip-h + Theme.desk.line-gap;
+    property <length> wd-h: 20px;
+    property <length> grid-y: wd-h + gap;
+    property <length> grid-h: root.height - grid-y;
+    property <int> n: max(1, weeks.length);
+    property <length> row-h: (grid-h - gap * (n - 1)) / n;
+    out property <int> capacity: max(0, floor((row-h - head-h - 3px + Theme.desk.line-gap) / lane-h));
+    callback select(string);
+    callback quick-add(string);
+    callback cell-menu(string, length, length);
+    callback chip-toggle(ChipData);
+    callback chip-open(ChipData);
+    callback chip-menu(ChipData, length, length);
+    callback chip-press(ChipData, length, length);
+    callback chip-move(length, length);
+    callback chip-release();
+    callback more(string, length, length, length, length);
+    property <length> area-x: show-week-no ? 18px + gap : 0;
+    property <length> col-w: (root.width - area-x - 6 * gap) / 7;
+    if show-week-no: GText {
+        x: 0;
+        y: 0;
+        width: 18px;
+        height: wd-h;
+        text: "周";
+        font-size: 10px * fs;
+        color: Theme.c.text-tertiary;
+        horizontal-alignment: center;
+    }
+    for h[i] in heads: GText {
+        x: area-x + i * (col-w + gap) + 6px;
+        y: 0;
+        width: col-w - 12px;
+        height: wd-h;
+        text: h.label;
+        font-size: 12px * fs;
+        color: h.rest ? Theme.desk.holiday-text : Theme.c.text-secondary;
+    }
+    accessible-role: table;
+    for w[i] in weeks: WeekRow {
+        x: 0;
+        y: grid-y + i * (row-h + gap);
+        width: root.width;
+        height: row-h;
+        week: w;
+        show-week-no: root.show-week-no;
+        head-h: root.head-h;
+        chip-h: root.chip-h;
+        lane-h: root.lane-h;
+        selected: root.selected;
+        drop-date: root.drop-date;
+        flash-date: root.flash-date;
+        dragging-key: root.dragging-key;
+        read-only: root.read-only;
+        select(d) => { root.select(d); }
+        quick-add(d) => { root.quick-add(d); }
+        cell-menu(d, x, y) => { root.cell-menu(d, x, y); }
+        chip-toggle(c) => { root.chip-toggle(c); }
+        chip-open(c) => { root.chip-open(c); }
+        chip-menu(c, x, y) => { root.chip-menu(c, x, y); }
+        chip-press(c, x, y) => { root.chip-press(c, x, y); }
+        chip-move(x, y) => { root.chip-move(x, y); }
+        chip-release => { root.chip-release(); }
+        more(d, x, y, w, h) => { root.more(d, x, y, w, h); }
+    }
+}
+
+// 0.2's TitleBar: title (opens the year/month picker in the month view), paging, view switch
+// and the tool buttons. Narrow windows drop the less used buttons (its container queries).
+component TitleBar inherits Rectangle {
+    in property <string> title;
+    in property <string> view;
+    in property <bool> locked;
+    in property <bool> sync-enabled;
+    in property <bool> sync-busy;
+    in property <bool> sync-failed;
+    in property <string> sync-tip;
+    in property <string> today-tip;
+    callback pick-month(length, length, length, length);
+    callback page(int);
+    callback go-today();
+    callback set-view(string);
+    callback search();
+    callback sync-now();
+    callback toggle-lock();
+    callback settings();
+    callback more-menu(length, length, length, length);
+    // 0.2's container queries measure the content box (padding 0 2px 0 4px).
+    property <bool> wide: root.width - 6px > 520px;
+    property <bool> mid: root.width - 6px > 430px;
+    property <float> fs: Theme.desk.fs;
+    height: 36px;
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 2px;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: start;
+            cross-axis-alignment: center;
+            horizontal-stretch: 0;
+            title-btn := Rectangle {
+                property <bool> is-button: root.view == "month";
+                height: 32px;
+                border-radius: 4px;
+                background: is-button && tta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: button;
+                accessible-label: root.title;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 4px;
+                    cross-axis-alignment: center;
+                    GText {
+                        text: root.title;
+                        font-family: Theme.font-display;
+                        font-size: 18px * fs;
+                        font-weight: 600;
+                    }
+                    if title-btn.is-button: Icon {
+                        glyph: Glyph.chevron-down;
+                        size: 10px;
+                        color: Theme.c.text-primary.transparentize(0.3);
+                    }
+                }
+                tta := TouchArea {
+                    enabled: title-btn.is-button;
+                    clicked => { root.pick-month(title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height); }
+                }
+            }
+            Rectangle { width: 2px; }
+            if root.view != "gantt": Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.chevron-left;
+                accessible-label: root.view == "weeks" ? "上一周" : "上个月";
+                clicked => { root.page(-1); }
+            }
+            if root.view != "gantt": Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.chevron-right;
+                accessible-label: root.view == "weeks" ? "下一周" : "下个月";
+                clicked => { root.page(1); }
+            }
+            if root.view != "gantt" && wide: Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.small;
+                text: "今天";
+                clicked => { root.go-today(); }
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: end;
+            cross-axis-alignment: center;
+            horizontal-stretch: 0;
+            if mid: Segmented {
+                small: true;
+                value: root.view;
+                options: [
+                    { value: "month", label: "月", title: "月视图" },
+                    { value: "weeks", label: "多周", title: "多周视图（滚动显示最近几周）" },
+                    { value: "gantt", label: "甘特", title: "甘特图" },
+                ];
+                selected(v) => { root.set-view(v); }
+            }
+            if mid: Rectangle { width: 2px; }
+            Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.search;
+                accessible-label: "搜索 (Ctrl+F)";
+                clicked => { root.search(); }
+            }
+            if root.sync-enabled && wide: Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: root.sync-failed ? Glyph.warning : Glyph.sync;
+                color-override: root.sync-failed ? Theme.c.caution : transparent;
+                accessible-label: root.sync-tip;
+                clicked => { root.sync-now(); }
+            }
+            Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: root.locked ? Glyph.lock : Glyph.unlock;
+                color-override: root.locked ? transparent : Theme.c.accent-text;
+                accessible-label: root.locked ? "解锁以调整位置和大小" : "完成调整并锁定";
+                clicked => { root.toggle-lock(); }
+            }
+            if wide: Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.settings;
+                accessible-label: "设置";
+                clicked => { root.settings(); }
+            }
+            more-btn := Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.more;
+                accessible-label: "更多";
+                clicked => { root.more-menu(more-btn.absolute-position.x, more-btn.absolute-position.y, more-btn.width, more-btn.height); }
+            }
+        }
+    }
+}
+
+// Countdown pills under the calendar ("距 妈妈生日 还有 10 天").
+component CountdownBar inherits Rectangle {
+    in property <[CountdownData]> items;
+    callback jump(string);
+    property <float> fs: Theme.desk.fs;
+    height: 22px * fs;
+    clip: true;
+    accessible-role: groupbox;
+    accessible-label: "倒数日";
+    HorizontalLayout {
+        spacing: 4px;
+        alignment: start;
+        for c in root.items: pill := Rectangle {
+            property <bool> hover: cta.has-hover;
+            property <color> fg: hover ? Theme.c.text-primary : Theme.c.text-secondary;
+            border-radius: 11px;
+            background: hover ? Theme.c.subtle-fill-hover : Theme.desk.cell-bg;
+            horizontal-stretch: 0;
+            min-width: self.preferred-width;
+            accessible-role: button;
+            accessible-label: c.days == 0 ? "\{c.label} 就是今天" : "距\{c.label}还有 \{c.days} 天";
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 4px;
+                cross-axis-alignment: center;
+                Icon {
+                    glyph: c.task ? Glyph.flag : Glyph.calendar-day;
+                    size: 11px;
+                    color: pill.fg;
+                }
+                if c.days != 0: GText { text: "距"; font-size: 12px * fs; color: pill.fg; }
+                // <b> with margin: 0 2px
+                HorizontalLayout {
+                    padding-left: 2px;
+                    padding-right: 2px;
+                    GText {
+                        text: c.label;
+                        font-size: 12px * fs;
+                        font-weight: 600;
+                        color: Theme.c.text-primary;
+                    }
+                }
+                if c.days == 0: GText { text: "就是今天"; font-size: 12px * fs; color: pill.fg; }
+                if c.days != 0: GText { text: "还有"; font-size: 12px * fs; color: pill.fg; }
+                if c.days != 0: GText { text: c.days; font-size: 12px * fs; font-weight: 700; color: Theme.c.accent-text; }
+                if c.days != 0: GText { text: "天"; font-size: 12px * fs; color: pill.fg; }
+            }
+            cta := TouchArea {
+                clicked => { root.jump(c.date); }
+            }
+        }
+    }
+}
+
+// The desk window: transparent, the calendar card inset by `pad` so its shadow has room.
+export component DeskWindow inherits Window {
+    in property <string> title-text;
+    in property <string> view: "month";
+    in property <bool> locked: true;
+    in property <bool> read-only;
+    in property <[WeekData]> weeks;
+    in property <[WeekdayHead]> heads;
+    in property <bool> show-week-no;
+    in property <[CountdownData]> countdowns;
+    in property <string> selected;
+    in property <string> flash-date;
+    in property <string> today-tip;
+    in property <bool> sync-enabled;
+    in property <bool> sync-busy;
+    in property <bool> sync-failed;
+    in property <string> sync-tip;
+    out property <int> capacity: month.capacity;
+    callback capacity-changed(int);
+    callback page(int);
+    callback go-today();
+    callback set-view(string);
+    callback select(string);
+    callback quick-add(string);
+    callback jump(string);
+    callback chip-toggle(ChipData);
+    callback chip-open(ChipData);
+    title: "FluentCal";
+    no-frame: true;
+    background: transparent;
+    default-font-family: Theme.font-ui;
+    default-font-size: 14px;
+    property <length> pad: Theme.desk.pad;
+    card := Rectangle {
+        x: pad;
+        y: pad;
+        width: root.width - 2 * pad;
+        height: root.height - 2 * pad;
+        BoxShadow {
+            width: parent.width;
+            height: parent.height;
+            shadow: Theme.shadow-desk;
+        }
+        Rectangle {
+            border-radius: Theme.desk.radius;
+            background: Theme.desk.bg;
+            border-width: 1px;
+            border-color: Theme.desk.stroke;
+        }
+        VerticalLayout {
+            padding-top: 6px;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-bottom: 8px;
+            spacing: 4px;
+            TitleBar {
+                title: root.title-text;
+                view: root.view;
+                locked: root.locked;
+                sync-enabled: root.sync-enabled;
+                sync-busy: root.sync-busy;
+                sync-failed: root.sync-failed;
+                sync-tip: root.sync-tip;
+                today-tip: root.today-tip;
+                page(d) => { root.page(d); }
+                go-today => { root.go-today(); }
+                set-view(v) => { root.set-view(v); }
+            }
+            month := MonthView {
+                vertical-stretch: 1;
+                weeks: root.weeks;
+                heads: root.heads;
+                show-week-no: root.show-week-no;
+                selected: root.selected;
+                flash-date: root.flash-date;
+                read-only: root.read-only;
+                select(d) => { root.select(d); }
+                quick-add(d) => { root.quick-add(d); }
+                chip-toggle(c) => { root.chip-toggle(c); }
+                chip-open(c) => { root.chip-open(c); }
+                changed capacity => { root.capacity-changed(self.capacity); }
+            }
+            if root.countdowns.length > 0: CountdownBar {
+                items: root.countdowns;
+                jump(d) => { root.jump(d); }
+            }
+        }
+    }
+}

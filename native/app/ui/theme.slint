@@ -1,0 +1,115 @@
+// Fluent design tokens (0.2's src/fluent/tokens.css), set from Rust (src/theme.rs) for the
+// current theme and accent; the desk calendar's appearance variables (deskVars).
+
+// One entry per CSS custom property of tokens.css, same names.
+export struct Palette {
+    accent-fill: color, accent-fill-hover: color, accent-fill-pressed: color, accent-text: color,
+    accent-text-secondary: color, text-on-accent: color, text-on-accent-secondary: color, attention: color,
+    text-primary: color, text-secondary: color, text-tertiary: color, text-disabled: color,
+    text-inverse: color, accent-fill-disabled: color, text-on-accent-disabled: color, control-fill: color,
+    control-fill-hover: color, control-fill-pressed: color, control-fill-disabled: color, control-fill-input-active: color,
+    control-alt-fill: color, control-alt-fill-hover: color, control-alt-fill-pressed: color, control-strong-fill: color,
+    control-strong-fill-disabled: color, control-solid-fill: color, control-stroke: color, control-stroke-secondary: color,
+    control-strong-stroke: color, control-strong-stroke-disabled: color, elev-top: color, elev-bottom: color,
+    accent-elev-top: color, accent-elev-bottom: color, subtle-fill-hover: color, subtle-fill-pressed: color,
+    card-fill: color, card-fill-secondary: color, card-stroke: color, surface-stroke: color,
+    surface-stroke-flyout: color, layer-fill: color, layer-fill-alt: color, solid-base: color,
+    solid-secondary: color, solid-tertiary: color, solid-quarternary: color, flyout-fill: color,
+    tooltip-fill: color, smoke: color, divider: color, focus-outer: color,
+    focus-inner: color, success: color, caution: color, critical: color,
+    info-bg: color, success-bg: color, caution-bg: color, critical-bg: color,
+}
+
+// The desk calendar surface (0.2's deskVars in composables/theme.ts).
+export struct DeskVars {
+    bg: color,
+    radius: length,
+    pad: length,
+    stroke: color,
+    panel-bg: color,
+    cell-bg: color,
+    cell-gap: length,
+    line-gap: length,
+    // Font scale, 1 = 100 %.
+    fs: float,
+    today: color,
+    rest-tint: color,
+    holiday-text: color,
+    term-text: color,
+    // Halo behind text on a see-through calendar.
+    glow: bool,
+    glow-color: color,
+}
+
+// A pre-rendered box-shadow (src/shadow.rs): the shadow of a box `inner` px wide around its
+// edges, cut out under the box. Nine slices stretch it over a box of any size.
+export struct ShadowImage {
+    image: image,
+    // Physical px per image px (big blurs are rendered at a lower resolution).
+    k: int,
+    // Image px from the image edge to the box edge.
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    // Image px of corner per side, measured from the box edge inwards.
+    corner: int,
+}
+
+export global Theme {
+    in property <bool> dark;
+    in property <Palette> c;
+    in property <DeskVars> desk;
+    in property <string> font-ui: "Segoe UI Variable Text";
+    in property <string> font-display: "Segoe UI Variable Display";
+    in property <string> font-icon: "Segoe Fluent Icons";
+    in property <bool> reduce-motion;
+    in property <ShadowImage> shadow-desk;
+    in property <ShadowImage> shadow-flyout;
+    in property <ShadowImage> shadow-tooltip;
+    in property <ShadowImage> shadow-dialog;
+    out property <length> radius-control: 4px;
+    out property <length> radius-overlay: 8px;
+    out property <duration> dur-fast: reduce-motion ? 0ms : 83ms;
+    out property <duration> dur-normal: reduce-motion ? 0ms : 187ms;
+    out property <duration> dur-slow: reduce-motion ? 0ms : 333ms;
+}
+
+// Draws a ShadowImage around its parent's geometry (place it first, at x: 0; y: 0, with the
+// parent's width and height). The software renderer has no drop-shadow of its own.
+export component BoxShadow {
+    in property <ShadowImage> shadow;
+    property <float> k: max(1, shadow.k);
+    property <length> l: shadow.left * k * 1phx;
+    property <length> t: shadow.top * k * 1phx;
+    property <length> r: shadow.right * k * 1phx;
+    property <length> b: shadow.bottom * k * 1phx;
+    // Corner size along each side, clamped so the halves of a small box meet in the middle.
+    property <length> cx: min(shadow.corner * k * 1phx, root.width / 2);
+    property <length> cy: min(shadow.corner * k * 1phx, root.height / 2);
+    property <int> iw: shadow.image.width;
+    property <int> ih: shadow.image.height;
+    // The same corner sizes in image px.
+    property <int> pcx: round(cx / 1phx / k);
+    property <int> pcy: round(cy / 1phx / k);
+    visible: shadow.image.width > 0;
+    // Top row: corner, stretched edge, corner.
+    Image { x: -l; y: -t; width: l + cx; height: t + cy; image-fit: fill; source: shadow.image;
+        source-clip-x: 0; source-clip-y: 0; source-clip-width: shadow.left + pcx; source-clip-height: shadow.top + pcy; }
+    Image { x: cx; y: -t; width: root.width - 2 * cx; height: t + cy; image-fit: fill; source: shadow.image;
+        source-clip-x: shadow.left + shadow.corner; source-clip-y: 0; source-clip-width: 1; source-clip-height: shadow.top + pcy; }
+    Image { x: root.width - cx; y: -t; width: cx + r; height: t + cy; image-fit: fill; source: shadow.image;
+        source-clip-x: iw - shadow.right - pcx; source-clip-y: 0; source-clip-width: shadow.right + pcx; source-clip-height: shadow.top + pcy; }
+    // Middle row: the side edges (the box interior has no shadow).
+    Image { x: -l; y: cy; width: l + cx; height: root.height - 2 * cy; image-fit: fill; source: shadow.image;
+        source-clip-x: 0; source-clip-y: shadow.top + shadow.corner; source-clip-width: shadow.left + pcx; source-clip-height: 1; }
+    Image { x: root.width - cx; y: cy; width: cx + r; height: root.height - 2 * cy; image-fit: fill; source: shadow.image;
+        source-clip-x: iw - shadow.right - pcx; source-clip-y: shadow.top + shadow.corner; source-clip-width: shadow.right + pcx; source-clip-height: 1; }
+    // Bottom row.
+    Image { x: -l; y: root.height - cy; width: l + cx; height: cy + b; image-fit: fill; source: shadow.image;
+        source-clip-x: 0; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: shadow.left + pcx; source-clip-height: shadow.bottom + pcy; }
+    Image { x: cx; y: root.height - cy; width: root.width - 2 * cx; height: cy + b; image-fit: fill; source: shadow.image;
+        source-clip-x: shadow.left + shadow.corner; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: 1; source-clip-height: shadow.bottom + pcy; }
+    Image { x: root.width - cx; y: root.height - cy; width: cx + r; height: cy + b; image-fit: fill; source: shadow.image;
+        source-clip-x: iw - shadow.right - pcx; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: shadow.right + pcx; source-clip-height: shadow.bottom + pcy; }
+}

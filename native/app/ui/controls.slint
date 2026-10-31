@@ -1,0 +1,216 @@
+// Fluent controls (0.2's src/fluent/*.vue), drawn by hand to match their CSS.
+
+import { Theme } from "theme.slint";
+import { Icon } from "icons.slint";
+
+// Text with the desk calendar's halo (the CSS `text-shadow: var(--text-glow)`): offset copies in
+// the halo colour behind the text, drawn only while the calendar is see-through.
+export component GText {
+    in property <string> text;
+    in property <brush> color: Theme.c.text-primary;
+    in property <length> font-size: 14px;
+    in property <int> font-weight: 400;
+    in property <string> font-family: Theme.font-ui;
+    in property <TextHorizontalAlignment> horizontal-alignment: left;
+    in property <TextVerticalAlignment> vertical-alignment: center;
+    in property <TextOverflow> overflow: clip;
+    in property <bool> glow: Theme.desk.glow;
+    // Width the text needs (for decorations such as a strike-through line).
+    out property <length> text-width: min(t.preferred-width, root.width);
+    preferred-width: t.preferred-width;
+    min-width: overflow == TextOverflow.elide ? 0 : t.preferred-width;
+    preferred-height: t.preferred-height;
+    if glow: Rectangle {
+        for o in [{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 2 }]: Text {
+            x: o.x * 1px;
+            y: o.y * 1px;
+            width: root.width;
+            height: root.height;
+            text: root.text;
+            color: Theme.desk.glow-color.transparentize(o.y == 2 ? 0.7 : 0.74);
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            font-family: root.font-family;
+            horizontal-alignment: root.horizontal-alignment;
+            vertical-alignment: root.vertical-alignment;
+            overflow: root.overflow;
+            accessible-role: none;
+        }
+    }
+    t := Text {
+        width: 100%;
+        height: 100%;
+        text: root.text;
+        color: root.color;
+        font-size: root.font-size;
+        font-weight: root.font-weight;
+        font-family: root.font-family;
+        horizontal-alignment: root.horizontal-alignment;
+        vertical-alignment: root.vertical-alignment;
+        overflow: root.overflow;
+    }
+}
+
+// The Windows elevation border: `top` all round, `bottom` on the bottom edge
+// (CSS border-color: top; border-bottom-color: bottom).
+export component ElevBorder inherits Rectangle {
+    in property <brush> top;
+    in property <brush> bottom;
+    in property <length> radius: Theme.radius-control;
+    border-radius: radius;
+    border-width: 1px;
+    border-color: top;
+    Rectangle {
+        x: root.radius;
+        y: root.height - 1px;
+        width: root.width - 2 * root.radius;
+        height: 1px;
+        background: root.bottom;
+    }
+}
+
+export enum ButtonVariant { standard, accent, subtle }
+export enum ButtonSize { medium, small, icon }
+
+// 0.2's FButton: an icon and/or a label.
+export component Button inherits Rectangle {
+    in property <ButtonVariant> variant: ButtonVariant.standard;
+    in property <ButtonSize> size: ButtonSize.medium;
+    in property <string> text;
+    in property <string> icon;
+    in property <string> icon-right;
+    in property <bool> enabled: true;
+    // Toggle-button state (a selected look).
+    in property <bool> pressed-state;
+    in property <brush> color-override: transparent;
+    callback clicked();
+    out property <bool> hovered: ta.has-hover;
+    property <bool> down: ta.pressed && enabled;
+    property <bool> hover: ta.has-hover && enabled;
+    property <length> line: size == ButtonSize.small ? 16px : 20px;
+    property <brush> fg: !enabled ? Theme.c.text-disabled
+        : variant == ButtonVariant.accent ? (down ? Theme.c.text-on-accent-secondary : Theme.c.text-on-accent)
+        : down && variant != ButtonVariant.accent ? Theme.c.text-secondary
+        : color-override != transparent ? color-override
+        : variant == ButtonVariant.subtle && pressed-state ? Theme.c.accent-text
+        : Theme.c.text-primary;
+    border-radius: Theme.radius-control;
+    background: variant == ButtonVariant.standard ? (!enabled ? Theme.c.control-fill-disabled : down ? Theme.c.control-fill-pressed : hover ? Theme.c.control-fill-hover : Theme.c.control-fill)
+        : variant == ButtonVariant.accent ? (!enabled ? Theme.c.accent-fill-disabled : down ? Theme.c.accent-fill-pressed : hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
+        : (down ? Theme.c.subtle-fill-pressed : hover || pressed-state ? Theme.c.subtle-fill-hover : transparent);
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    width: size == ButtonSize.icon ? 32px : content.preferred-width;
+    height: size == ButtonSize.icon ? 32px : content.preferred-height;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    accessible-action-default => { clicked(); }
+    if variant == ButtonVariant.standard: ElevBorder {
+        top: !enabled || down ? Theme.c.control-stroke : Theme.c.elev-top;
+        bottom: !enabled || down ? Theme.c.control-stroke : Theme.c.elev-bottom;
+    }
+    if variant == ButtonVariant.accent && enabled && !down: ElevBorder {
+        top: Theme.c.accent-elev-top;
+        bottom: Theme.c.accent-elev-bottom;
+    }
+    if size == ButtonSize.icon: Icon {
+        glyph: root.icon;
+        size: 16px;
+        color: root.fg;
+    }
+    content := HorizontalLayout {
+        visible: size != ButtonSize.icon;
+        padding-left: size == ButtonSize.small ? 8px : 12px;
+        padding-right: self.padding-left;
+        padding-top: size == ButtonSize.small ? 2px : 6px;
+        padding-bottom: size == ButtonSize.small ? 3px : 7px;
+        spacing: size == ButtonSize.small ? 6px : 8px;
+        alignment: center;
+        cross-axis-alignment: center;
+        if root.icon != "": Icon {
+            glyph: root.icon;
+            size: size == ButtonSize.small ? 12px : 16px;
+            color: root.fg;
+        }
+        if root.text != "": Text {
+            height: root.line;
+            text: root.text;
+            color: root.fg;
+            font-size: size == ButtonSize.small ? 12px : 14px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.icon-right != "": Icon {
+            glyph: root.icon-right;
+            size: 12px;
+            color: root.fg;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+export struct SegOption { value: string, label: string, icon: string, title: string }
+
+// 0.2's FSegmented: a radio group drawn as one strip.
+export component Segmented inherits Rectangle {
+    in property <[SegOption]> options;
+    in property <string> value;
+    in property <bool> small;
+    callback selected(string);
+    border-radius: Theme.radius-control;
+    background: Theme.c.control-alt-fill;
+    border-width: 1px;
+    border-color: Theme.c.control-stroke;
+    accessible-role: tab-list;
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for o in root.options: item := Rectangle {
+            property <bool> on: o.value == root.value;
+            height: root.small ? 22px : 26px;
+            border-radius: 3px;
+            background: on ? Theme.c.control-fill : ita.pressed ? Theme.c.subtle-fill-pressed : ita.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+            accessible-role: tab;
+            accessible-label: o.label != "" ? o.label : o.title;
+            accessible-item-selected: on;
+            accessible-action-default => { if !on { root.selected(o.value); } }
+            if on: ElevBorder {
+                radius: 3px;
+                top: Theme.c.elev-top;
+                bottom: Theme.c.elev-bottom;
+            }
+            HorizontalLayout {
+                padding-left: o.label == "" ? (root.small ? 6px : 8px) : (root.small ? 9px : 12px);
+                padding-right: self.padding-left;
+                spacing: 6px;
+                cross-axis-alignment: center;
+                if o.icon != "": Icon {
+                    glyph: o.icon;
+                    size: root.small ? 14px : 16px;
+                    color: on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+                }
+                if o.label != "": Text {
+                    text: o.label;
+                    font-size: root.small ? 12px : 14px;
+                    vertical-alignment: center;
+                    color: on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+                }
+            }
+            if on: Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: parent.height - self.height - (root.small ? 2px : 3px);
+                width: root.small ? 12px : 16px;
+                height: root.small ? 2px : 3px;
+                border-radius: 2px;
+                background: Theme.c.accent-fill;
+            }
+            ita := TouchArea {
+                clicked => { if !on { root.selected(o.value); } }
+            }
+        }
+    }
+}

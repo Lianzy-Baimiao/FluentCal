@@ -24,5 +24,6 @@ pub mod store;
 pub mod sync;
 pub mod sync_text;
 pub mod tasks;
+pub mod theme;
 pub mod web;
 pub mod week;

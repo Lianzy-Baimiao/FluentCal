@@ -14,3 +14,7 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# The software renderer with glyph contrast/hinting closer to DirectWrite (see vendor/README.md).
+[patch.crates-io]
+i-slint-renderer-software = { path = "vendor/i-slint-renderer-software" }
