@@ -117,3 +117,43 @@ export component Icon {
         accessible-role: none;
     }
 }
+
+// icons.ts SVG_ICONS: 16x16 outlines drawn with a 1px stroke. `name`: "gantt" | "milestone".
+export component SvgIcon {
+    in property <string> name;
+    in property <length> size: 16px;
+    in property <brush> color: Theme.c.text-primary;
+    width: size;
+    height: size;
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 16;
+        viewbox-height: 16;
+        commands: root.name == "gantt"
+            ? "M3 2.5h5a1.5 1.5 0 0 1 0 3H3a1.5 1.5 0 0 1 0-3z M6 6.5h7a1.5 1.5 0 0 1 0 3H6a1.5 1.5 0 0 1 0-3z M4 10.5h3a1.5 1.5 0 0 1 0 3H4a1.5 1.5 0 0 1 0-3z"
+            : "M8 1.7 14.3 8 8 14.3 1.7 8z";
+        stroke: root.color;
+        stroke-width: root.size / 16;
+        fill: transparent;
+    }
+}
+
+// A glyph name from Glyph, or "svg:gantt" / "svg:milestone".
+export component AnyIcon {
+    in property <string> glyph;
+    in property <length> size: 16px;
+    in property <brush> color: Theme.c.text-primary;
+    width: size;
+    height: size;
+    if root.glyph == "svg:gantt" || root.glyph == "svg:milestone": SvgIcon {
+        name: root.glyph == "svg:gantt" ? "gantt" : "milestone";
+        size: root.size;
+        color: root.color;
+    }
+    if root.glyph != "svg:gantt" && root.glyph != "svg:milestone": Icon {
+        glyph: root.glyph;
+        size: root.size;
+        color: root.color;
+    }
+}

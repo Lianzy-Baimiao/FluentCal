@@ -1,0 +1,1272 @@
+// Text box, number box, select, date/time pickers, calendar, shortcut box (0.2's FTextBox,
+// FNumberBox, FSelect, FDatePicker, FCalendarView, FTimePicker, FShortcutBox). Dates are ISO
+// strings ("2026-10-14"); the arithmetic and parsing are Rust callbacks on the Fluent global
+// (src/fluent.rs, installed per window).
+
+import { Theme, Swatch } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Overlay, Tip, FocusRing, Flyout, Placement, PlacedRect } from "overlay.slint";
+import { ElevBorder, Button, ButtonVariant } from "controls.slint";
+
+export struct CalDay { iso: string, day: int, out: bool, lunar: string, marker: string }
+
+export global Fluent {
+    // Today for the calendars (Rust keeps it current; parity runs fix it).
+    in-out property <string> today: "2026-10-14";
+    pure callback add-days(string, int) -> string;
+    // Month shift keeping the day where the month allows (FCalendarView.shift).
+    pure callback add-months(string, int) -> string;
+    pure callback make-date(int, int, int) -> string;
+    pure callback year-of(string) -> int;
+    pure callback month-of(string) -> int;
+    pure callback day-of(string) -> int;
+    // 0 = Sunday.
+    pure callback weekday-of(string) -> int;
+    // 42 days from the week holding the 1st; lunar text / 休班 markers when asked.
+    pure callback month-grid(int, int, int, bool, bool) -> [CalDay];
+    // Typed date / time → ISO / "HH:mm", "" when invalid (0.2's dates.ts).
+    pure callback parse-date(string) -> string;
+    pure callback parse-time(string) -> string;
+    // "09:30" → 570; -1 when invalid.
+    pure callback time-minutes(string) -> int;
+    pure callback trim(string) -> string;
+    // "#abc" / "0078d4" → "#AABBCC"; "" when not a hex colour (theme.ts normalizeHex).
+    pure callback normalize-hex(string) -> string;
+    pure callback hex-color(string) -> color;
+    // White or black, whichever reads on the colour (theme.ts bestTextOn).
+    pure callback text-on(string) -> color;
+    // The selected value as a custom hex when it isn't one of the swatches' keys, else "".
+    pure callback custom-value(string, [Swatch]) -> string;
+    // Minutes since midnight now (the time list opens there when empty).
+    in-out property <int> now-minutes: 600;
+    // "Ctrl+Alt+D" → ["Ctrl", "Alt", "D"] (keycap labels).
+    pure callback shortcut-labels(string) -> [string];
+    // A key press while recording → "Ctrl+Alt+D", or "" when it isn't a complete shortcut.
+    pure callback shortcut-from(string, bool, bool, bool, bool) -> string;
+}
+
+// 0.2's FTextBox. Single line by default; `multiline` with `rows`. Children go after the
+// input (the date picker's weekday and calendar button).
+export component TextBox {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> icon;
+    in property <bool> clearable;
+    in property <bool> multiline;
+    in property <int> rows: 3;
+    in property <bool> enabled: true;
+    // 24px high, 12px text (dense toolbars).
+    in property <bool> small;
+    // Take the keyboard focus when created (0.2's dialogs focus their first field).
+    in property <bool> autofocus;
+    in property <bool> password;
+    // 0 = no limit.
+    in property <int> max-length;
+    out property <bool> has-focus: input.has-focus;
+    callback edited(string);
+    // Enter (Ctrl+Enter when multi-line).
+    callback accepted(string);
+    callback escape();
+    callback focus-changed(bool);
+    property <bool> hover: ta.has-hover && enabled;
+    property <length> line: small ? 18px : 20px;
+    property <length> pad-l: icon != "" ? 8px : small ? 8px : 11px;
+    property <length> pad-r: small ? 8px : 10px;
+    property <bool> show-clear: clearable && text != "" && enabled;
+    forward-focus: input;
+    preferred-width: 160px;
+    min-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
+    max-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
+    preferred-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
+    accessible-role: text-input;
+    accessible-value: text;
+    accessible-placeholder-text: placeholder;
+    accessible-enabled: enabled;
+    public function focus-input() { input.focus(); }
+    init => {
+        if autofocus {
+            input.focus();
+        }
+    }
+    public function select-all() { input.select-all(); }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.radius-control;
+        background: !root.enabled ? Theme.c.control-fill-disabled
+            : input.has-focus ? Theme.c.control-fill-input-active
+            : root.hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+        animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+        clip: true;
+        ElevBorder {
+            top: Theme.c.control-stroke;
+            bottom: root.enabled ? Theme.c.control-strong-stroke : Theme.c.control-stroke;
+        }
+        // the accent line under a focused box (::after scaleX 0 → 1)
+        Rectangle {
+            property <float> k: input.has-focus ? 1 : 0;
+            animate k { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+            x: (1 - k) * parent.width / 2;
+            y: parent.height - 2px;
+            width: k * parent.width;
+            height: 1px;
+            background: Theme.c.accent-fill;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        enabled: root.enabled;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                input.focus();
+            }
+        }
+    }
+    // (inside a plain wrapper: the layout's own height limits must not become the control's)
+    Rectangle {
+        width: 100%;
+        height: 100%;
+    HorizontalLayout {
+        padding: 1px;
+        if root.icon != "": HorizontalLayout {
+            padding-left: 10px;
+            cross-axis-alignment: center;
+            Icon {
+                glyph: root.icon;
+                size: 14px;
+                color: Theme.c.text-secondary;
+            }
+        }
+        field := Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0;
+            clip: true;
+            ph := Text {
+                x: root.pad-l;
+                y: root.multiline ? 6px : (parent.height - root.line) / 2;
+                width: parent.width - root.pad-l - root.pad-r;
+                height: root.multiline ? root.line : root.line;
+                text: root.text == "" && input.preedit-text == "" ? root.placeholder : "";
+                font-size: root.small ? 12px : 14px;
+                color: !root.enabled ? Theme.c.text-disabled : input.has-focus ? Theme.c.text-tertiary : Theme.c.text-secondary;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            input := TextInput {
+                property <length> scroll-x;
+                x: root.multiline ? root.pad-l : root.pad-l + min(0px, max(field.width - root.pad-l - root.pad-r - self.width, scroll-x));
+                y: root.multiline ? 6px : (parent.height - root.line) / 2;
+                width: root.multiline ? parent.width - root.pad-l - root.pad-r : max(field.width - root.pad-l - root.pad-r, self.preferred-width + 2px);
+                height: root.multiline ? parent.height - 12px : root.line;
+                text <=> root.text;
+                enabled: root.enabled;
+                single-line: !root.multiline;
+                wrap: root.multiline ? word-wrap : no-wrap;
+                vertical-alignment: root.multiline ? top : center;
+                input-type: root.password ? InputType.password : InputType.text;
+                font-size: root.small ? 12px : 14px;
+                color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+                selection-background-color: Theme.c.accent-fill;
+                selection-foreground-color: Theme.c.text-on-accent;
+                text-cursor-width: 1px;
+                accessible-role: none;
+                cursor-position-changed(p) => {
+                    if !root.multiline {
+                        let view = field.width - root.pad-l - root.pad-r;
+                        if p.x + scroll-x < 0 {
+                            scroll-x = -p.x;
+                        } else if p.x + scroll-x > view - 1px {
+                            scroll-x = view - 1px - p.x;
+                        }
+                    }
+                }
+                edited => {
+                    root.edited(self.text);
+                }
+                accepted => {
+                    root.accepted(self.text);
+                }
+                key-pressed(e) => {
+                    if e.text == Key.Escape {
+                        root.escape();
+                        return reject;
+                    }
+                    if root.multiline && e.text == Key.Return && e.modifiers.control {
+                        root.accepted(self.text);
+                        return accept;
+                    }
+                    return reject;
+                }
+                changed has-focus => {
+                    if self.has-focus {
+                        Tip.hide();
+                    }
+                    root.focus-changed(self.has-focus);
+                }
+            }
+        }
+        if root.show-clear: HorizontalLayout {
+            padding-right: 4px;
+            alignment: center;
+            cross-axis-alignment: center;
+            Rectangle {
+                width: 28px;
+                height: 24px;
+                border-radius: Theme.radius-control;
+                background: cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: button;
+                accessible-label: "清除";
+                Icon { glyph: Glyph.close; size: 10px; color: Theme.c.text-secondary; }
+                cta := TouchArea {
+                    clicked => {
+                        root.text = "";
+                        root.edited("");
+                        input.focus();
+                    }
+                }
+            }
+        }
+        @children
+    }
+    }
+}
+// 0.2's FNumberBox: typed value committed on Enter / focus loss (clamped, rounded to the
+// step's decimals), spin buttons and arrow keys step it.
+export component NumberBox {
+    in property <float> value;
+    in property <float> minimum: -1000000000;
+    in property <float> maximum: 1000000000;
+    in property <float> step: 1;
+    in property <string> suffix;
+    in property <bool> enabled: true;
+    callback changed-value(float);
+    // (set in init: a plain binding is dropped by the two-way binding to the TextInput)
+    property <string> draft;
+    property <bool> hover: ta.has-hover && enabled;
+    forward-focus: input;
+    preferred-width: 120px;
+    min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+    init => { draft = fmt(value); }
+    accessible-role: spinbox;
+    accessible-value: fmt(value);
+    accessible-value-minimum: minimum;
+    accessible-value-maximum: maximum;
+    accessible-enabled: enabled;
+    changed value => { draft = fmt(value); }
+    pure function fmt(v: float) -> string {
+        return round(v) == v ? "\{round(v)}" : "\{v}";
+    }
+    function clamp-v(v: float) -> float {
+        let digits = step == round(step) ? 0 : step * 10 == round(step * 10) ? 1 : 2;
+        let k = pow(10, digits);
+        return clamp(round(v * k) / k, minimum, maximum);
+    }
+    function commit() {
+        let v = draft.to-float();
+        if draft == "" || !draft.is-float() {
+            draft = fmt(value);
+            return;
+        }
+        let c = clamp-v(v);
+        draft = fmt(c);
+        if c != value {
+            changed-value(c);
+        }
+    }
+    function step-by(n: int) {
+        if enabled {
+            let c = clamp-v(value + n * step);
+            if c != value {
+                changed-value(c);
+            }
+        }
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.radius-control;
+        background: !root.enabled ? Theme.c.control-fill-disabled
+            : input.has-focus ? Theme.c.control-fill-input-active
+            : root.hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+        clip: true;
+        ElevBorder {
+            top: Theme.c.control-stroke;
+            bottom: root.enabled ? Theme.c.control-strong-stroke : Theme.c.control-stroke;
+        }
+        Rectangle {
+            property <float> k: input.has-focus ? 1 : 0;
+            animate k { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+            x: (1 - k) * parent.width / 2;
+            y: parent.height - 2px;
+            width: k * parent.width;
+            height: 1px;
+            background: Theme.c.accent-fill;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        enabled: root.enabled;
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                input.focus();
+            }
+        }
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+    HorizontalLayout {
+        padding: 1px;
+        Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0;
+            clip: true;
+            input := TextInput {
+                x: 11px;
+                y: (parent.height - 20px) / 2;
+                width: parent.width - 15px;
+                height: 20px;
+                text <=> root.draft;
+                enabled: root.enabled;
+                single-line: true;
+                vertical-alignment: center;
+                input-type: InputType.decimal;
+                color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+                selection-background-color: Theme.c.accent-fill;
+                selection-foreground-color: Theme.c.text-on-accent;
+                text-cursor-width: 1px;
+                accessible-role: none;
+                accepted => { root.commit(); }
+                key-pressed(e) => {
+                    let n = e.text == Key.UpArrow ? 1 : e.text == Key.DownArrow ? -1 : e.text == Key.PageUp ? 10 : e.text == Key.PageDown ? -10 : 0;
+                    if n != 0 {
+                        root.step-by(n);
+                        return accept;
+                    }
+                    return reject;
+                }
+                changed has-focus => {
+                    if !self.has-focus {
+                        root.commit();
+                    }
+                }
+            }
+        }
+        if root.suffix != "": HorizontalLayout {
+            padding-right: 4px;
+            Text {
+                text: root.suffix;
+                color: Theme.c.text-secondary;
+                vertical-alignment: center;
+            }
+        }
+        for d[i] in [1, -1]: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                property <bool> can: root.enabled && (d > 0 ? root.value < root.maximum : root.value > root.minimum);
+                width: 24px;
+                height: 24px;
+                border-radius: Theme.radius-control;
+                background: can && sta.pressed ? Theme.c.subtle-fill-pressed : can && sta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: button;
+                accessible-label: d > 0 ? "增加" : "减少";
+                Icon {
+                    glyph: d > 0 ? Glyph.chevron-up : Glyph.chevron-down;
+                    size: 10px;
+                    color: parent.can ? Theme.c.text-secondary : Theme.c.text-disabled;
+                }
+                sta := TouchArea {
+                    enabled: parent.can;
+                    clicked => { root.step-by(d); }
+                }
+            }
+        }
+        Rectangle { width: 3px; }
+    }
+    }
+}
+
+export struct SelectOption { value: string, label: string, icon: string, disabled: bool }
+
+// 0.2's FSelect: a button showing the choice, with the list in a flyout at least as wide.
+export component Select {
+    in property <[SelectOption]> options;
+    in property <string> value;
+    in property <string> placeholder: "请选择";
+    in property <bool> enabled: true;
+    callback selected(string);
+    property <int> sel: index-of(value);
+    property <int> hi: -1;
+    property <bool> hover: ta.has-hover && enabled;
+    property <bool> down: ta.pressed && enabled;
+    forward-focus: fs;
+    preferred-width: max(120px, row.preferred-width);
+    min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+    accessible-role: combobox;
+    accessible-value: sel >= 0 ? options[sel].label : placeholder;
+    accessible-enabled: enabled;
+    pure function index-of(v: string) -> int {
+        return options.length > 0 && options[0].value == v ? 0 : options.length > 1 && options[1].value == v ? 1
+            : options.length > 2 && options[2].value == v ? 2 : options.length > 3 && options[3].value == v ? 3
+            : options.length > 4 && options[4].value == v ? 4 : options.length > 5 && options[5].value == v ? 5
+            : options.length > 6 && options[6].value == v ? 6 : options.length > 7 && options[7].value == v ? 7
+            : options.length > 8 && options[8].value == v ? 8 : options.length > 9 && options[9].value == v ? 9
+            : options.length > 10 && options[10].value == v ? 10 : options.length > 11 && options[11].value == v ? 11 : -1;
+    }
+    // Next enabled index from `i` in direction `d`, without wrapping (FSelect.next).
+    function next(i: int, d: int) -> int {
+        let n = options.length;
+        let a = i + d;
+        let b = i + 2 * d;
+        let c = i + 3 * d;
+        return a >= 0 && a < n && !options[a].disabled ? a : b >= 0 && b < n && !options[b].disabled ? b
+            : c >= 0 && c < n && !options[c].disabled ? c : i;
+    }
+    function show() {
+        if enabled {
+            hi = sel >= 0 ? sel : next(-1, 1);
+            fly.open-at(root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+        }
+    }
+    function choose(i: int) {
+        if i >= 0 && i < options.length && !options[i].disabled {
+            if options[i].value != value {
+                selected(options[i].value);
+            }
+            fly.close();
+            fs.focus();
+        }
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.radius-control;
+        background: !root.enabled ? Theme.c.control-fill-disabled
+            : root.down || fly.is-open ? Theme.c.control-fill-pressed
+            : root.hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+        animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+        ElevBorder {
+            top: root.enabled ? Theme.c.elev-top : Theme.c.control-stroke;
+            bottom: root.enabled ? Theme.c.elev-bottom : Theme.c.control-stroke;
+        }
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+    row := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        if root.sel >= 0 && root.options[root.sel].icon != "": Icon {
+            glyph: root.options[root.sel].icon;
+            size: 16px;
+            color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.sel >= 0 ? root.options[root.sel].label : root.placeholder;
+            color: !root.enabled ? Theme.c.text-disabled : root.sel >= 0 ? Theme.c.text-primary : Theme.c.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            padding-left: 4px;
+            Icon {
+                glyph: Glyph.chevron-down;
+                size: 12px;
+                color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
+            }
+        }
+    }
+    }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " || e.text == Key.F4 || (e.modifiers.alt && e.text == Key.DownArrow) {
+                root.show();
+                return accept;
+            }
+            if e.text == Key.DownArrow || e.text == Key.UpArrow {
+                let i = root.next(root.sel, e.text == Key.DownArrow ? 1 : -1);
+                if i != root.sel && i >= 0 {
+                    root.selected(root.options[i].value);
+                }
+                return accept;
+            }
+            return reject;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.show(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                fs.focus();
+            }
+        }
+    }
+    FocusRing { show: fs.has-focus && Overlay.keyboard && !fly.is-open; }
+    fly := Flyout {
+        placement: Placement.bottom-start;
+        padded: false;
+        min-panel-width: root.width;
+        key(e) => {
+            if e.text == Key.DownArrow || e.text == Key.UpArrow {
+                root.hi = root.next(root.hi, e.text == Key.DownArrow ? 1 : -1);
+                return accept;
+            }
+            if e.text == Key.Home || e.text == Key.End {
+                root.hi = e.text == Key.Home ? root.next(-1, 1) : root.next(root.options.length, -1);
+                return accept;
+            }
+            if e.text == Key.Return || e.text == " " {
+                root.choose(root.hi);
+                return accept;
+            }
+            if e.text == Key.Tab {
+                fly.close();
+                return accept;
+            }
+            return reject;
+        }
+        VerticalLayout {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            for o[i] in root.options: item := Rectangle {
+                property <bool> is-sel: i == root.sel;
+                property <bool> is-hi: i == root.hi;
+                min-height: i == root.options.length - 1 ? 32px : 34px;
+                accessible-role: list-item;
+                accessible-label: o.label;
+                accessible-item-selected: is-sel;
+                Rectangle {
+                    x: 4px;
+                    y: 0;
+                    width: parent.width - 8px;
+                    height: 32px;
+                    border-radius: Theme.radius-control;
+                    background: ita.pressed && !o.disabled ? Theme.c.subtle-fill-pressed : item.is-hi || item.is-sel ? Theme.c.subtle-fill-hover : transparent;
+                    if item.is-sel: Rectangle {
+                        x: 0;
+                        y: (parent.height - 16px) / 2;
+                        width: 3px;
+                        height: 16px;
+                        border-radius: 2px;
+                        background: Theme.c.accent-fill;
+                    }
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 12px;
+                        cross-axis-alignment: center;
+                        if o.icon != "": Icon { glyph: o.icon; size: 16px; color: o.disabled ? Theme.c.text-disabled : Theme.c.text-primary; }
+                        Text {
+                            text: o.label;
+                            color: o.disabled ? Theme.c.text-disabled : ita.pressed ? Theme.c.text-secondary : Theme.c.text-primary;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                ita := TouchArea {
+                    clicked => { root.choose(i); }
+                    changed has-hover => {
+                        if self.has-hover && !o.disabled {
+                            root.hi = i;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+// 0.2's FCalendarView: a month of days (lunar text and 休/班 when asked) or the 12 months.
+export component CalendarView {
+    in property <string> selected;
+    in property <bool> lunar;
+    in property <bool> markers;
+    // 0 = Sunday first, 1 = Monday first.
+    in property <int> first-day: 1;
+    callback picked(string);
+    // Show the focus ring on the title (0.2's FFlyout autofocus) until the next input.
+    in-out property <bool> title-ring;
+    property <string> cursor: selected != "" ? selected : Fluent.today;
+    property <int> vy: Fluent.year-of(cursor);
+    property <int> vm: Fluent.month-of(cursor);
+    property <bool> months;
+    property <[CalDay]> days: Fluent.month-grid(vy, vm, first-day, lunar, markers);
+    property <length> cw: (root.width - 8px) / 7;
+    property <length> ch: lunar ? 44px : 42px;
+    property <[string]> week: ["日", "一", "二", "三", "四", "五", "六"];
+    forward-focus: fs;
+    width: lunar ? 316px : 300px;
+    height: months ? 2px + 40px + 16px + 3 * 56px + 2 * 4px + 6px : 2px + 40px + 32px + 6 * ch + 6px;
+    accessible-role: table;
+    accessible-label: "\{vy}年\{vm}月";
+    changed selected => {
+        if selected != "" {
+            cursor = selected;
+            vy = Fluent.year-of(selected);
+            vm = Fluent.month-of(selected);
+        }
+    }
+    function shift(n: int) {
+        let d = Fluent.add-months(Fluent.make-date(vy, vm, 1), n);
+        vy = Fluent.year-of(d);
+        vm = Fluent.month-of(d);
+        cursor = Fluent.add-months(cursor, n);
+    }
+    function move-to(d: string) {
+        cursor = d;
+        vy = Fluent.year-of(d);
+        vm = Fluent.month-of(d);
+    }
+    function pick(d: string) {
+        move-to(d);
+        picked(d);
+    }
+    // head: title button and the two arrows
+    HorizontalLayout {
+        x: 4px;
+        y: 2px;
+        width: root.width - 8px;
+        height: 40px;
+        spacing: 2px;
+        padding-right: 2px;
+        cross-axis-alignment: center;
+        Rectangle {
+            horizontal-stretch: 1;
+            min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+            border-radius: Theme.radius-control;
+            background: tta.pressed ? Theme.c.subtle-fill-pressed : tta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            Text {
+                x: 8px;
+                text: root.months ? "\{root.vy}年" : "\{root.vy}年\{root.vm}月";
+                font-weight: 600;
+                color: Theme.c.text-primary;
+                vertical-alignment: center;
+            }
+            tta := TouchArea { clicked => { root.months = !root.months; } }
+            if root.title-ring: FocusRing { show: true; }
+        }
+        for d in [-1, 1]: Rectangle {
+            width: 32px;
+            min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+            border-radius: Theme.radius-control;
+            background: nta.pressed ? Theme.c.subtle-fill-pressed : nta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            accessible-label: root.months ? (d < 0 ? "上一年" : "下一年") : (d < 0 ? "上个月" : "下个月");
+            Icon { glyph: d < 0 ? Glyph.chevron-up : Glyph.chevron-down; size: 12px; color: Theme.c.text-secondary; }
+            nta := TouchArea {
+                clicked => {
+                    if root.months {
+                        root.vy += d;
+                    } else {
+                        root.shift(d);
+                    }
+                }
+            }
+        }
+    }
+    if !root.months: Rectangle {
+        y: 42px;
+        height: 32px + 6 * root.ch;
+        for w[i] in root.week: Text {
+            x: 4px + i * root.cw;
+            y: 0;
+            width: root.cw;
+            min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+            text: root.week[Math.mod(i + root.first-day, 7)];
+            font-size: 12px;
+            color: Theme.c.text-primary;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        for d[i] in root.days: cell := Rectangle {
+            property <bool> today: d.iso == Fluent.today;
+            property <bool> sel: d.iso == root.selected;
+            property <bool> hover: dta.has-hover;
+            x: 4px + Math.mod(i, 7) * root.cw + 1px;
+            y: 32px + floor(i / 7) * root.ch + 1px;
+            width: root.cw - 2px;
+            height: root.ch - 2px;
+            border-radius: root.lunar ? 6px : min(self.width, self.height) / 2;
+            background: today ? (hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
+                : dta.pressed ? Theme.c.subtle-fill-pressed : hover ? Theme.c.subtle-fill-hover : transparent;
+            border-width: sel ? 1px : 0;
+            border-color: Theme.c.accent-fill;
+            accessible-role: button;
+            accessible-label: "\{Fluent.year-of(d.iso)}年\{Fluent.month-of(d.iso)}月\{d.day}";
+            accessible-checked: sel;
+            // today + selected: inset 2px accent ring, then 1px on-accent ring
+            if cell.today && cell.sel: Rectangle {
+                border-radius: parent.border-radius;
+                border-width: 2px;
+                border-color: Theme.c.accent-fill;
+                Rectangle {
+                    x: 2px;
+                    y: 2px;
+                    width: parent.width - 4px;
+                    height: parent.height - 4px;
+                    border-radius: max(0, parent.border-radius - 2px);
+                    border-width: 1px;
+                    border-color: Theme.c.text-on-accent;
+                }
+            }
+            Text {
+                y: d.lunar != "" ? (parent.height - 27px) / 2 : (parent.height - 14px) / 2;
+                width: parent.width;
+                height: 14px;
+                text: d.day;
+                font-size: 14px;
+                font-weight: cell.today ? 600 : d.out ? 300 : 400;
+                color: cell.today ? Theme.c.text-on-accent : d.out ? Theme.c.text-secondary : Theme.c.text-primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if d.lunar != "": Text {
+                y: (parent.height - 27px) / 2 + 17px;
+                width: parent.width;
+                height: 10px;
+                text: d.lunar;
+                font-size: 10px;
+                color: cell.today ? Theme.c.text-on-accent : Theme.c.text-secondary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: clip;
+            }
+            if d.marker != "": Text {
+                x: parent.width - self.width - 3px;
+                y: 2px;
+                height: 10px;
+                text: d.marker;
+                font-size: 9px;
+                color: cell.today ? Theme.c.text-on-accent : d.marker == "休" ? Theme.c.critical : Theme.c.text-secondary;
+                vertical-alignment: center;
+            }
+            dta := TouchArea {
+                clicked => { root.pick(d.iso); }
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        Overlay.keyboard = false;
+                        fs.focus();
+                    }
+                }
+            }
+            if d.iso == root.cursor && fs.has-focus && Overlay.keyboard: FocusRing { radius: cell.border-radius; }
+        }
+    }
+    if root.months: Rectangle {
+        y: 42px;
+        for m[i] in 12: Rectangle {
+            property <length> mw: (root.width - 8px - 4px - 3 * 4px) / 4;
+            property <bool> cur: i + 1 == root.vm;
+            x: 4px + 2px + Math.mod(i, 4) * (mw + 4px);
+            y: 8px + floor(i / 4) * (56px + 4px);
+            width: mw;
+            height: 56px;
+            border-radius: 28px;
+            background: cur ? Theme.c.accent-fill : mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            Text {
+                text: "\{i + 1}月";
+                color: parent.cur ? Theme.c.text-on-accent : Theme.c.text-primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            mta := TouchArea {
+                clicked => {
+                    root.vm = i + 1;
+                    root.cursor = Fluent.make-date(root.vy, i + 1, min(Fluent.day-of(root.cursor), 28));
+                    root.months = false;
+                }
+            }
+        }
+    }
+    fs := FocusScope {
+        width: 0;
+        height: 0;
+        key-pressed(e) => {
+            root.title-ring = false;
+            let step = e.text == Key.LeftArrow ? -1 : e.text == Key.RightArrow ? 1 : e.text == Key.UpArrow ? -7 : e.text == Key.DownArrow ? 7 : 0;
+            if step != 0 {
+                root.move-to(Fluent.add-days(root.cursor, step));
+                return accept;
+            }
+            if e.text == Key.PageUp || e.text == Key.PageDown {
+                root.shift(e.text == Key.PageUp ? -1 : 1);
+                return accept;
+            }
+            if e.text == Key.Home || e.text == Key.End {
+                let wd = Math.mod(Fluent.weekday-of(root.cursor) - root.first-day + 7, 7);
+                root.move-to(Fluent.add-days(root.cursor, e.text == Key.Home ? -wd : 6 - wd));
+                return accept;
+            }
+            if e.text == Key.Return || e.text == " " {
+                root.pick(root.cursor);
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+// The small button inside a text box (calendar / clock).
+component FieldButton inherits Rectangle {
+    in property <string> glyph;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback clicked();
+    width: 28px;
+    height: 24px;
+    border-radius: Theme.radius-control;
+    background: enabled && ta.pressed ? Theme.c.subtle-fill-pressed : enabled && ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    accessible-role: button;
+    accessible-label: label;
+    Icon { glyph: root.glyph; size: 14px; color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled; }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+// 0.2's FDatePicker: typed dates (parse-date) or the calendar in a flyout.
+export component DatePicker {
+    in property <string> value;
+    in property <string> placeholder: "选择日期";
+    in property <int> first-day: 1;
+    in property <bool> lunar;
+    in property <bool> markers;
+    in property <bool> clearable;
+    in property <bool> enabled: true;
+    callback changed-value(string);
+    property <string> draft;
+    property <int> wd: value == "" ? -1 : Fluent.weekday-of(value);
+    preferred-width: 180px;
+    min-height: 33px;
+    max-height: 33px;
+    preferred-height: 33px;
+    init => { draft = value; }
+    changed value => { draft = value; }
+    function commit() {
+        let t = Fluent.trim(draft);
+        if t == "" {
+            if clearable {
+                if value != "" { changed-value(""); }
+            } else {
+                draft = value;
+            }
+            return;
+        }
+        let v = Fluent.parse-date(t);
+        // (assign last: Slint 1.18.1 moves a local into an assignment and can't use it after)
+        if v != "" {
+            if v != value { changed-value(v); }
+            draft = v;
+        } else {
+            draft = value;
+        }
+    }
+    box := TextBox {
+        width: 100%;
+        text <=> root.draft;
+        placeholder: root.placeholder;
+        clearable: root.clearable;
+        enabled: root.enabled;
+        edited(t) => {
+            if t == "" && root.clearable && root.value != "" {
+                root.changed-value("");
+            }
+        }
+        accepted => { root.commit(); }
+        focus-changed(f) => {
+            if !f && !fly.is-open {
+                root.commit();
+            }
+        }
+        if root.wd >= 0: HorizontalLayout {
+            padding-left: 2px;
+            padding-right: 2px;
+            Text {
+                text: "周" + ["日", "一", "二", "三", "四", "五", "六"][root.wd];
+                font-size: 12px;
+                color: Theme.c.text-secondary;
+                vertical-alignment: center;
+            }
+        }
+        HorizontalLayout {
+            padding-right: 3px;
+            alignment: center;
+            cross-axis-alignment: center;
+            FieldButton {
+                glyph: Glyph.calendar;
+                enabled: root.enabled;
+                label: "打开日历";
+                clicked => {
+                    if fly.is-open {
+                        fly.close();
+                    } else {
+                        fly.open-at(root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                    }
+                }
+            }
+        }
+    }
+    fly := Flyout {
+        padded: false;
+        label: "日历";
+        CalendarView {
+            selected: root.value;
+            first-day: root.first-day;
+            lunar: root.lunar;
+            markers: root.markers;
+            title-ring: true;
+            picked(d) => {
+                root.draft = d;
+                root.changed-value(d);
+                fly.close();
+            }
+        }
+    }
+}
+
+// 0.2's FTimePicker: typed times (parse-time) or a list every `step` minutes in a flyout.
+export component TimePicker {
+    in property <string> value;
+    in property <string> placeholder: "时间";
+    in property <int> step: 30;
+    in property <bool> clearable;
+    in property <bool> enabled: true;
+    callback changed-value(string);
+    property <string> draft;
+    preferred-width: 120px;
+    min-height: 33px;
+    max-height: 33px;
+    preferred-height: 33px;
+    init => { draft = value; }
+    changed value => { draft = value; }
+    pure function hhmm(m: int) -> string {
+        let h = floor(m / 60);
+        let mi = Math.mod(m, 60);
+        return (h < 10 ? "0" : "") + h + ":" + (mi < 10 ? "0" : "") + mi;
+    }
+    function commit() {
+        let t = Fluent.trim(draft);
+        if t == "" {
+            if clearable {
+                if value != "" { changed-value(""); }
+            } else {
+                draft = value;
+            }
+            return;
+        }
+        let v = Fluent.parse-time(t);
+        // (assign last: Slint 1.18.1 moves a local into an assignment and can't use it after)
+        if v != "" {
+            if v != value { changed-value(v); }
+            draft = v;
+        } else {
+            draft = value;
+        }
+    }
+    TextBox {
+        width: 100%;
+        text <=> root.draft;
+        placeholder: root.placeholder;
+        clearable: root.clearable;
+        enabled: root.enabled;
+        edited(t) => {
+            if t == "" && root.clearable && root.value != "" {
+                root.changed-value("");
+            }
+        }
+        accepted => { root.commit(); }
+        focus-changed(f) => {
+            if !f && !fly.is-open {
+                root.commit();
+            }
+        }
+        HorizontalLayout {
+            padding-right: 3px;
+            alignment: center;
+            cross-axis-alignment: center;
+            FieldButton {
+                glyph: Glyph.clock;
+                enabled: root.enabled;
+                label: "选择时间";
+                clicked => {
+                    if fly.is-open {
+                        fly.close();
+                    } else {
+                        fly.open-at(root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                    }
+                }
+            }
+        }
+    }
+    fly := Flyout {
+        padded: false;
+        label: "时间";
+        min-panel-width: root.width;
+        property <int> count: floor(24 * 60 / max(1, root.step));
+        // The pointer moved over the list since it opened (the focus ring goes then).
+        in-out property <bool> moved;
+        // First slot at or after the value (or now), like 0.2's onOpened.
+        property <int> target: max(0, ceil((Fluent.time-minutes(root.value) >= 0 ? Fluent.time-minutes(root.value) : Fluent.now-minutes) / max(1, root.step)));
+        Flickable {
+            height: min(264px, fly.count * 36px + 4px);
+            preferred-width: 0;
+            content-height: fly.count * 36px + 4px;
+            // scrollIntoView({ block: 'center' })
+            content-y: -clamp(2px + fly.target * 36px + 18px - 132px, 0, max(0, fly.count * 36px + 4px - 264px));
+            VerticalLayout {
+                width: parent.width;
+                padding-top: 2px;
+                padding-bottom: 2px;
+                for i in fly.count: item := Rectangle {
+                    property <string> t: root.hhmm(i * root.step);
+                    property <bool> sel: t == root.value;
+                    height: 36px;
+                    accessible-role: list-item;
+                    accessible-label: t;
+                    accessible-item-selected: sel;
+                    Rectangle {
+                        x: 4px;
+                        y: 2px;
+                        width: parent.width - 8px;
+                        min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+                        border-radius: Theme.radius-control;
+                        background: item.sel || ita.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                        if item.sel: Rectangle {
+                            x: 0;
+                            y: 8px;
+                            width: 3px;
+                            height: 16px;
+                            border-radius: 2px;
+                            background: Theme.c.accent-fill;
+                        }
+                        Text {
+                            x: 12px;
+                            text: item.t;
+                            color: Theme.c.text-primary;
+                            vertical-alignment: center;
+                        }
+                        // 0.2 focuses the item it opens at
+                        if i == fly.target && !fly.moved: FocusRing { show: true; }
+                    }
+                    ita := TouchArea {
+                        changed has-hover => {
+                            if self.has-hover {
+                                fly.moved = true;
+                            }
+                        }
+                        clicked => {
+                            root.draft = item.t;
+                            root.changed-value(item.t);
+                            fly.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+// A 1px dashed rounded border (CSS border-style: dashed): 3px dashes, 3px gaps, per side.
+export component DashedBorder {
+    in property <brush> color;
+    in property <length> radius: Theme.radius-control;
+    property <int> nx: max(1, floor((root.width - 2 * radius) / 6px));
+    property <int> ny: max(1, floor((root.height - 2 * radius) / 6px));
+    property <length> sx: (root.width - 2 * radius) / nx;
+    property <length> sy: (root.height - 2 * radius) / ny;
+    for i in nx: Rectangle { x: root.radius + i * root.sx + (root.sx - 3px) / 2; y: 0; width: 3px; height: 1px; background: root.color; }
+    for i in nx: Rectangle { x: root.radius + i * root.sx + (root.sx - 3px) / 2; y: root.height - 1px; width: 3px; height: 1px; background: root.color; }
+    for i in ny: Rectangle { x: 0; y: root.radius + i * root.sy + (root.sy - 3px) / 2; width: 1px; height: 3px; background: root.color; }
+    for i in ny: Rectangle { x: root.width - 1px; y: root.radius + i * root.sy + (root.sy - 3px) / 2; width: 1px; height: 3px; background: root.color; }
+}
+
+// 0.2's FShortcutBox: click (or Enter/Space), then press the combination; Esc cancels,
+// Backspace/Delete clears.
+export component ShortcutBox {
+    in property <string> value;
+    in property <string> placeholder: "未设置";
+    in property <bool> enabled: true;
+    callback changed-value(string);
+    property <bool> recording;
+    property <bool> ctrl;
+    property <bool> alt;
+    property <bool> shift;
+    property <bool> meta;
+    property <bool> any-mod: ctrl || alt || shift || meta;
+    property <[string]> partial: Fluent.shortcut-labels((ctrl ? "Ctrl+" : "") + (alt ? "Alt+" : "") + (shift ? "Shift+" : "") + (meta ? "Super+" : ""));
+    property <[string]> keys: recording ? partial : Fluent.shortcut-labels(value);
+    property <bool> hover: ta.has-hover && enabled;
+    forward-focus: fs;
+    preferred-width: max(160px, row.preferred-width);
+    min-height: 32px;
+    max-height: 32px;
+    preferred-height: 32px;
+    accessible-role: button;
+    accessible-label: "快捷键 " + value;
+    accessible-description: recording ? "按下新的快捷键，Esc 取消，Backspace 清除" : "";
+    accessible-enabled: enabled;
+    function start() {
+        if enabled {
+            recording = true;
+            ctrl = false;
+            alt = false;
+            shift = false;
+            meta = false;
+        }
+    }
+    function stop() {
+        recording = false;
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: Theme.radius-control;
+        background: !root.enabled ? Theme.c.control-fill-disabled : root.recording ? Theme.c.control-fill-input-active : root.hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+        if !root.recording: ElevBorder {
+            top: Theme.c.elev-top;
+            bottom: Theme.c.elev-bottom;
+        }
+        if root.recording: DashedBorder { color: Theme.c.accent-fill; }
+    }
+    Rectangle {
+        width: 100%;
+        height: 100%;
+    row := HorizontalLayout {
+        padding-left: 5px;
+        padding-right: 9px;
+        spacing: 4px;
+        cross-axis-alignment: center;
+        if root.keys.length > 0: HorizontalLayout {
+            spacing: 4px;
+            for k in root.keys: Rectangle {
+                width: max(24px, kt.preferred-width + 14px);
+                height: 24px;
+                // box-shadow: 0 1px 0 accent-elev-bottom; recording: 0 0 0 1px control-stroke
+                Rectangle {
+                    y: root.recording ? -1px : 1px;
+                    x: root.recording ? -1px : 0;
+                    width: parent.width + (root.recording ? 2px : 0);
+                    height: parent.height + (root.recording ? 2px : 0);
+                    border-radius: Theme.radius-control + (root.recording ? 1px : 0);
+                    background: root.recording ? Theme.c.control-stroke : Theme.c.accent-elev-bottom;
+                }
+                Rectangle {
+                    border-radius: Theme.radius-control;
+                    background: root.recording ? Theme.c.control-solid-fill : root.enabled ? Theme.c.accent-fill : Theme.c.accent-fill-disabled;
+                }
+                kt := Text {
+                    text: k;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: root.recording ? Theme.c.text-primary : Theme.c.text-on-accent;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        if root.keys.length == 0: HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 6px;
+            Text {
+                text: root.recording ? "按下快捷键…" : root.placeholder;
+                color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
+                vertical-alignment: center;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        HorizontalLayout {
+            padding-left: 8px;
+            Icon {
+                glyph: root.recording ? Glyph.keyboard : Glyph.edit;
+                size: 14px;
+                color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
+            }
+        }
+    }
+    }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if !root.recording {
+                if e.text == Key.Return || e.text == " " {
+                    root.start();
+                    return accept;
+                }
+                if e.text == Key.Backspace || e.text == Key.Delete {
+                    root.changed-value("");
+                    return accept;
+                }
+                return reject;
+            }
+            if e.text == Key.Control { root.ctrl = true; return accept; }
+            if e.text == Key.Alt || e.text == Key.AltGr { root.alt = true; return accept; }
+            if e.text == Key.Shift { root.shift = true; return accept; }
+            if e.text == Key.Meta { root.meta = true; return accept; }
+            if !root.any-mod && e.text == Key.Escape {
+                root.stop();
+                return accept;
+            }
+            if !root.any-mod && (e.text == Key.Backspace || e.text == Key.Delete) {
+                root.changed-value("");
+                root.stop();
+                return accept;
+            }
+            let s = Fluent.shortcut-from(e.text, root.ctrl || e.modifiers.control, root.alt || e.modifiers.alt, root.shift || e.modifiers.shift, root.meta || e.modifiers.meta);
+            if s != "" {
+                root.changed-value(s);
+                root.stop();
+            }
+            return accept;
+        }
+        key-released(e) => {
+            if e.text == Key.Control { root.ctrl = false; }
+            if e.text == Key.Alt || e.text == Key.AltGr { root.alt = false; }
+            if e.text == Key.Shift { root.shift = false; }
+            if e.text == Key.Meta { root.meta = false; }
+            return root.recording ? accept : reject;
+        }
+        focus-changed-event => {
+            if !self.has-focus {
+                root.stop();
+            }
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            if root.recording {
+                root.stop();
+            } else {
+                root.start();
+            }
+        }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                fs.focus();
+            }
+        }
+    }
+    FocusRing { show: fs.has-focus && Overlay.keyboard; }
+}
