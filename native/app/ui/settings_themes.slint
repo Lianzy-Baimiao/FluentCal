@@ -1,0 +1,166 @@
+// 设置 › 外观: the colour-mode and preset cards (0.2's ThemeCards.vue and presets.ts).
+// .cards is a grid of auto-fill columns (min 112px, 12px gaps); the cards are placed here.
+
+import { Theme, BoxShadow } from "theme.slint";
+import { SetState } from "settings_state.slint";
+
+// 0.2's .card: thumbnail, label, optional description; selected = accent ring.
+component Card inherits Rectangle {
+    in property <bool> on;
+    in property <string> label;
+    in property <string> desc;
+    in property <length> thumb-h;
+    callback clicked();
+    border-radius: 8px;
+    background: ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill;
+    accessible-role: radio-button;
+    accessible-label: label;
+    accessible-checked: on;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea { clicked => { root.clicked(); } }
+    @children
+    Text {
+        x: 0;
+        y: 7px + root.thumb-h + 6px;
+        width: root.width;
+        height: 20px;
+        text: root.label;
+        font-size: 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: Theme.c.text-primary;
+    }
+    if root.desc != "": Text {
+        x: 0;
+        y: 7px + root.thumb-h + 6px + 20px + 2px;
+        width: root.width;
+        height: 20px;
+        text: root.desc;
+        font-size: 11px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: Theme.c.text-secondary;
+    }
+    // border: 1px card-stroke; selected: accent border + 1px inset ring
+    Rectangle {
+        border-radius: 8px;
+        border-width: root.on ? 2px : 1px;
+        border-color: root.on ? Theme.c.accent-fill : Theme.c.card-stroke;
+    }
+}
+
+// .thumb with the mini window (.win): light, dark or split for "system".
+component ModeThumb inherits Rectangle {
+    in property <string> mode;
+    border-radius: 4px;
+    clip: true;
+    background: mode == "dark" ? @linear-gradient(160deg, #0b2a5b 0%, #1b4f9c 100%)
+        : mode == "system" ? @linear-gradient(115deg, #cfe2fb 50%, #0b2a5b 50%)
+        : @linear-gradient(160deg, #cfe2fb 0%, #5d93e0 100%);
+    win := Rectangle {
+        x: (parent.width - 92px) / 2;
+        y: (parent.height - 56px) / 2;
+        width: 92px;
+        height: 56px;
+        BoxShadow { width: parent.width; height: parent.height; shadow: SetState.thumb-shadow; }
+        Rectangle {
+            border-radius: 4px;
+            background: root.mode == "dark" ? #202020 : root.mode == "system" ? @linear-gradient(115deg, #f3f3f3 50%, #202020 50%) : #f3f3f3;
+        }
+        // 6px padding, 5px gaps: accent bar (40%), two bars, a short one (60%)
+        Rectangle { x: 6px; y: 6px; width: (92px - 12px) * 0.4; height: 6px; border-radius: 2px; background: Theme.c.accent-fill; }
+        Rectangle { x: 6px; y: 17px; width: 92px - 12px; height: 5px; border-radius: 2px; background: rgba(128, 128, 128, 0.45); }
+        Rectangle { x: 6px; y: 27px; width: 92px - 12px; height: 5px; border-radius: 2px; background: rgba(128, 128, 128, 0.45); }
+        Rectangle { x: 6px; y: 37px; width: (92px - 12px) * 0.6; height: 5px; border-radius: 2px; background: rgba(128, 128, 128, 0.45); }
+    }
+}
+
+// .thumb.wall with the mini calendar (.mini: 7 columns, 3 rows of 14px cells, 2px gaps).
+component PresetThumb inherits Rectangle {
+    in property <float> bg;
+    in property <float> cell;
+    in property <bool> dark;
+    border-radius: 4px;
+    clip: true;
+    background: @linear-gradient(160deg, #0b2a5b 0%, #1b4f9c 55%, #3a7bd5 100%);
+    property <length> mw: root.width * 0.84;
+    property <length> mh: 5px * 2 + 14px * 3 + 2px * 2;
+    property <length> cw: (mw - 10px - 6 * 2px) / 7;
+    mini := Rectangle {
+        x: (root.width - root.mw) / 2;
+        y: (root.height - root.mh) / 2;
+        width: root.mw;
+        height: root.mh;
+        border-radius: 4px;
+        background: root.dark ? rgba(32, 32, 32, root.bg) : rgba(243, 243, 243, root.bg);
+        for i in 21: Rectangle {
+            x: 5px + Math.mod(i, 7) * (root.cw + 2px);
+            y: 5px + floor(i / 7) * (14px + 2px);
+            width: root.cw;
+            height: 14px;
+            border-radius: 2px;
+            background: root.dark ? rgba(60, 60, 60, root.cell) : rgba(255, 255, 255, root.cell * 0.9);
+            if i == 9: Rectangle {
+                border-radius: 2px;
+                border-width: 1.5px;
+                border-color: Theme.c.accent-fill;
+            }
+        }
+    }
+}
+
+struct Preset { id: string, label: string, desc: string, bg: float, cell: float, dark: bool }
+
+// kind "mode" or "preset".
+export component ThemeCards {
+    in property <string> kind;
+    property <[{v: string, label: string}]> modes: [
+        { v: "light", label: "浅色" }, { v: "dark", label: "深色" }, { v: "system", label: "跟随系统" },
+    ];
+    property <[Preset]> presets: [
+        { id: "light", label: "浅色卡片", desc: "明亮、清晰", bg: 0.92, cell: 0.7, dark: false },
+        { id: "dark", label: "深色卡片", desc: "夜间不刺眼", bg: 0.9, cell: 0.6, dark: true },
+        { id: "acrylic", label: "亚克力", desc: "Win11 毛玻璃", bg: 0.45, cell: 0.4, dark: true },
+        { id: "glass", label: "透明玻璃", desc: "透出壁纸", bg: 0.18, cell: 0.38, dark: true },
+        { id: "minimal", label: "极简", desc: "只显示文字", bg: 0, cell: 0.1, dark: true },
+    ];
+    property <int> n: kind == "mode" ? modes.length : presets.length;
+    // grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap 12px
+    property <int> cols: max(1, floor((root.width + 12px) / (112px + 12px)));
+    property <length> cw: (root.width - (cols - 1) * 12px) / cols;
+    property <length> th: (cw - 14px) * 80 / 132;
+    // padding 6 6 8 + border; label 20; desc 20 - 4
+    property <length> ch: 7px + th + 6px + 20px + (kind == "mode" ? 0 : 2px + 20px) + 9px;
+    property <int> rows: ceil(n / cols);
+    preferred-height: 4px + rows * ch + (rows - 1) * 12px + 12px;
+    min-height: self.preferred-height;
+    accessible-role: radio-group;
+    accessible-label: kind == "mode" ? "颜色模式" : "预设方案";
+    if root.kind == "mode": Rectangle {
+        for m[i] in root.modes: Card {
+            x: Math.mod(i, root.cols) * (root.cw + 12px);
+            y: 4px + floor(i / root.cols) * (root.ch + 12px);
+            width: root.cw;
+            height: root.ch;
+            thumb-h: root.th;
+            label: m.label;
+            on: SetState.appearance.mode == m.v;
+            clicked => { SetState.set-str("theme.mode", m.v); }
+            ModeThumb { x: 7px; y: 7px; width: parent.width - 14px; height: root.th; mode: m.v; }
+        }
+    }
+    if root.kind != "mode": Rectangle {
+        for p[i] in root.presets: Card {
+            x: Math.mod(i, root.cols) * (root.cw + 12px);
+            y: 4px + floor(i / root.cols) * (root.ch + 12px);
+            width: root.cw;
+            height: root.ch;
+            thumb-h: root.th;
+            label: p.label;
+            desc: p.desc;
+            on: SetState.appearance.preset == p.id;
+            clicked => { SetState.action-arg("preset", p.id); }
+            PresetThumb { x: 7px; y: 7px; width: parent.width - 14px; height: root.th; bg: p.bg; cell: p.cell; dark: p.dark; }
+        }
+    }
+}

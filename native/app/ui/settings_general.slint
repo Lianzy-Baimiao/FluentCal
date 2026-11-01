@@ -1,0 +1,113 @@
+// 设置 › 常规 (0.2's GeneralPage.vue).
+
+import { Glyph } from "icons.slint";
+import { Button } from "controls.slint";
+import { Toggle } from "forms.slint";
+import { Select, ShortcutBox } from "inputs.slint";
+import { SettingsGroup, SettingsCard, InfoBar, Severity } from "cards.slint";
+import { SetState } from "settings_state.slint";
+
+export component GeneralPage inherits VerticalLayout {
+    property <bool> desktop: SetState.general.pin-mode == "desktop";
+    SettingsGroup {
+        title: "启动";
+        SettingsCard {
+            icon: Glyph.power;
+            title: "开机自动启动";
+            description: SetState.general.autostart-desc;
+            Toggle { checked: SetState.general.autostart; toggled(v) => { SetState.set-bool("general.autostart", v); } }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "桌面日历窗口";
+        SettingsCard {
+            icon: Glyph.desktop;
+            title: "窗口层级";
+            description: SetState.general.pin-hint;
+            Select {
+                width: 180px;
+                value: SetState.general.pin-mode;
+                options: [{ value: "desktop", label: "嵌入桌面（推荐）" }, { value: "top", label: "始终置顶" }, { value: "normal", label: "普通窗口" }];
+                selected(v) => { SetState.set-str("desk.pinMode", v); }
+            }
+        }
+        if SetState.screens.length > 1: SettingsCard {
+            icon: Glyph.desktop;
+            title: "显示在";
+            description: "把日历移到另一块屏幕（保持在屏幕上的相对位置）。解锁后也可以直接拖过去。";
+            Select {
+                width: 220px;
+                value: SetState.general.screen;
+                options: SetState.screens;
+                selected(v) => { SetState.action-arg("move-to-screen", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.lock;
+            title: "锁定位置和大小";
+            description: "解锁后按住日历任意空白处拖动来移动，拖动四边或四角调整大小";
+            Toggle { checked: SetState.general.locked; toggled(v) => { SetState.set-bool("desk.locked", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.mouse;
+            title: "鼠标穿透";
+            description: "日历只显示、不响应鼠标，可以点到下方的桌面图标。在托盘菜单中关闭。";
+            Toggle { checked: SetState.general.click-through; toggled(v) => { SetState.set-bool("desk.clickThrough", v); } }
+        }
+        if root.desktop: SettingsCard {
+            icon: Glyph.desktop;
+            title: "点击日历时不抢焦点";
+            description: "保持 Win+D“显示桌面”正常：点击日历后再按 Win+D 仍能恢复窗口。输入文字时日历会自动获得键盘；快捷键（Ctrl+Z 等）需先用唤出快捷键把日历调到前面。";
+            Toggle { checked: SetState.general.no-activate; toggled(v) => { SetState.set-bool("desk.noActivate", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.eye-off;
+            title: "隐藏桌面日历";
+            description: "隐藏后可从托盘图标或快捷键重新打开";
+            Button { text: "隐藏"; clicked => { SetState.action("desk-hide"); } }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "快捷键";
+        SettingsCard {
+            icon: Glyph.keyboard;
+            title: "唤出日历";
+            description: "在任意程序中按下，日历临时显示在最前；再按一次或点到别处即回到桌面层";
+            ShortcutBox { value: SetState.general.toggle-key; changed-value(v) => { SetState.set-str("shortcuts.toggle", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.add;
+            title: "快速新建任务";
+            ShortcutBox { value: SetState.general.new-key; changed-value(v) => { SetState.set-str("shortcuts.newTask", v); } }
+        }
+        if SetState.general.shortcut-errors != "": InfoBar {
+            severity: Severity.warning;
+            title: "部分快捷键注册失败";
+            text: SetState.general.shortcut-errors + "。可能已被其他程序占用，请换一个组合。";
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "节假日";
+        SettingsCard {
+            icon: Glyph.sync;
+            title: "自动更新法定节假日";
+            description: SetState.general.holiday-desc;
+            Button {
+                text: SetState.general.checking ? "正在检查…" : "立即检查";
+                enabled: !SetState.general.checking;
+                clicked => { SetState.action("check-holidays"); }
+            }
+            Toggle { checked: SetState.general.holiday-auto; toggled(v) => { SetState.set-bool("holidays.autoUpdate", v); } }
+        }
+        if SetState.msg.shown: InfoBar {
+            severity: SetState.msg.severity;
+            title: SetState.msg.title;
+            text: SetState.msg.text;
+            closable: true;
+            closed => { SetState.action("msg-close"); }
+        }
+    }
+}

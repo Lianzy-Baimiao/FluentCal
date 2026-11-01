@@ -1,0 +1,100 @@
+// The settings window's state (0.2's src/windows/settings): what each page shows, computed in
+// Rust (windows/settings/view.rs) from the settings and the app's state, and the callbacks the
+// pages call. `set-*` take a settings path as 0.2's useSetting ("desk.locked").
+
+import { Swatch, ShadowImage } from "theme.slint";
+import { SelectOption } from "inputs.slint";
+import { Severity } from "cards.slint";
+
+export struct SMsg { shown: bool, severity: Severity, title: string, text: string }
+
+export struct SGeneral {
+    autostart: bool, autostart-desc: string,
+    pin-mode: string, pin-hint: string,
+    locked: bool, click-through: bool, no-activate: bool,
+    toggle-key: string, new-key: string, shortcut-errors: string,
+    holiday-auto: bool, holiday-desc: string, checking: bool,
+    screen: string,
+}
+
+export struct SAppearance {
+    mode: string, follow-accent: bool, accent-hex: string, preset: string,
+    bg-color: string, bg-opacity: float, cell-opacity: float, acrylic: bool, no-transparency: bool,
+    radius: float, shadow: bool, text-shadow: string, font-scale: float, cell-gap: float, line-spacing: float,
+    today-color: string, rest-color: string, holiday-color: string, term-color: string,
+    reduce-motion: bool,
+}
+
+export struct SCalendar {
+    view: string, week-start: string, month-rows: string, weeks-rows: float, weeks-past: float,
+    show-lunar: bool, show-holidays: bool, show-week-numbers: bool, show-almanac: bool, holiday-countdown: bool,
+    rest-days: [bool],
+    show-completed: bool, completed-last: bool, auto-postpone: bool, default-color: string,
+}
+
+export struct SGantt { scale: string, show-table: bool, show-deps: bool, hide-done: bool, hide-single-day: bool }
+
+export struct SReminders { enabled: bool, style: string, all-day-time: string, offsets: [string], can-add: bool }
+
+export struct SData { samples: int, samples-desc: string, backups-desc: string, dir-desc: string, custom: bool, missing: string }
+
+export struct SSync {
+    status: string, enabled: bool, syncing: bool, error: string, halted: bool,
+    provider: string, locked: bool, cloud: bool,
+    dav-url: string, dav-user: string, dav-folder: string,
+    git-name: string, repo: string, branch: string, path: string,
+    secret-key: string, secret-saved: bool, secret-hint: string,
+    interval: string, proxy: string, proxy-mode: string, busy: bool,
+}
+
+export struct SWeb { enabled: bool, running: bool, port: float, error: string, has-addresses: bool, qr: image }
+
+export struct SAbout { version: string, build: string }
+
+export struct SGroup { id: string, name: string, color: string, desc: string }
+export struct SBackup { name: string, desc: string }
+export struct SUpcoming { key: string, title: string, desc: string }
+export struct SAddress { ip: string, text: string, note: string, url: string }
+
+export global SetState {
+    in-out property <string> page: "general";
+    in property <SGeneral> general;
+    in property <SAppearance> appearance;
+    in property <SCalendar> calendar;
+    in property <SGantt> gantt;
+    in property <SReminders> reminders;
+    in property <SData> data;
+    in property <SSync> sync;
+    in property <SWeb> web;
+    in property <SAbout> about;
+    // The page's message bar (0.2: each page's `msg`; cleared when the page changes).
+    in-out property <SMsg> msg;
+    // Lists
+    in property <[SelectOption]> screens;
+    in property <[SGroup]> groups;
+    in property <[SBackup]> backups;
+    in property <[SUpcoming]> upcoming;
+    in property <[SAddress]> addresses;
+    in property <[SelectOption]> offset-options;
+    // Swatches
+    in property <[Swatch]> accent-swatches;
+    in property <[Swatch]> bg-swatches;
+    in property <[Swatch]> detail-swatches;
+    in property <[Swatch]> task-swatches;
+    in property <ShadowImage> thumb-shadow;
+    in property <image> icon;
+    callback set-bool(string, bool);
+    callback set-num(string, float);
+    callback set-str(string, string);
+    // Buttons without an argument ("check-holidays", "sync-now", "export-json"…) and with one.
+    callback action(string);
+    callback action-arg(string, string);
+    callback set-rest-day(int, bool);
+    callback set-offset(int, string);
+    callback set-group-name(string, string);
+    callback set-group-color(string, string);
+    callback add-group(string);
+    callback save-secret(string, string);
+    callback navigate(string);
+    callback confirm-answer(string);
+}

@@ -84,6 +84,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         post(move |app| {
             app.sync = s;
             app.desk_refresh_status();
+            app.settings_refresh();
         });
     });
     let cloud = Cloud::start(store.clone(), Some(on_status), local.join("cloud-state.json"));
@@ -141,6 +142,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         day: today,
         web: Default::default(),
         reminder_win: None,
+        settings_win: None,
     })
 }
 

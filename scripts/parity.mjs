@@ -25,6 +25,10 @@ mkdirSync(outDir, { recursive: true });
 const glass = { bgOpacity: 18, cellOpacity: 38, shadow: false };
 const month = { width: 880, height: 640 };
 const gallery = { width: 1280, height: 900 };
+const settingsWin = { width: 980, height: 700 };
+const settingsScene = (name, page, extra = {}) => ({
+  name, window: 'settings', url: `?w=settings&theme=${extra.dark ? 'dark' : 'light'}&page=${page}`, page, size: settingsWin, ...extra,
+});
 // Gallery steps: [action, target, extra]. Targets are Playwright selectors on 0.2's page.
 const SCENES = [
   { name: 'month-light', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } } },
@@ -44,12 +48,49 @@ const SCENES = [
   { name: 'gallery-dialog', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'button:has-text("对话框")']] },
   { name: 'gallery-dialog-dark', window: 'gallery', url: '?w=gallery&theme=dark', size: gallery, dark: true, steps: [['click', 'button:has-text("确认框")']] },
   { name: 'gallery-tip', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['hover', 'button:has-text("悬停提示")'], ['wait', 700]] },
+  settingsScene('settings-general', 'general'),
+  settingsScene('settings-appearance', 'appearance'),
+  settingsScene('settings-calendar', 'calendar'),
+  settingsScene('settings-gantt', 'gantt'),
+  settingsScene('settings-reminders', 'reminders'),
+  settingsScene('settings-data', 'data'),
+  settingsScene('settings-sync', 'sync'),
+  settingsScene('settings-web', 'web'),
+  settingsScene('settings-about', 'about'),
+  settingsScene('settings-general-dark', 'general', { dark: true }),
+  settingsScene('settings-appearance-dark', 'appearance', { dark: true }),
+  settingsScene('settings-sync-webdav', 'sync', { settings: { sync: { provider: 'webdav', webdav: { url: 'https://dav.jianguoyun.com/dav/', user: 'me@example.com' } } } }),
+  settingsScene('settings-sync-help', 'sync', { settings: { sync: { provider: 'github' } }, steps: [['click', '.f-exp .hdr:has-text("怎样创建 GitHub")']] }),
+  settingsScene('settings-web-lan', 'web', { settings: { web: { enabled: true } } }),
+  settingsScene('settings-general-select', 'general', { steps: [['click', '.f-select >> nth=0']] }),
+  settingsScene('settings-gantt-delete', 'gantt', { steps: [['click', 'button[title="删除分组 官网改版"]']] }),
+  settingsScene('settings-appearance-open', 'appearance', { steps: [['click', '.f-exp .hdr:has-text("布局与文字")'], ['click', '.f-exp .hdr:has-text("细节颜色")']] }),
   { name: 'gallery-focus', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'input[placeholder="搜索任务"]'], ['type', '', '周报'], ['key', '', 'Tab']] },
 ];
 const only = process.argv.slice(2);
 // 125 % is this PC's scaling (both screens); PARITY_SCALE=1 / 1.5 / 2 for others.
 const SCALE = Number(process.env.PARITY_SCALE || 1.25);
 const PORT = Number(process.env.PARITY_PORT || 1434);
+
+/** What 0.2's browser preview mock (src/api.ts) answers the settings window. */
+function settingsInfo(s, doc) {
+  const set = doc.settings ?? {};
+  const port = set.web?.port ?? 18765;
+  const url = (ip) => `http://${ip}:${port}/?w=web#k=0123456789abcdef0123456789abcdef`;
+  const names = { webdav: 'WebDAV', github: 'GitHub', gitee: 'Gitee' };
+  const on = !!set.sync?.enabled && !!names[set.sync?.provider];
+  return {
+    page: s.page, version: '0.2.0-web', build: 26300, debug: true, transparency: true,
+    dataDir: '（浏览器预览，数据保存在 localStorage）',
+    screens: [
+      { value: '0', label: '显示器 1（主）  3840×2160', current: true },
+      { value: '1', label: '显示器 2  2560×1600', current: false },
+    ],
+    web: { running: !!set.web?.enabled, port, addresses: [{ ip: '192.168.1.23', label: 'WLAN', virt: false, url: url('192.168.1.23') }] },
+    sync: on ? { enabled: true, provider: names[set.sync.provider], lastSync: NOW.getTime() - 120_000, remoteDevice: 'OFFICE-PC', remoteSavedAt: NOW.getTime() - 3_600_000 } : { enabled: false, provider: '' },
+    secrets: on ? [set.sync.provider] : [],
+  };
+}
 
 /** Runs the steps in 0.2's page and returns the same input as snapshot events. */
 async function runSteps(page, steps = []) {
@@ -94,9 +135,11 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const s of SCENES.filter((s) => !only.length || only.includes(s.name))) {
     const isGallery = s.window === 'gallery';
+    const isSettings = s.window === 'settings';
     const ctx = await browser.newContext({ viewport: s.size, deviceScaleFactor: SCALE, timezoneId: 'Asia/Shanghai', locale: 'zh-CN', colorScheme: s.dark ? 'dark' : 'light' });
     await ctx.clock.setFixedTime(NOW);
-    const doc = isGallery ? demoDoc({ theme: { mode: s.dark ? 'dark' : 'light' } }) : demoDoc(s.settings);
+    const doc = isGallery ? demoDoc({ theme: { mode: s.dark ? 'dark' : 'light' } })
+      : isSettings ? demoDoc({ ...s.settings, theme: { mode: s.dark ? 'dark' : 'light' } }) : demoDoc(s.settings);
     await ctx.addInitScript((d) => localStorage.setItem('fluentcal.mock.doc', d), JSON.stringify(doc));
     const page = await ctx.newPage();
     const errors = [];
@@ -111,12 +154,22 @@ try {
       await page.setViewportSize(size);
       await page.waitForTimeout(100);
     }
+    if (isSettings) {
+      // The page's full height (it scrolls inside the window): no scrolling on either side.
+      const h = await page.evaluate(() => {
+        const c = document.querySelector('.f-nav .content');
+        return c ? c.scrollHeight : 0;
+      });
+      size = { width: s.size.width, height: Math.max(s.size.height, h) };
+      await page.setViewportSize(size);
+      await page.waitForTimeout(100);
+    }
     await page.waitForTimeout(600);
     const events = await runSteps(page, s.steps);
     if (s.steps?.length) await page.waitForTimeout(600);
     const base = path.join(outDir, s.name);
     await page.screenshot({ path: `${base}.ref.png` });
-    if (!isGallery) {
+    if (!isGallery && !isSettings) {
       await page.addStyleTag({ content: '#app { visibility: hidden !important; }' });
       await page.waitForTimeout(100);
       await page.screenshot({ path: `${base}.wall.png` });
@@ -125,7 +178,8 @@ try {
       window: s.window ?? 'desk',
       doc, now: NOW.getTime(), offset: 480, width: size.width, height: size.height, scale: SCALE,
       dark: !!s.dark, systemAccent: s.accent ?? '#0078D4', events,
-      ...(isGallery ? {} : { wallpaper: `${base}.wall.png` }),
+      ...(isGallery || isSettings ? {} : { wallpaper: `${base}.wall.png` }),
+      ...(isSettings ? { settingsInfo: settingsInfo(s, doc) } : {}),
     };
     writeFileSync(`${base}.json`, JSON.stringify(scenario, null, 1));
     console.log(`${s.name}${errors.length ? `  page errors: ${errors.join(' | ')}` : ''}`);

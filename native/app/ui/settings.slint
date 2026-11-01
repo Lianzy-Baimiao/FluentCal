@@ -1,0 +1,104 @@
+// The settings window (0.2's SettingsApp.vue): navigation and the page; the confirmations of
+// every page (0.2's confirm()); Mica behind it on Windows 11.
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { OverlayRoot, TipLayer, DialogHost, DialogBody } from "overlay.slint";
+import { NavView } from "nav.slint";
+import { DialogFooter } from "dialog.slint";
+import { Palette } from "std-widgets.slint";
+import { SetState } from "settings_state.slint";
+import { GeneralPage } from "settings_general.slint";
+import { AppearancePage } from "settings_appearance.slint";
+import { CalendarPage, GanttPage } from "settings_calendar.slint";
+import { RemindersPage, DataPage } from "settings_data.slint";
+import { SyncPage } from "settings_sync.slint";
+import { WebPage, AboutPage } from "settings_web.slint";
+
+export component SettingsWindow inherits Window {
+    title: "FluentCal 设置";
+    // Mica shows through a transparent window (Windows 11); else the solid background.
+    in property <bool> mica;
+    background: mica ? transparent : Theme.c.solid-base;
+    default-font-family: Theme.font-ui;
+    default-font-size: 14px;
+    preferred-width: 980px;
+    preferred-height: 700px;
+    min-width: 760px;
+    min-height: 520px;
+    in property <string> confirm-title;
+    in property <string> confirm-content;
+    in property <string> confirm-primary: "确定";
+    in property <string> confirm-secondary;
+    in property <string> confirm-close: "取消";
+    in property <bool> confirm-danger;
+    // The AboutSlint badge follows the app's theme, not the system's.
+    init => { Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light; }
+    property <bool> dark: Theme.dark;
+    changed dark => { Palette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
+    public function open-confirm() {
+        confirm.open();
+    }
+    public function scroll-top() {
+        nav.scroll-top();
+    }
+    OverlayRoot {
+        win-width: root.width;
+        win-height: root.height;
+        nav := NavView {
+            width: 100%;
+            height: 100%;
+            title: "设置";
+            selected: SetState.page;
+            items: [
+                { key: "general", label: "常规", icon: Glyph.settings },
+                { key: "appearance", label: "外观", icon: Glyph.palette },
+                { key: "calendar", label: "日历", icon: Glyph.calendar },
+                { key: "gantt", label: "甘特图", icon: "svg:gantt" },
+                { key: "reminders", label: "提醒", icon: Glyph.alarm },
+                { key: "data", label: "数据", icon: Glyph.data },
+                { key: "sync", label: "同步", icon: Glyph.cloud },
+                { key: "web", label: "网页查看", icon: Glyph.globe },
+            ];
+            footer-items: [{ key: "about", label: "关于", icon: Glyph.info }];
+            navigate(k) => { SetState.navigate(k); }
+            if SetState.page == "general": GeneralPage { spacing: 4px; }
+            if SetState.page == "appearance": AppearancePage { spacing: 4px; }
+            if SetState.page == "calendar": CalendarPage { spacing: 4px; }
+            if SetState.page == "gantt": GanttPage { spacing: 4px; }
+            if SetState.page == "reminders": RemindersPage { spacing: 4px; }
+            if SetState.page == "data": DataPage { }
+            if SetState.page == "sync": SyncPage { }
+            if SetState.page == "web": WebPage { }
+            if SetState.page == "about": AboutPage { }
+        }
+        confirm := DialogHost {
+            title: root.confirm-title;
+            primary => {
+                SetState.confirm-answer("primary");
+                confirm.close();
+            }
+            DialogBody {
+                title: root.confirm-title;
+                if root.confirm-content != "": Text { text: root.confirm-content; wrap: word-wrap; color: Theme.c.text-primary; }
+            }
+            DialogFooter {
+                primary-text: root.confirm-primary;
+                secondary-text: root.confirm-secondary;
+                close-text: root.confirm-close;
+                danger: root.confirm-danger;
+                primary => {
+                    SetState.confirm-answer("primary");
+                    confirm.close();
+                }
+                secondary => {
+                    SetState.confirm-answer("secondary");
+                    confirm.close();
+                }
+                close => { confirm.close(); }
+            }
+            closed => { SetState.confirm-answer("close"); }
+        }
+        TipLayer { }
+    }
+}

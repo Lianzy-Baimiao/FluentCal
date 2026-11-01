@@ -20,12 +20,13 @@ component CardHead inherits VerticalLayout {
         min-height: 20px;
         vertical-alignment: center;
     }
-    if root.description != "": VerticalLayout {
-        padding-top: 1px;
+    VerticalLayout {
+        padding-top: root.description != "" ? 1px : 0;
         Text {
             text: root.description;
             font-size: 12px;
-            min-height: 16px;
+            min-height: root.description != "" ? 16px : 0;
+            max-height: root.description != "" ? 100000px : 0;
             color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
             wrap: word-wrap;
             vertical-alignment: center;
@@ -68,7 +69,8 @@ export component SettingsCard inherits Rectangle {
     border-color: Theme.c.card-stroke;
     background: clickable && enabled ? (ta.pressed ? Theme.c.control-fill-pressed : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill) : Theme.c.card-fill;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
-    min-height: 68px;
+    min-height: max(68px, 28px + max(head.preferred-height, ctl.preferred-height));
+    preferred-height: self.min-height;
     accessible-role: groupbox;
     accessible-label: title;
     accessible-description: description;
@@ -82,18 +84,17 @@ export component SettingsCard inherits Rectangle {
         padding-right: 17px;
         padding-top: 14px;
         padding-bottom: 14px;
-        cross-axis-alignment: center;
         if root.icon != "": HorizontalLayout {
             padding-right: 20px;
             Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
         }
-        CardHead {
+        head := CardHead {
             horizontal-stretch: 1;
             title: root.title;
             description: root.description;
             enabled: root.enabled;
         }
-        HorizontalLayout {
+        ctl := HorizontalLayout {
             padding-left: root.has-content ? 16px : 0;
             spacing: 8px;
             alignment: end;
@@ -126,7 +127,8 @@ export component SettingsExpander inherits Rectangle {
     border-color: Theme.c.card-stroke;
     background: ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
-    min-height: 68px;
+    min-height: max(68px, 28px + max(head.preferred-height, ctl.preferred-height));
+    preferred-height: self.min-height;
     accessible-role: groupbox;
     accessible-label: title;
     accessible-expanded: expanded;
@@ -145,18 +147,17 @@ export component SettingsExpander inherits Rectangle {
         padding-right: 9px;
         padding-top: 14px;
         padding-bottom: 14px;
-        cross-axis-alignment: center;
         if root.icon != "": HorizontalLayout {
             padding-right: 20px;
             Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
         }
-        CardHead {
+        head := CardHead {
             horizontal-stretch: 1;
             title: root.title;
             description: root.description;
             enabled: root.enabled;
         }
-        HorizontalLayout {
+        ctl := HorizontalLayout {
             padding-left: root.has-content ? 16px : 0;
             spacing: 8px;
             alignment: end;
@@ -227,7 +228,8 @@ export component SettingsRow inherits Rectangle {
     in property <bool> icon-pad: true;
     // Not the first row: a divider above.
     in property <bool> divider;
-    min-height: 52px;
+    min-height: max(52px, (root.divider ? 17px : 16px) + max(head.preferred-height, ctl.preferred-height));
+    preferred-height: self.min-height;
     if root.divider: Rectangle { y: 0; height: 1px; background: Theme.c.card-stroke; }
     HorizontalLayout {
         padding-left: root.icon-pad ? 56px : 16px;
@@ -235,13 +237,12 @@ export component SettingsRow inherits Rectangle {
         padding-top: root.divider ? 9px : 8px;
         padding-bottom: 8px;
         spacing: 16px;
-        cross-axis-alignment: center;
-        CardHead {
+        head := CardHead {
             horizontal-stretch: 1;
             title: root.title;
             description: root.description;
         }
-        HorizontalLayout {
+        ctl := HorizontalLayout {
             spacing: 8px;
             alignment: end;
             cross-axis-alignment: center;
@@ -268,7 +269,10 @@ export component InfoBar inherits Rectangle {
     border-color: Theme.c.card-stroke;
     background: severity == Severity.success ? Theme.c.success-bg : severity == Severity.warning ? Theme.c.caution-bg
         : severity == Severity.error ? Theme.c.critical-bg : Theme.c.info-bg;
-    min-height: 48px;
+    // the message's height or the action button's (32px), the body's 13px paddings and the
+    // 1px border (0.2's border-box: the border is outside the body)
+    min-height: max(48px, 28px + max(msg.preferred-height, root.action-text != "" ? 32px : 0));
+    preferred-height: self.min-height;
     accessible-role: groupbox;
     accessible-label: title;
     accessible-description: text;
@@ -296,24 +300,26 @@ export component InfoBar inherits Rectangle {
             padding-top: 13px;
             padding-bottom: 13px;
             spacing: 12px;
-            cross-axis-alignment: center;
             if root.title != "": Text {
                 text: root.title;
                 font-weight: 600;
                 vertical-alignment: center;
                 color: Theme.c.text-primary;
             }
-            Text {
+            msg := Text {
                 horizontal-stretch: 1;
                 text: root.text;
                 wrap: word-wrap;
                 vertical-alignment: center;
                 color: Theme.c.text-primary;
             }
-            if root.action-text != "": Button {
-                text: root.action-text;
-                variant: root.action-accent ? ButtonVariant.accent : ButtonVariant.standard;
-                clicked => { root.action(); }
+            if root.action-text != "": VerticalLayout {
+                alignment: center;
+                Button {
+                    text: root.action-text;
+                    variant: root.action-accent ? ButtonVariant.accent : ButtonVariant.standard;
+                    clicked => { root.action(); }
+                }
             }
         }
         if root.closable: VerticalLayout {

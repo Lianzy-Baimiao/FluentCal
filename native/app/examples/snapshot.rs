@@ -8,7 +8,8 @@
 
 use fluentcal_app::desk::Desk;
 use fluentcal_app::theme::{apply, Look};
-use fluentcal_app::{DeskWindow, GalleryWindow};
+use fluentcal_app::windows::settings::view::{self as settings_view, Info, Local, WebView};
+use fluentcal_app::{DeskWindow, GalleryWindow, SetState, SettingsWindow};
 use fluentcal_core::date::local_of_ms;
 use fluentcal_core::settings::Desk as DeskSettings;
 use fluentcal_core::tasks::Doc;
@@ -176,8 +177,21 @@ fn main() {
     // Keeps the window (and the desk model) alive while rendering.
     let mut desk: Option<Desk> = None;
     let _gallery: Option<GalleryWindow>;
+    let mut _settings: Option<SettingsWindow> = None;
     let show: Box<dyn Fn()>;
-    if kind == "gallery" {
+    if kind == "settings" {
+        let w = SettingsWindow::new().unwrap();
+        apply(&w, &look);
+        fluentcal_app::fluent::install(&w, &today, None);
+        settings_view::setup_with(&w, scale);
+        let (info, local) = settings_scene(&scenario, &doc, scale);
+        w.global::<SetState>().set_page(local.page.clone().into());
+        settings_view::push(&w, &doc, &info, &local);
+        let h = w.clone_strong();
+        show = Box::new(move || h.show().unwrap());
+        _settings = Some(w);
+        _gallery = None;
+    } else if kind == "gallery" {
         let g = GalleryWindow::new().unwrap();
         apply(&g, &look);
         fluentcal_app::gallery::install(&g, &today);
@@ -239,6 +253,52 @@ fn main() {
     }
     write_png(out, size.width, size.height, &rgba);
     println!("{out} {}x{}{}", size.width, size.height, desk.map_or(String::new(), |d| format!(" capacity {:?}", d.capacity)));
+}
+
+/// The settings window's state in a parity scene: 0.2's browser preview mock (src/api.ts),
+/// written into the scenario by scripts/parity.mjs as `settingsInfo`.
+fn settings_scene(sc: &Value, doc: &Doc, scale: f32) -> (Info, Local) {
+    let si = &sc["settingsInfo"];
+    let st = |v: &Value| v.as_str().unwrap_or("").to_owned();
+    let screens = si["screens"].as_array().map(|a| a.iter().map(|x| (st(&x["value"]), st(&x["label"]), x["current"].as_bool().unwrap_or(false))).collect()).unwrap_or_default();
+    let holiday_years = sc["doc"]["holidays"].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
+    let sync = fluentcal_core::cloud::service::Status {
+        enabled: si["sync"]["enabled"].as_bool().unwrap_or(false),
+        provider: st(&si["sync"]["provider"]),
+        last_sync: si["sync"]["lastSync"].as_i64(),
+        remote_device: si["sync"]["remoteDevice"].as_str().map(str::to_owned),
+        remote_saved_at: si["sync"]["remoteSavedAt"].as_i64(),
+        ..Default::default()
+    };
+    let info = Info {
+        version: st(&si["version"]),
+        build: si["build"].as_u64().unwrap_or(26300) as u32,
+        debug: si["debug"].as_bool().unwrap_or(true),
+        transparency: si["transparency"].as_bool(),
+        system_accent: sc["systemAccent"].as_str().map(str::to_owned),
+        shortcut_errors: Vec::new(),
+        data_dir: fluentcal_core::datadir::DataDir { path: st(&si["dataDir"]), custom: false, missing: si["missingDir"].as_str().map(str::to_owned) },
+        sync,
+        screens,
+        holiday_years,
+        now_ms: sc["now"].as_i64().unwrap_or(0),
+        offset: sc["offset"].as_i64().unwrap_or(480) as i32,
+    };
+    let w = &si["web"];
+    let addresses: Vec<(String, String, bool, String)> =
+        w["addresses"].as_array().map(|a| a.iter().map(|x| (st(&x["ip"]), st(&x["label"]), x["virt"].as_bool().unwrap_or(false), st(&x["url"]))).collect()).unwrap_or_default();
+    let qr = addresses.first().map(|a| (a.3.clone(), settings_view::qr_image(&a.3, (168.0 * scale).round() as u32)));
+    let web = WebView {
+        enabled: doc.settings.web.enabled,
+        running: w["running"].as_bool().unwrap_or(false),
+        port: w["port"].as_u64().unwrap_or(18765) as u16,
+        error: None,
+        addresses,
+        qr,
+    };
+    let secrets = si["secrets"].as_array().map(|a| a.iter().map(st).collect()).unwrap_or_default();
+    let local = Local { page: st(&si["page"]), web, secrets, ..Default::default() };
+    (info, local)
 }
 
 /// RGB bytes of a PNG (any colour type png can expand to RGB/RGBA).

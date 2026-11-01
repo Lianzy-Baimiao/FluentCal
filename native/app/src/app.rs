@@ -43,6 +43,7 @@ pub struct App {
     pub day: String,
     pub web: crate::webcmd::WebState,
     pub reminder_win: Option<crate::ReminderWindow>,
+    pub settings_win: Option<crate::windows::settings::SettingsWin>,
 }
 
 thread_local! {
@@ -150,6 +151,7 @@ impl App {
         self.desk_refresh_data();
         crate::shell::tray_refresh(self);
         self.schedule_reminders();
+        self.settings_refresh();
     }
 
     pub fn patch_settings(&mut self, patch: serde_json::Value) {
@@ -164,6 +166,7 @@ impl App {
 
     pub fn settings_changed(&mut self, old: &Settings) {
         crate::shell::apply_settings(self, old);
+        self.settings_refresh();
     }
 
     /// Theme mode, accent, appearance or the system theme changed.

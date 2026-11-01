@@ -1,0 +1,153 @@
+// 设置 › 提醒 and 设置 › 数据 (0.2's RemindersPage.vue with ReminderEditor.vue, DataPage.vue).
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Toggle } from "forms.slint";
+import { Select, TimePicker } from "inputs.slint";
+import { SettingsGroup, SettingsCard, SettingsExpander, SettingsExpanderItems, SettingsRow, InfoBar, Severity } from "cards.slint";
+import { SetState } from "settings_state.slint";
+
+// .settings .note: 12px secondary text (a <p>: 12px margins above and below).
+export component Note inherits VerticalLayout {
+    in property <string> text;
+    in property <length> margin: 12px;
+    padding-top: margin;
+    padding-bottom: margin;
+    Text { text: root.text; font-size: 12px; color: Theme.c.text-secondary; wrap: word-wrap; min-height: 20px; vertical-alignment: center; }
+}
+
+// The message bar every page may show (0.2's `msg`).
+export component PageMsg inherits InfoBar {
+    severity: SetState.msg.severity;
+    title: SetState.msg.title;
+    text: SetState.msg.text;
+    closable: true;
+    closed => { SetState.action("msg-close"); }
+}
+
+// 新任务默认提醒 (0.2's ReminderEditor with allDay = false): one select per reminder.
+component OffsetsEditor inherits VerticalLayout {
+    spacing: 6px;
+    for v[i] in SetState.reminders.offsets: HorizontalLayout {
+        spacing: 6px;
+        Select { width: 200px; value: v; options: SetState.offset-options; selected(x) => { SetState.set-offset(i, x); } }
+        Button { variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.close; tip: "删除提醒"; clicked => { SetState.set-offset(i, ""); } }
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        alignment: start;
+        Button { variant: ButtonVariant.subtle; icon: Glyph.add; text: "添加提醒"; enabled: SetState.reminders.can-add; clicked => { SetState.action("add-offset"); } }
+        if !SetState.reminders.enabled: Text { text: "提醒已在设置中关闭"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+    }
+}
+
+export component RemindersPage inherits VerticalLayout {
+    SettingsGroup {
+        title: "通知";
+        SettingsCard {
+            icon: Glyph.alarm;
+            title: "任务提醒";
+            description: "到点弹出 Windows 通知。程序在托盘运行即可提醒。";
+            Toggle { checked: SetState.reminders.enabled; toggled(v) => { SetState.set-bool("reminders.enabled", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.notification;
+            title: "提醒方式";
+            description: "提醒卡片显示在屏幕右下角，可以“完成”或“稍后提醒”，不会打断正在输入的内容";
+            Select {
+                width: 200px;
+                value: SetState.reminders.style;
+                options: [{ value: "both", label: "通知 + 提醒卡片" }, { value: "popup", label: "只用提醒卡片" }, { value: "toast", label: "只用 Windows 通知" }];
+                selected(v) => { SetState.set-str("reminders.style", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.clock;
+            title: "全天任务的提醒时间";
+            description: "没有设置具体时间的任务在这个时间提醒";
+            TimePicker { width: 120px; value: SetState.reminders.all-day-time; changed-value(v) => { SetState.set-str("reminders.allDayTime", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.add;
+            title: "新任务默认提醒";
+            description: "新建任务时自动加上这些提醒";
+            OffsetsEditor { }
+        }
+        SettingsCard {
+            icon: Glyph.notification;
+            title: "发送测试通知";
+            Button { text: "测试"; clicked => { SetState.action("notify-test"); } }
+        }
+        if SetState.msg.shown: PageMsg { }
+    }
+    SettingsGroup {
+        first: false;
+        title: "接下来 48 小时";
+        for r in SetState.upcoming: SettingsCard { icon: Glyph.clock; title: r.title; description: r.desc; has-content: false; }
+        if SetState.upcoming.length == 0: Note { text: "接下来 48 小时没有提醒。"; }
+    }
+}
+
+export component DataPage inherits VerticalLayout {
+    property <bool> open-backups;
+    spacing: 4px;
+    if SetState.msg.shown: PageMsg { }
+    if SetState.data.samples > 0: SettingsGroup {
+        title: "示例数据";
+        SettingsCard {
+            icon: Glyph.delete;
+            title: "清除示例数据";
+            description: SetState.data.samples-desc;
+            Button { text: "清除"; clicked => { SetState.action("clear-samples"); } }
+        }
+    }
+    SettingsGroup {
+        first: SetState.data.samples == 0;
+        title: "导出";
+        SettingsCard { icon: Glyph.save; title: "完整备份（JSON）"; description: "包含任务、分组、日期颜色和设置，可在其他电脑上导入"; Button { text: "导出"; clicked => { SetState.action("export-json"); } } }
+        SettingsCard { icon: Glyph.list; title: "任务列表（CSV）"; description: "用 Excel 打开查看或统计"; Button { text: "导出"; clicked => { SetState.action("export-csv"); } } }
+        SettingsCard { icon: Glyph.calendar; title: "日历文件（ICS）"; description: "导入到 Outlook、Google 日历或手机日历"; Button { text: "导出"; clicked => { SetState.action("export-ics"); } } }
+    }
+    SettingsGroup {
+        first: false;
+        title: "导入";
+        SettingsCard { icon: Glyph.open-file; title: "从备份文件导入"; description: "选择之前导出的 JSON 备份"; Button { text: "选择文件…"; clicked => { SetState.action("import-json"); } } }
+    }
+    SettingsGroup {
+        first: false;
+        title: "自动备份";
+        SettingsExpander {
+            icon: Glyph.sync;
+            title: "备份文件";
+            description: SetState.data.backups-desc;
+            expanded: root.open-backups;
+            toggled(v) => { root.open-backups = v; }
+            Button { text: "立即备份"; clicked => { SetState.action("backup-now"); } }
+        }
+        SettingsExpanderItems {
+            expanded: root.open-backups;
+            for b[i] in SetState.backups: SettingsRow {
+                divider: i > 0;
+                title: b.name;
+                description: b.desc;
+                Button { text: "恢复"; size: ButtonSize.small; clicked => { SetState.action-arg("restore", b.name); } }
+            }
+            if SetState.backups.length == 0: SettingsRow { title: "还没有备份"; }
+        }
+        SettingsCard {
+            icon: Glyph.folder;
+            title: "数据文件夹";
+            description: SetState.data.dir-desc;
+            Button { text: "打开"; clicked => { SetState.action("open-data-dir"); } }
+            Button { text: "更改…"; clicked => { SetState.action("change-dir"); } }
+            if SetState.data.custom: Button { text: "恢复默认"; variant: ButtonVariant.subtle; clicked => { SetState.action("reset-dir"); } }
+        }
+        Note { text: "想通过坚果云、GitHub 等在多台电脑间同步，请到“同步”页设置。"; }
+        if SetState.data.missing != "": InfoBar {
+            severity: Severity.warning;
+            title: "找不到自定义数据文件夹";
+            text: SetState.data.missing + " 现在无法访问（同步盘未启动或磁盘未连接），本次使用的是本机默认文件夹。重新连接后重启程序即可。";
+        }
+    }
+}

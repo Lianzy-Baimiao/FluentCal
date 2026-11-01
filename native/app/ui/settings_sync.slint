@@ -1,0 +1,227 @@
+// 设置 › 同步 (0.2's SyncPage.vue).
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Select, TextBox } from "inputs.slint";
+import { SettingsGroup, SettingsCard, SettingsExpander, SettingsExpanderItems, SettingsRow, InfoBar, Severity } from "cards.slint";
+import { SetState } from "settings_state.slint";
+import { Note, PageMsg } from "settings_data.slint";
+
+// A text setting saved as it is typed (0.2's v-model on useSetting).
+component SettingBox inherits TextBox {
+    in property <string> path;
+    in property <string> value;
+    width: 300px;
+    text: value;
+    enabled: !SetState.sync.locked;
+    edited(v) => { SetState.set-str(root.path, v); }
+}
+
+// Password / token: typed here, saved to Credential Manager on Enter or leaving the box.
+component SecretBox inherits TextBox {
+    width: 300px;
+    password: true;
+    placeholder: SetState.sync.secret-saved ? "••••••••" : "";
+    accepted(v) => {
+        SetState.save-secret(SetState.sync.secret-key, v);
+        self.text = "";
+    }
+    focus-changed(f) => {
+        if !f && self.text != "" {
+            SetState.save-secret(SetState.sync.secret-key, self.text);
+            self.text = "";
+        }
+    }
+}
+
+// A help expander (header only; the rows follow it).
+component Help inherits SettingsExpander {
+    icon: Glyph.help;
+    has-content: false;
+}
+
+export component SyncPage inherits VerticalLayout {
+    property <bool> dav: SetState.sync.provider == "webdav";
+    property <bool> git: SetState.sync.provider == "github" || SetState.sync.provider == "gitee";
+    property <bool> help-open;
+    spacing: 4px;
+    SettingsGroup {
+        title: "云同步";
+        SettingsCard {
+            icon: Glyph.cloud;
+            title: "同步状态";
+            description: SetState.sync.status;
+            has-content: SetState.sync.enabled;
+            if SetState.sync.enabled: Button {
+                text: SetState.sync.syncing ? "正在同步…" : "立即同步";
+                enabled: !SetState.sync.syncing;
+                clicked => { SetState.action("sync-now"); }
+            }
+            if SetState.sync.enabled: Button { text: "关闭同步"; variant: ButtonVariant.subtle; clicked => { SetState.action("sync-disable"); } }
+        }
+        SettingsCard {
+            icon: Glyph.sync;
+            title: "同步方式";
+            description: "多台电脑使用同一个地方即可共用任务。只同步任务、分组和日期颜色，设置留在每台电脑上";
+            Select {
+                width: 290px;
+                enabled: !SetState.sync.locked;
+                value: SetState.sync.provider;
+                options: [
+                    { value: "", label: "不同步" },
+                    { value: "webdav", label: "WebDAV（坚果云、Nextcloud、群晖…）" },
+                    { value: "github", label: "GitHub 私有仓库" },
+                    { value: "gitee", label: "Gitee 私有仓库" },
+                    { value: "folder", label: "同步盘文件夹（OneDrive、Google Drive…）" },
+                ];
+                selected(v) => { SetState.set-str("sync.provider", v); }
+            }
+        }
+        if SetState.sync.locked: InfoBar { text: "同步已开启。要换同步方式或地址，请先关闭同步。"; }
+    }
+    if root.dav: SettingsGroup {
+        first: false;
+        title: "WebDAV";
+        SettingsCard {
+            title: "服务器地址";
+            description: "坚果云为 https://dav.jianguoyun.com/dav/";
+            Button {
+                text: "坚果云";
+                size: ButtonSize.small;
+                variant: ButtonVariant.subtle;
+                enabled: !SetState.sync.locked;
+                clicked => { SetState.set-str("sync.webdav.url", "https://dav.jianguoyun.com/dav/"); }
+            }
+            SettingBox { path: "sync.webdav.url"; value: SetState.sync.dav-url; placeholder: "https://"; }
+        }
+        SettingsCard { title: "用户名"; SettingBox { path: "sync.webdav.user"; value: SetState.sync.dav-user; } }
+        SettingsCard {
+            title: "密码";
+            description: SetState.sync.secret-hint != "" ? SetState.sync.secret-hint : "坚果云请用“第三方应用密码”";
+            SecretBox { }
+        }
+        SettingsCard {
+            title: "文件夹";
+            description: "数据保存为 文件夹/fluentcal-data.json，不存在会自动创建";
+            SettingBox { path: "sync.webdav.folder"; value: SetState.sync.dav-folder; }
+        }
+    }
+    if root.git: SettingsGroup {
+        first: false;
+        title: SetState.sync.git-name;
+        SettingsCard {
+            title: "仓库";
+            description: "用户名/仓库名，必须是私有仓库";
+            SettingBox { path: "sync." + SetState.sync.provider + ".repo"; value: SetState.sync.repo; placeholder: "name/fluentcal-data"; }
+        }
+        SettingsCard {
+            title: "Token";
+            description: SetState.sync.secret-hint != "" ? SetState.sync.secret-hint
+                : SetState.sync.provider == "github" ? "需要这个仓库的 Contents 读写权限" : "需要 projects 权限";
+            SecretBox { }
+        }
+        SettingsCard { title: "分支"; description: "留空使用默认分支"; SettingBox { path: "sync." + SetState.sync.provider + ".branch"; value: SetState.sync.branch; } }
+        SettingsCard { title: "文件路径"; description: "留空为 fluentcal-data.json"; SettingBox { path: "sync." + SetState.sync.provider + ".path"; value: SetState.sync.path; } }
+    }
+    if SetState.sync.provider == "folder": SettingsGroup {
+        first: false;
+        title: "同步盘文件夹";
+        SettingsCard {
+            icon: Glyph.folder;
+            title: "把数据文件夹放到同步盘";
+            description: "在“数据”页把数据文件夹改到 OneDrive、Dropbox 或 Google Drive 桌面版的文件夹里，由它们负责同步。各电脑同时修改时按任务合并";
+            Button { text: "去设置"; clicked => { SetState.navigate("data"); } }
+        }
+    }
+    if SetState.sync.cloud: HorizontalLayout {
+        spacing: 8px;
+        alignment: end;
+        Button { text: "测试连接"; enabled: !SetState.sync.busy; clicked => { SetState.action("sync-test"); } }
+        if !SetState.sync.enabled: Button { text: "开启同步"; variant: ButtonVariant.accent; enabled: !SetState.sync.busy; clicked => { SetState.action("sync-enable"); } }
+    }
+    if SetState.sync.cloud && SetState.msg.shown: PageMsg { }
+    if SetState.sync.cloud && !SetState.msg.shown && SetState.sync.enabled && SetState.sync.error != "": InfoBar {
+        severity: SetState.sync.halted ? Severity.error : Severity.warning;
+        title: SetState.sync.halted ? "同步已暂停" : "同步失败";
+        text: SetState.sync.error + (SetState.sync.halted ? "。修改设置或点“立即同步”后重试。" : "");
+    }
+    if SetState.sync.cloud: SettingsGroup {
+        first: true;
+        title: "帮助";
+        if root.dav: Help {
+            title: "怎样获取坚果云的 WebDAV 密码";
+            expanded: root.help-open;
+            toggled(v) => { root.help-open = v; }
+        }
+        if root.dav: SettingsExpanderItems {
+            expanded: root.help-open;
+            SettingsRow { title: "坚果云网页版 › 右上角账户名 › 账户信息 › 安全选项 › 第三方应用管理 › 添加应用，生成的密码填到上面（不是登录密码）。用户名是坚果云的登录邮箱。"; }
+        }
+        if SetState.sync.provider == "github": Help {
+            title: "怎样创建 GitHub 仓库和 Token";
+            expanded: root.help-open;
+            toggled(v) => { root.help-open = v; }
+        }
+        if SetState.sync.provider == "github": SettingsExpanderItems {
+            expanded: root.help-open;
+            SettingsRow { title: "1. 新建一个私有仓库（Private），例如 fluentcal-data"; }
+            SettingsRow {
+                divider: true;
+                title: "2. Settings › Developer settings › Fine-grained tokens › Generate new token：只选这个仓库，Repository permissions 里 Contents 选 Read and write";
+                Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://github.com/settings/personal-access-tokens/new"); } }
+            }
+            SettingsRow { divider: true; title: "每次上传是一次提交，可以在仓库里查看历史版本。修改后等 1 分钟左右再上传，减少提交次数。"; }
+        }
+        if SetState.sync.provider == "gitee": Help {
+            title: "怎样创建 Gitee 仓库和令牌";
+            expanded: root.help-open;
+            toggled(v) => { root.help-open = v; }
+        }
+        if SetState.sync.provider == "gitee": SettingsExpanderItems {
+            expanded: root.help-open;
+            SettingsRow { title: "1. 新建一个私有仓库"; }
+            SettingsRow {
+                divider: true;
+                title: "2. 设置 › 私人令牌 › 生成新令牌，勾选 projects";
+                Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://gitee.com/profile/personal_access_tokens"); } }
+            }
+        }
+    }
+    if SetState.sync.cloud: SettingsGroup {
+        first: false;
+        title: "高级";
+        SettingsCard {
+            icon: Glyph.clock;
+            title: "自动同步";
+            description: "修改后会自动上传；这里设置多久检查一次其他电脑的修改";
+            Select {
+                width: 200px;
+                value: SetState.sync.interval;
+                options: [
+                    { value: "1", label: "每 1 分钟" }, { value: "5", label: "每 5 分钟" }, { value: "15", label: "每 15 分钟" },
+                    { value: "30", label: "每 30 分钟" }, { value: "60", label: "每 60 分钟" }, { value: "0", label: "只在启动和修改后" },
+                ];
+                selected(v) => { SetState.set-num("sync.interval", v.to-float()); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.globe;
+            title: "网络代理";
+            description: "局域网地址（NAS 等）总是直连";
+            if SetState.sync.proxy-mode == "custom": TextBox {
+                width: 200px;
+                text: SetState.sync.proxy;
+                placeholder: "http://127.0.0.1:7890";
+                edited(v) => { SetState.set-str("sync.proxy", v); }
+            }
+            Select {
+                width: 160px;
+                value: SetState.sync.proxy-mode;
+                options: [{ value: "system", label: "使用系统代理" }, { value: "direct", label: "不使用代理" }, { value: "custom", label: "手动填写…" }];
+                selected(v) => { SetState.action-arg("proxy-mode", v); }
+            }
+        }
+    }
+    if SetState.sync.cloud: Note { text: "密码、Token 只保存在本机的 Windows 凭据管理器里，不会写进数据文件、备份或导出文件。开启同步前、用云端数据替换前都会自动备份本机数据（数据 › 备份文件）。"; }
+}
