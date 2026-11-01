@@ -6,7 +6,7 @@ import { Glyph, Icon } from "icons.slint";
 import { GText, Button, ButtonVariant, ButtonSize, Segmented, SegOption } from "controls.slint";
 import { GanttView } from "gantt.slint";
 import { ChipData, TaskChip } from "chip.slint";
-import { Overlay, OverlayRoot, Tip, TipLayer, Flyout, DialogHost, DialogBody, Placement } from "overlay.slint";
+import { Overlay, OverlayRoot, Tip, TipLayer, Flyout, DialogHost, DialogBody, Placement, FocusRing } from "overlay.slint";
 import { Menu, MenuEntry } from "menu.slint";
 import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
@@ -311,11 +311,24 @@ component WeekRow inherits Rectangle {
             font-size: 11px * fs;
             color: mta.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
         }
+        // a <button> in 0.2: Tab reaches it, Enter / Space open the list
+        mfs := FocusScope {
+            focus-on-click: false;
+            focus-on-tab-navigation: n > 0;
+            key-pressed(e) => {
+                if e.text == Key.Return || e.text == " " {
+                    root.more(week.cells[i].date, parent.absolute-position.x, parent.absolute-position.y, parent.width, parent.height);
+                    return accept;
+                }
+                reject
+            }
+        }
         mta := TouchArea {
             enabled: n > 0;
             clicked => { root.more(week.cells[i].date, parent.absolute-position.x, parent.absolute-position.y, parent.width, parent.height); }
             double-clicked => { }
         }
+        FocusRing { show: mfs.has-focus && Overlay.keyboard; radius: 4px; }
     }
     // Quick add: an inline box at the bottom of the day cell; stays open for the next entry.
     for c[i] in week.cells: Rectangle {
@@ -707,6 +720,16 @@ component CountdownBar inherits Rectangle {
                 if c.days != 0: GText { text: "天"; font-size: 12px * fs; color: pill.fg; }
             }
             property <int> tip-token: -1;
+            pfs := FocusScope {
+                focus-on-click: false;
+                key-pressed(e) => {
+                    if e.text == Key.Return || e.text == " " {
+                        root.jump(c.date);
+                        return accept;
+                    }
+                    reject
+                }
+            }
             cta := TouchArea {
                 changed has-hover => {
                     if self.has-hover {
@@ -717,6 +740,7 @@ component CountdownBar inherits Rectangle {
                 }
                 clicked => { root.jump(c.date); }
             }
+            FocusRing { show: pfs.has-focus && Overlay.keyboard; radius: 11px; }
         }
     }
 }
