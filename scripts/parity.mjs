@@ -48,6 +48,10 @@ const SCENES = [
   { name: 'desk-search-empty', url: '?w=desk&theme=dark', size: month, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['key', '', 'Control+f']], native: { open: 'search', query: '' } },
   { name: 'desk-adjust', url: '?w=desk&theme=light', size: small, settings: { theme: { mode: 'light' }, desk: { locked: false } } },
   { name: 'desk-welcome', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, general: { onboarded: false } }, doc: (d) => { Object.values(d.tasks)[0].sample = true; } },
+  // Hover tips (pure Slint on the native side: the pointer move is replayed).
+  { name: 'desk-tip-chip', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } }, steps: [['hover', '.chip[aria-label="评审会"]'], ['wait', 700]] },
+  { name: 'desk-tip-head', url: '?w=desk&theme=dark', size: month, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['hover', '.cell[data-date="2026-10-21"] .head'], ['wait', 700]] },
+  { name: 'gantt-tip', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } }, steps: [['hover', '.bar[data-task="api"]'], ['wait', 700]] },
   { name: 'gallery-light', window: 'gallery', url: '?w=gallery&theme=light', size: gallery },
   { name: 'gallery-dark', window: 'gallery', url: '?w=gallery&theme=dark', size: gallery, dark: true },
   { name: 'gallery-menu', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'button:has-text("菜单")']] },
