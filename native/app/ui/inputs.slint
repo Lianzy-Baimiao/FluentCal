@@ -62,6 +62,11 @@ export component TextBox {
     in property <bool> password;
     // 0 = no limit.
     in property <int> max-length;
+    // Text size and weight (the editor's title: 20px semibold); the box keeps its height.
+    in property <length> text-size: small ? 12px : 14px;
+    in property <int> text-weight: 400;
+    // The box's height (0.2's editor title: 32px, its 40px input overflows the box).
+    in property <length> box-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
     out property <bool> has-focus: input.has-focus;
     callback edited(string);
     // Enter (Ctrl+Enter when multi-line).
@@ -75,9 +80,9 @@ export component TextBox {
     property <bool> show-clear: clearable && text != "" && enabled;
     forward-focus: input;
     preferred-width: 160px;
-    min-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
-    max-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
-    preferred-height: multiline ? rows * 20px + 12px + 2px : small ? 24px : 33px;
+    min-height: box-height;
+    max-height: box-height;
+    preferred-height: box-height;
     accessible-role: text-input;
     accessible-value: text;
     accessible-placeholder-text: placeholder;
@@ -148,7 +153,8 @@ export component TextBox {
                 width: parent.width - root.pad-l - root.pad-r;
                 height: root.multiline ? root.line : root.line;
                 text: root.text == "" && input.preedit-text == "" ? root.placeholder : "";
-                font-size: root.small ? 12px : 14px;
+                font-size: root.text-size;
+                font-weight: root.text-weight;
                 color: !root.enabled ? Theme.c.text-disabled : input.has-focus ? Theme.c.text-tertiary : Theme.c.text-secondary;
                 vertical-alignment: center;
                 overflow: elide;
@@ -166,7 +172,8 @@ export component TextBox {
                 wrap: root.multiline ? word-wrap : no-wrap;
                 vertical-alignment: root.multiline ? top : center;
                 input-type: root.password ? InputType.password : InputType.text;
-                font-size: root.small ? 12px : 14px;
+                font-size: root.text-size;
+                font-weight: root.text-weight;
                 color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
                 selection-background-color: Theme.c.accent-fill;
                 selection-foreground-color: Theme.c.text-on-accent;
@@ -418,7 +425,25 @@ export component Select {
             : options.length > 4 && options[4].value == v ? 4 : options.length > 5 && options[5].value == v ? 5
             : options.length > 6 && options[6].value == v ? 6 : options.length > 7 && options[7].value == v ? 7
             : options.length > 8 && options[8].value == v ? 8 : options.length > 9 && options[9].value == v ? 9
-            : options.length > 10 && options[10].value == v ? 10 : options.length > 11 && options[11].value == v ? 11 : -1;
+            : options.length > 10 && options[10].value == v ? 10 : options.length > 11 && options[11].value == v ? 11
+            : options.length > 12 && options[12].value == v ? 12 : options.length > 13 && options[13].value == v ? 13
+            : options.length > 14 && options[14].value == v ? 14 : options.length > 15 && options[15].value == v ? 15
+            : options.length > 16 && options[16].value == v ? 16 : options.length > 17 && options[17].value == v ? 17
+            : options.length > 18 && options[18].value == v ? 18 : options.length > 19 && options[19].value == v ? 19
+            : options.length > 20 && options[20].value == v ? 20 : options.length > 21 && options[21].value == v ? 21
+            : options.length > 22 && options[22].value == v ? 22 : options.length > 23 && options[23].value == v ? 23 : -1;
+    }
+    // The list's scroll position (inside the popup, bound both ways) and its visible height.
+    property <length> scroll-y;
+    property <length> list-h: min(320px, options.length * 34px - 2px + 8px);
+    // Keyboard moves scroll the highlighted option into view (0.2's scrollHi).
+    function scroll-hi() {
+        let top = 4px + hi * 34px;
+        if top < -scroll-y {
+            scroll-y = -top;
+        } else if top + 34px > -scroll-y + list-h {
+            scroll-y = list-h - top - 34px;
+        }
     }
     // Next enabled index from `i` in direction `d`, without wrapping (FSelect.next).
     function next(i: int, d: int) -> int {
@@ -432,6 +457,7 @@ export component Select {
     function show() {
         if enabled {
             hi = sel >= 0 ? sel : next(-1, 1);
+            scroll-y = 0;
             fly.open-at(root.absolute-position.x, root.absolute-position.y, root.width, root.height);
         }
     }
@@ -522,10 +548,12 @@ export component Select {
         key(e) => {
             if e.text == Key.DownArrow || e.text == Key.UpArrow {
                 root.hi = root.next(root.hi, e.text == Key.DownArrow ? 1 : -1);
+                root.scroll-hi();
                 return accept;
             }
             if e.text == Key.Home || e.text == Key.End {
                 root.hi = e.text == Key.Home ? root.next(-1, 1) : root.next(root.options.length, -1);
+                root.scroll-hi();
                 return accept;
             }
             if e.text == Key.Return || e.text == " " {
@@ -538,7 +566,15 @@ export component Select {
             }
             return reject;
         }
-        VerticalLayout {
+        // 0.2's .f-list: at most 320px high, scrolling
+        list := Flickable {
+            preferred-width: rows.preferred-width;
+            preferred-height: min(rows.preferred-height, 320px);
+            content-height: rows.preferred-height;
+            content-width: self.width;
+            content-y <=> root.scroll-y;
+        rows := VerticalLayout {
+            width: list.width;
             padding-top: 4px;
             padding-bottom: 4px;
             for o[i] in root.options: item := Rectangle {
@@ -585,6 +621,7 @@ export component Select {
                     }
                 }
             }
+        }
         }
     }
 }
@@ -658,7 +695,7 @@ export component CalendarView {
                 vertical-alignment: center;
             }
             tta := TouchArea { clicked => { root.months = !root.months; } }
-            if root.title-ring: FocusRing { show: true; }
+            if root.title-ring: FocusRing { show: true; width: parent.width; height: parent.height; }
         }
         for d in [-1, 1]: Rectangle {
             width: 32px;
@@ -768,7 +805,7 @@ export component CalendarView {
                     }
                 }
             }
-            if d.iso == root.cursor && fs.has-focus && Overlay.keyboard: FocusRing { radius: cell.border-radius; }
+            if d.iso == root.cursor && fs.has-focus && Overlay.keyboard: FocusRing { show: true; width: parent.width; height: parent.height; radius: cell.border-radius; }
         }
     }
     if root.months: Rectangle {
@@ -1068,7 +1105,7 @@ export component TimePicker {
                             vertical-alignment: center;
                         }
                         // 0.2 focuses the item it opens at
-                        if i == fly.target && !fly.moved: FocusRing { show: true; }
+                        if i == fly.target && !fly.moved: FocusRing { show: true; width: parent.width; height: parent.height; }
                     }
                     ita := TouchArea {
                         changed has-hover => {

@@ -8,4 +8,6 @@ pub mod settings;
 use crate::app::App;
 
 /// The theme changed: every open settings/editor window follows (each adds its line here).
-pub fn retheme(_app: &App) {}
+pub fn retheme(app: &mut App) {
+    app.editor_retheme();
+}

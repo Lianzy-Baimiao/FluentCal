@@ -1,0 +1,162 @@
+// Pieces of the task editor (0.2's editor.css, RepeatEditor's day buttons, DepsEditor's tags).
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+
+// .editor .card: a framed group of rows (6px 16px padding, 1px border, radius 8).
+export component Card inherits Rectangle {
+    in property <length> pad-y: 6px;
+    in property <length> pad-x: 16px;
+    background: Theme.c.card-fill;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    border-radius: 8px;
+    VerticalLayout {
+        padding-top: root.pad-y + 1px;
+        padding-bottom: root.pad-y + 1px;
+        padding-left: root.pad-x + 1px;
+        padding-right: root.pad-x + 1px;
+        @children
+    }
+}
+
+// .editor .row: 72px label, 12px gap, the controls; centred; min 48px with the divider
+// (the last row has none), 6px padding.
+export component Row inherits Rectangle {
+    in property <string> label;
+    in property <bool> last;
+    // The controls take the whole width (wrapping rows: swatches, the group box).
+    in property <bool> wide;
+    min-height: root.last ? 47px : 48px;
+    HorizontalLayout {
+        padding-top: 6px;
+        padding-bottom: root.last ? 6px : 7px;
+        spacing: 12px;
+        cross-axis-alignment: center;
+        Text {
+            width: 72px;
+            height: 20px;
+            text: root.label;
+            color: Theme.c.text-secondary;
+            vertical-alignment: center;
+        }
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 0;
+            spacing: 8px;
+            alignment: root.wide ? LayoutAlignment.stretch : LayoutAlignment.start;
+            cross-axis-alignment: center;
+            @children
+        }
+    }
+    if !root.last: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.c.divider;
+    }
+}
+
+// .row.top: the label at the top (6px down), the controls from the top.
+export component TopRow inherits Rectangle {
+    in property <string> label;
+    in property <bool> last;
+    min-height: root.last ? 47px : 48px;
+    HorizontalLayout {
+        padding-top: 6px;
+        padding-bottom: root.last ? 6px : 7px;
+        spacing: 12px;
+        alignment: stretch;
+        VerticalLayout {
+            width: 72px;
+            padding-top: 6px;
+            alignment: start;
+            Text {
+                height: 20px;
+                text: root.label;
+                color: Theme.c.text-secondary;
+                vertical-alignment: center;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            min-width: 0;
+            alignment: start;
+            @children
+        }
+    }
+    if !root.last: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.c.divider;
+    }
+}
+
+// RepeatEditor .days button: a 32px round toggle.
+export component DayButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> on;
+    callback toggled();
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: on ? Theme.c.accent-fill : Theme.c.control-stroke;
+    background: on ? Theme.c.accent-fill : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+    accessible-role: button;
+    accessible-label: "周" + label;
+    accessible-checked: on;
+    accessible-action-default => { toggled(); }
+    Text {
+        text: root.label;
+        color: root.on ? Theme.c.text-on-accent : Theme.c.text-primary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        clicked => { root.toggled(); }
+    }
+}
+
+// DepsEditor .tag: colour dot, title, remove button (28px high, radius 14).
+export component DepTagView inherits Rectangle {
+    in property <string> title;
+    in property <color> dot;
+    callback remove();
+    height: 28px;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: Theme.c.control-stroke;
+    background: Theme.c.control-fill;
+    max-width: 260px;
+    HorizontalLayout {
+        padding-left: 11px;
+        padding-right: 5px;
+        spacing: 6px;
+        cross-axis-alignment: center;
+        Rectangle {
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: root.dot;
+        }
+        Text {
+            text: root.title;
+            font-size: 12px;
+            color: Theme.c.text-primary;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        Rectangle {
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            background: xa.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            accessible-label: "移除 " + root.title;
+            accessible-action-default => { root.remove(); }
+            Icon { glyph: Glyph.close; size: 9px; color: Theme.c.text-secondary; }
+            xa := TouchArea { clicked => { root.remove(); } }
+        }
+    }
+}
