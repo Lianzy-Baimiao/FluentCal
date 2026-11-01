@@ -1,6 +1,6 @@
 //! Renders a window offscreen to PNG for the visual comparison with 0.2 (scripts/parity.mjs
 //! writes the scenarios and 0.2's screenshots): `snapshot <scenario.json> <out.png>`.
-//! The scenario has the window ("desk" or "gallery"), the document, the fixed "now", the window
+//! The scenario has the window ("desk", "gallery" or "editor" with its `payload`), the document, the fixed "now", the window
 //! size and scale, optionally a wallpaper PNG to draw a transparent window on, and input
 //! `events` played before rendering (pointer and keys, logical px). Time only moves when the
 //! events say so (`wait`), and 1 s more before the picture so transitions have finished.
@@ -176,8 +176,17 @@ fn main() {
     // Keeps the window (and the desk model) alive while rendering.
     let mut desk: Option<Desk> = None;
     let _gallery: Option<GalleryWindow>;
+    let mut _editor: Option<fluentcal_app::windows::editor::Offline> = None;
     let show: Box<dyn Fn()>;
-    if kind == "gallery" {
+    if kind == "editor" {
+        let p: fluentcal_core::editor::Payload = serde_json::from_value(scenario.get("payload").cloned().unwrap_or(Value::Null)).expect("payload");
+        let e = fluentcal_app::windows::editor::Offline::new(doc, &p, &today, t.clone()).unwrap();
+        apply(&e.window, &look);
+        let h = e.window.clone_strong();
+        show = Box::new(move || h.show().unwrap());
+        _editor = Some(e);
+        _gallery = None;
+    } else if kind == "gallery" {
         let g = GalleryWindow::new().unwrap();
         apply(&g, &look);
         fluentcal_app::gallery::install(&g, &today);

@@ -26,6 +26,11 @@ const glass = { bgOpacity: 18, cellOpacity: 38, shadow: false };
 const month = { width: 880, height: 640 };
 const small = { width: 560, height: 430 };
 const gallery = { width: 1280, height: 900 };
+const editor = { width: 560, height: 720 };
+const editorUrl = (theme, payload) => `?w=editor&theme=${theme}&payload=${encodeURIComponent(JSON.stringify(payload))}`;
+const NEW = { mode: 'new', start: '2026-10-14' };
+const WEEKLY = { mode: 'edit', taskId: 'weekly', date: '2026-10-16' };
+const DESIGN = { mode: 'edit', taskId: 'design' };
 // Gallery steps: [action, target, extra]. Targets are Playwright selectors on 0.2's page.
 const SCENES = [
   { name: 'month-light', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } } },
@@ -54,6 +59,13 @@ const SCENES = [
   { name: 'gallery-dialog', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'button:has-text("对话框")']] },
   { name: 'gallery-dialog-dark', window: 'gallery', url: '?w=gallery&theme=dark', size: gallery, dark: true, steps: [['click', 'button:has-text("确认框")']] },
   { name: 'gallery-tip', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['hover', 'button:has-text("悬停提示")'], ['wait', 700]] },
+  { name: 'editor-new', window: 'editor', url: editorUrl('light', NEW), payload: NEW, size: editor, settings: { theme: { mode: 'light' } } },
+  { name: 'editor-repeat', window: 'editor', url: editorUrl('light', WEEKLY), payload: WEEKLY, size: editor, settings: { theme: { mode: 'light' } } },
+  { name: 'editor-deps', window: 'editor', url: editorUrl('light', DESIGN), payload: DESIGN, size: editor, settings: { theme: { mode: 'light' } } },
+  { name: 'editor-dark', window: 'editor', url: editorUrl('dark', DESIGN), payload: DESIGN, size: editor, dark: true, settings: { theme: { mode: 'dark' } } },
+  { name: 'editor-select', window: 'editor', url: editorUrl('light', NEW), payload: NEW, size: editor, settings: { theme: { mode: 'light' } }, steps: [['click', '.f-select >> nth=0']] },
+  { name: 'editor-date', window: 'editor', url: editorUrl('light', NEW), payload: NEW, size: editor, settings: { theme: { mode: 'light' } }, steps: [['click', '.cal-btn >> nth=0']] },
+  { name: 'editor-delete', window: 'editor', url: editorUrl('light', WEEKLY), payload: WEEKLY, size: editor, settings: { theme: { mode: 'light' } }, steps: [['click', '.footer button:has-text("删除")']] },
   { name: 'gallery-focus', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'input[placeholder="搜索任务"]'], ['type', '', '周报'], ['key', '', 'Tab']] },
 ];
 const only = process.argv.slice(2);
@@ -135,7 +147,8 @@ try {
     if (s.steps?.length) await page.waitForTimeout(600);
     const base = path.join(outDir, s.name);
     await page.screenshot({ path: `${base}.ref.png` });
-    if (!isGallery) {
+    const opaque = isGallery || s.window === 'editor';
+    if (!opaque) {
       // Flyouts, menus and the tooltip are mounted on <body>, outside #app.
       await page.addStyleTag({ content: 'body > * { visibility: hidden !important; }' });
       await page.waitForTimeout(100);
@@ -145,7 +158,8 @@ try {
       window: s.window ?? 'desk',
       doc, now: NOW.getTime(), offset: 480, width: size.width, height: size.height, scale: SCALE,
       dark: !!s.dark, systemAccent: s.accent ?? '#0078D4', events, ...(native ? { native } : {}),
-      ...(isGallery ? {} : { wallpaper: `${base}.wall.png` }),
+      ...(opaque ? {} : { wallpaper: `${base}.wall.png` }),
+      ...(s.payload ? { payload: s.payload } : {}),
     };
     writeFileSync(`${base}.json`, JSON.stringify(scenario, null, 1));
     console.log(`${s.name}${errors.length ? `  page errors: ${errors.join(' | ')}` : ''}`);

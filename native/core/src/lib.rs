@@ -7,6 +7,7 @@ pub mod color;
 pub mod countdown;
 pub mod datadir;
 pub mod date;
+pub mod editor;
 pub mod export;
 pub mod gantt;
 pub mod history;

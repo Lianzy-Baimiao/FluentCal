@@ -43,6 +43,7 @@ pub struct App {
     pub day: String,
     pub web: crate::webcmd::WebState,
     pub reminder_win: Option<crate::ReminderWindow>,
+    pub editor: Option<crate::windows::editor::EditorWin>,
 }
 
 thread_local! {
@@ -148,6 +149,7 @@ impl App {
     /// Tasks, groups or day marks changed: every view that shows them.
     pub fn doc_changed(&mut self) {
         self.desk_refresh_data();
+        self.editor_refresh();
         crate::shell::tray_refresh(self);
         self.schedule_reminders();
     }
@@ -164,6 +166,7 @@ impl App {
 
     pub fn settings_changed(&mut self, old: &Settings) {
         crate::shell::apply_settings(self, old);
+        self.editor_refresh();
     }
 
     /// Theme mode, accent, appearance or the system theme changed.

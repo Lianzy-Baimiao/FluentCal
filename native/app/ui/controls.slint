@@ -274,7 +274,7 @@ export component Segmented inherits Rectangle {
                     }
                 }
             }
-            if on && sfs.has-focus && Overlay.keyboard: FocusRing { radius: 3px; }
+            if on && sfs.has-focus && Overlay.keyboard: FocusRing { show: true; width: parent.width; height: parent.height; radius: 3px; }
         }
     }
     sfs := FocusScope {

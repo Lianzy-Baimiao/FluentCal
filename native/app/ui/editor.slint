@@ -1,0 +1,588 @@
+// The task editor window (0.2's src/windows/editor: EditorApp, RepeatEditor, ReminderEditor,
+// DepsEditor, editor.css). Rust keeps the draft (core::editor) and sets `data` after each
+// change; the title and notes boxes keep their own text (`title-text`, `notes-text`).
+
+import { Theme, Swatch } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { OverlayRoot, TipLayer, DialogHost, DialogBody } from "overlay.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Checkbox, RadioGroup, RadioOption, Slider } from "forms.slint";
+import { TextBox, NumberBox, Select, SelectOption, DatePicker, TimePicker, Fluent } from "inputs.slint";
+import { ColorSwatches } from "menu.slint";
+import { DialogFooter } from "dialog.slint";
+import { Card, Row, TopRow, DayButton, DepTagView } from "editor_parts.slint";
+
+export struct DepTag { id: string, title: string, dot: color }
+
+// What the window shows of the draft (core::editor::View plus the field values).
+export struct EditorData {
+    start: string,
+    end: string,
+    all-day: bool,
+    time: string,
+    milestone: bool,
+    span: string,
+    freq: string,
+    interval: float,
+    unit: string,
+    weekly: bool,
+    // index 0 = Sunday
+    days: [bool],
+    monthly: bool,
+    month-mode: string,
+    has-end: bool,
+    end-mode: string,
+    count: float,
+    until: string,
+    summary: string,
+    reminder-count: int,
+    reminder-hint: string,
+    group: string,
+    color: string,
+    show-progress: bool,
+    progress: float,
+    done: bool,
+    countdown: bool,
+    show-postpone: bool,
+    postpone: bool,
+}
+
+export component EditorWindow inherits Window {
+    title: root.is-new ? "新建任务" : "编辑任务";
+    // Mica behind the window (Windows 11); else the solid background (0.2's .no-mica).
+    in property <bool> mica;
+    background: root.mica ? transparent : Theme.c.solid-base;
+    default-font-family: Theme.font-ui;
+    default-font-size: 14px;
+    preferred-width: 560px;
+    preferred-height: 720px;
+    min-width: 460px;
+    min-height: 560px;
+    in property <bool> is-new;
+    // The task no longer exists (0.2's "这个任务已被删除。").
+    in property <bool> missing;
+    in property <bool> title-error;
+    in-out property <string> title-text;
+    in-out property <string> notes-text;
+    in property <EditorData> data;
+    in property <[SelectOption]> freqs;
+    in property <[RadioOption]> month-modes;
+    in property <[SelectOption]> reminder-options;
+    in property <[SelectOption]> groups;
+    in property <[SelectOption]> dep-options;
+    in property <[Swatch]> colors;
+    // The reminder offsets (as text, the select's values) and the predecessors' tags.
+    in property <[string]> reminders;
+    in property <[DepTag]> deps;
+    // Unsaved changes (the window's close button asks first).
+    in property <bool> dirty;
+    in-out property <bool> new-group-open;
+    in-out property <string> new-group-name;
+    // A field: key and value (numbers as text, booleans "1"/"0"), see core::editor::fields.
+    callback edit(string, string);
+    callback toggle-day(int);
+    callback reminder-set(int, string);
+    callback reminder-remove(int);
+    callback reminder-add();
+    callback dep-add(string);
+    callback dep-remove(string);
+    callback create-group(string);
+    callback save();
+    callback remove();
+    callback cancel();
+    // The question's answer: "primary", "secondary" or "close".
+    callback ask-result(string);
+    property <string> ask-title;
+    property <string> ask-text;
+    property <string> ask-primary;
+    property <string> ask-secondary;
+    property <string> ask-close;
+    property <bool> ask-danger;
+    property <bool> ask-answered;
+    // The title box; with the task gone, the window's keys (Esc still closes, as in 0.2).
+    public function focus-title() {
+        if missing {
+            keys.focus();
+        } else {
+            title-box.focus-input();
+        }
+    }
+    public function ask(title: string, text: string, primary: string, secondary: string, close: string, danger: bool) {
+        ask-title = title;
+        ask-text = text;
+        ask-primary = primary;
+        ask-secondary = secondary;
+        ask-close = close;
+        ask-danger = danger;
+        ask-answered = false;
+        dialog.open();
+    }
+    function answer(a: string) {
+        ask-answered = true;
+        dialog.close();
+        ask-result(a);
+    }
+    property <[string]> day-names: ["日", "一", "二", "三", "四", "五", "六"];
+    property <[int]> day-order: [1, 2, 3, 4, 5, 6, 0];
+    OverlayRoot {
+        win-width: root.width;
+        win-height: root.height;
+        keys := FocusScope {
+            focus-on-click: false;
+            // Ctrl+Enter / Ctrl+S save before a box sees them; Esc that nothing took cancels
+            // (popups and the dialog have their own focus, so their Esc stays theirs).
+            capture-key-pressed(e) => {
+                if e.modifiers.control && (e.text == Key.Return || e.text == "s" || e.text == "S" || e.text == "\u{13}") {
+                    root.save();
+                    return accept;
+                }
+                return reject;
+            }
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.cancel();
+                    return accept;
+                }
+                return reject;
+            }
+            VerticalLayout {
+                if root.missing: Rectangle {
+                    vertical-stretch: 1;
+                    Text {
+                        text: "这个任务已被删除。";
+                        color: Theme.c.text-secondary;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                // (always there: the window's functions reach the title box)
+                body := Flickable {
+                    visible: !root.missing;
+                    vertical-stretch: root.missing ? 0 : 1;
+                    min-height: 0;
+                    max-height: root.missing ? 0 : 100000px;
+                    content-height: page.preferred-height;
+                    content-width: self.width;
+                    page := VerticalLayout {
+                        width: body.width;
+                        padding-top: 20px;
+                        padding-bottom: 16px;
+                        padding-left: 24px;
+                        padding-right: 24px;
+                        spacing: 12px;
+                        alignment: start;
+                        // .error: margin -6px 2px 0 under the title
+                        VerticalLayout {
+                            spacing: 6px;
+                            title-box := TextBox {
+                                text <=> root.title-text;
+                                placeholder: "任务名称";
+                                text-size: 20px;
+                                text-weight: 600;
+                                box-height: 32px;
+                                edited(t) => { root.edit("title", t); }
+                                accepted => { root.save(); }
+                            }
+                            if root.title-error && Fluent.trim(root.title-text) == "": HorizontalLayout {
+                                padding-left: 2px;
+                                Text {
+                                    height: 20px;
+                                    text: "请输入任务名称";
+                                    font-size: 12px;
+                                    color: Theme.c.critical;
+                                    vertical-alignment: center;
+                                    accessible-role: text;
+                                }
+                            }
+                        }
+                        Card {
+                            Row {
+                                label: "日期";
+                                dr := Rectangle {
+                                // the hint stays on the dates' line when it fits (flex-wrap):
+                                // the pickers, "至" and the gaps are fixed widths
+                                property <length> room: body.width - 48px - 34px - 84px;
+                                property <length> dates-w: root.data.milestone ? 150px : 150px + 8px + 12px + 8px + 150px;
+                                property <bool> inline: self.dates-w + 8px + hint-w.preferred-width <= self.room;
+                                hint-w := Text {
+                                    visible: false;
+                                    width: 0;
+                                    height: 0;
+                                    text: root.data.span;
+                                    font-size: 12px;
+                                }
+                                VerticalLayout {
+                                    spacing: 8px;
+                                    dates := HorizontalLayout {
+                                        spacing: 8px;
+                                        alignment: start;
+                                        cross-axis-alignment: center;
+                                        DatePicker {
+                                            width: 150px;
+                                            value: root.data.start;
+                                            lunar: true;
+                                            markers: true;
+                                            changed-value(v) => { root.edit("start", v); }
+                                        }
+                                        if !root.data.milestone: Text {
+                                            height: 33px;
+                                            text: "至";
+                                            font-size: 12px;
+                                            color: Theme.c.text-secondary;
+                                            vertical-alignment: center;
+                                        }
+                                        if !root.data.milestone: DatePicker {
+                                            width: 150px;
+                                            value: root.data.end;
+                                            lunar: true;
+                                            markers: true;
+                                            changed-value(v) => { root.edit("end", v); }
+                                        }
+                                        if dr.inline: Text {
+                                            height: 33px;
+                                            text: root.data.span;
+                                            font-size: 12px;
+                                            color: Theme.c.text-secondary;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    if !dr.inline: Text {
+                                        height: 20px;
+                                        text: root.data.span;
+                                        font-size: 12px;
+                                        color: Theme.c.text-secondary;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                }
+                            }
+                            Row {
+                                label: "时间";
+                                Checkbox {
+                                    text: "全天";
+                                    checked: root.data.all-day;
+                                    toggled(v) => { root.edit("all-day", v ? "1" : "0"); }
+                                }
+                                if !root.data.all-day: TimePicker {
+                                    width: 110px;
+                                    value: root.data.time;
+                                    changed-value(v) => { root.edit("time", v); }
+                                }
+                            }
+                            TopRow {
+                                label: "重复";
+                                VerticalLayout {
+                                    spacing: 8px;
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        alignment: start;
+                                        cross-axis-alignment: center;
+                                        Select {
+                                            width: 200px;
+                                            options: root.freqs;
+                                            value: root.data.freq;
+                                            selected(v) => { root.edit("freq", v); }
+                                        }
+                                        if root.data.unit != "": Text { text: "每"; vertical-alignment: center; }
+                                        if root.data.unit != "": NumberBox {
+                                            width: 100px;
+                                            value: root.data.interval;
+                                            minimum: 1;
+                                            maximum: 99;
+                                            changed-value(v) => { root.edit("interval", v); }
+                                        }
+                                        if root.data.unit != "": Text { text: root.data.unit; vertical-alignment: center; }
+                                    }
+                                    if root.data.weekly: HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: start;
+                                        accessible-role: groupbox;
+                                        accessible-label: "重复的星期";
+                                        for d in root.day-order: DayButton {
+                                            label: root.day-names[d];
+                                            on: root.data.days[d];
+                                            toggled => { root.toggle-day(d); }
+                                        }
+                                    }
+                                    if root.data.monthly: RadioGroup {
+                                        horizontal: true;
+                                        options: root.month-modes;
+                                        value: root.data.month-mode;
+                                        selected(v) => { root.edit("month-mode", v); }
+                                    }
+                                    if root.data.has-end: HorizontalLayout {
+                                        spacing: 8px;
+                                        alignment: start;
+                                        cross-axis-alignment: center;
+                                        Select {
+                                            width: 140px;
+                                            options: [
+                                                { value: "never", label: "永不结束" },
+                                                { value: "count", label: "重复次数" },
+                                                { value: "until", label: "截止日期" },
+                                            ];
+                                            value: root.data.end-mode;
+                                            selected(v) => { root.edit("end-mode", v); }
+                                        }
+                                        if root.data.end-mode == "count": NumberBox {
+                                            width: 96px;
+                                            value: root.data.count;
+                                            minimum: 1;
+                                            maximum: 999;
+                                            suffix: "次";
+                                            changed-value(v) => { root.edit("count", v); }
+                                        }
+                                        if root.data.end-mode == "until": DatePicker {
+                                            width: 150px;
+                                            value: root.data.until;
+                                            changed-value(v) => { root.edit("until", v); }
+                                        }
+                                    }
+                                    if root.data.freq != "": Text {
+                                        height: 20px;
+                                        text: root.data.summary;
+                                        font-size: 12px;
+                                        color: Theme.c.text-secondary;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                            TopRow {
+                                label: "提醒";
+                                last: true;
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    for r[i] in root.reminders: HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        cross-axis-alignment: center;
+                                        Select {
+                                            width: 200px;
+                                            options: root.reminder-options;
+                                            value: r;
+                                            selected(v) => { root.reminder-set(i, v); }
+                                        }
+                                        Button {
+                                            variant: ButtonVariant.subtle;
+                                            size: ButtonSize.icon;
+                                            icon: Glyph.close;
+                                            tip: "删除提醒";
+                                            clicked => { root.reminder-remove(i); }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        cross-axis-alignment: center;
+                                        Button {
+                                            variant: ButtonVariant.subtle;
+                                            icon: Glyph.add;
+                                            text: "添加提醒";
+                                            enabled: root.data.reminder-count < 5;
+                                            clicked => { root.reminder-add(); }
+                                        }
+                                        if root.data.reminder-hint != "": Text {
+                                            text: root.data.reminder-hint;
+                                            font-size: 12px;
+                                            color: Theme.c.text-secondary;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Card {
+                            Row {
+                                label: "分组";
+                                wide: true;
+                                FlexboxLayout {
+                                    spacing: 8px;
+                                    cross-axis-alignment: center;
+                                    Select {
+                                        width: 200px;
+                                        options: root.groups;
+                                        value: root.data.group;
+                                        selected(v) => {
+                                            if v == "__new__" {
+                                                root.new-group-open = true;
+                                            } else {
+                                                root.edit("group", v);
+                                            }
+                                        }
+                                    }
+                                    if root.new-group-open: TextBox {
+                                        width: 150px;
+                                        text <=> root.new-group-name;
+                                        placeholder: "分组名称";
+                                        accepted => { root.create-group(root.new-group-name); }
+                                        escape => { root.new-group-open = false; }
+                                    }
+                                    if root.new-group-open: Button {
+                                        size: ButtonSize.small;
+                                        variant: ButtonVariant.accent;
+                                        text: "创建";
+                                        clicked => { root.create-group(root.new-group-name); }
+                                    }
+                                }
+                            }
+                            Row {
+                                label: "颜色";
+                                wide: true;
+                                ColorSwatches {
+                                    colors: root.colors;
+                                    value: root.data.color;
+                                    allow-none: true;
+                                    custom: true;
+                                    size: 22px;
+                                    custom-value: Fluent.custom-value(root.data.color, root.colors);
+                                    custom-color: Fluent.hex-color(self.custom-value);
+                                    custom-fg: Fluent.text-on(self.custom-value);
+                                    picked(k) => { root.edit("color", k); }
+                                }
+                            }
+                            if root.data.show-progress: Row {
+                                label: "进度";
+                                if !root.data.milestone: Slider {
+                                    track-width: 180px;
+                                    minimum: 0;
+                                    maximum: 100;
+                                    step: 5;
+                                    value: root.data.progress;
+                                    show-value: true;
+                                    suffix: "%";
+                                    moved(v) => { root.edit("progress", v); }
+                                    committed(v) => { root.edit("progress-done", v); }
+                                }
+                                Checkbox {
+                                    text: "已完成";
+                                    checked: root.data.done;
+                                    toggled(v) => { root.edit("done", v ? "1" : "0"); }
+                                }
+                            }
+                            Row {
+                                label: "里程碑";
+                                Checkbox {
+                                    text: "在甘特图中显示为菱形";
+                                    checked: root.data.milestone;
+                                    toggled(v) => { root.edit("milestone", v ? "1" : "0"); }
+                                }
+                            }
+                            TopRow {
+                                label: "前置任务";
+                                FlexboxLayout {
+                                    spacing: 6px;
+                                    cross-axis-alignment: center;
+                                    for t in root.deps: DepTagView {
+                                        title: t.title;
+                                        dot: t.dot;
+                                        remove => { root.dep-remove(t.id); }
+                                    }
+                                    Select {
+                                        width: 220px;
+                                        options: root.dep-options;
+                                        value: "";
+                                        placeholder: "添加前置任务…";
+                                        enabled: root.dep-options.length > 0;
+                                        selected(v) => { root.dep-add(v); }
+                                    }
+                                }
+                            }
+                            Row {
+                                label: "倒数日";
+                                last: !root.data.show-postpone;
+                                Checkbox {
+                                    text: "在日历底部显示“距离这一天还有 N 天”";
+                                    checked: root.data.countdown;
+                                    toggled(v) => { root.edit("countdown", v ? "1" : "0"); }
+                                }
+                            }
+                            if root.data.show-postpone: Row {
+                                label: "顺延";
+                                last: true;
+                                Checkbox {
+                                    text: "未完成时自动顺延到今天";
+                                    checked: root.data.postpone;
+                                    toggled(v) => { root.edit("postpone", v ? "1" : "0"); }
+                                }
+                            }
+                        }
+                        Card {
+                            pad-y: 12px;
+                            pad-x: 12px;
+                            TextBox {
+                                text <=> root.notes-text;
+                                multiline: true;
+                                rows: 4;
+                                placeholder: "备注";
+                                edited(t) => { root.edit("notes", t); }
+                            }
+                        }
+                    }
+                }
+                // .footer: 16px 24px, solid-base, a divider above
+                if !root.missing: Rectangle {
+                    height: 66px;
+                    background: Theme.c.solid-base;
+                    Rectangle { y: 0; height: 1px; background: Theme.c.card-stroke; }
+                    HorizontalLayout {
+                        padding-top: 17px;
+                        padding-bottom: 16px;
+                        padding-left: 24px;
+                        padding-right: 24px;
+                        spacing: 8px;
+                        cross-axis-alignment: center;
+                        if !root.is-new: Button {
+                            variant: ButtonVariant.subtle;
+                            icon: Glyph.delete;
+                            text: "删除";
+                            color-override: Theme.c.critical;
+                            clicked => { root.remove(); }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Button {
+                            width: 96px;
+                            text: "取消";
+                            clicked => { root.cancel(); }
+                        }
+                        Button {
+                            width: 96px;
+                            variant: ButtonVariant.accent;
+                            text: root.is-new ? "创建" : "保存";
+                            enabled: Fluent.trim(root.title-text) != "";
+                            clicked => { root.save(); }
+                        }
+                    }
+                }
+            }
+        }
+        // 0.2's confirm(): Enter = the primary button, Esc / 取消 = close
+        dialog := DialogHost {
+            title: root.ask-title;
+            primary => { root.answer("primary"); }
+            closed => {
+                if !root.ask-answered {
+                    root.ask-answered = true;
+                    root.ask-result("close");
+                }
+            }
+            DialogBody {
+                title: root.ask-title;
+                if root.ask-text != "": Text {
+                    text: root.ask-text;
+                    wrap: word-wrap;
+                    color: Theme.c.text-primary;
+                }
+            }
+            DialogFooter {
+                primary-text: root.ask-primary;
+                secondary-text: root.ask-secondary;
+                close-text: root.ask-close;
+                danger: root.ask-danger;
+                primary => { root.answer("primary"); }
+                secondary => { root.answer("secondary"); }
+                close => { root.answer("close"); }
+            }
+        }
+        TipLayer { }
+    }
+}

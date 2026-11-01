@@ -141,6 +141,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         day: today,
         web: Default::default(),
         reminder_win: None,
+        editor: None,
     })
 }
 
