@@ -107,7 +107,8 @@ Windows 上 Rust 默认用 MSVC 工具链，需要 Visual Studio Build Tools（�
 
 ### 原生版（native/，开发中）
 
-0.3 起改为 Rust 原生界面（[Slint](https://slint.dev)，软件渲染），不再需要 WebView2：空闲内存约 10 MB（0.2 约 104 MB）。
+0.3 起改为 Rust 原生界面（[Slint](https://slint.dev)，软件渲染），不再需要 WebView2。发布版实测（2026-11-01）：空闲内存（专用工作集）
+10.0 MB（0.2 约 104 MB），17 个线程，空闲 CPU 测不出来，日历 0.15 秒出现；程序 17.5 MB。
 0.2 的 Tauri 版保留在仓库中，原生版功能齐全前仍以它为准。原生版同样用 GNU 工具链，把 `src-tauri/.cargo/config.toml`
 复制到 `native/.cargo/config.toml`（改一个构建目录）。
 
