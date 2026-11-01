@@ -19,7 +19,8 @@ export component GTableRow inherits Rectangle {
         : add ? transparent
         : ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
     accessible-role: list-item;
-    accessible-label: r.name;
+    // the add row: named by its button (0.2's listitem holds "添加任务")
+    accessible-label: add ? "添加任务" : r.name;
     accessible-item-selected: sel;
     ta := TouchArea {
         clicked => { if group { GanttData.row-chevron(r); } else if task { GanttData.row-click(r); } }

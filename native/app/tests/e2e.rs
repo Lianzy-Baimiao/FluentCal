@@ -252,7 +252,8 @@ fn gantt_drag_add_link_zoom() {
     assert_eq!(t.task("开发")["deps"], json!(["a"]));
     // "添加任务" in the group: a new task, renamed inline.
     let before = t.tasks().len();
-    t.click_at(t.at(&t.find("添加任务"), 10.0, 10.0));
+    let add = ElementHandle::find_by_accessible_label(&t.w, "添加任务").find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button)).expect("the add button");
+    t.click_at(t.at(&add, 10.0, 10.0));
     assert_eq!(t.tasks().len(), before + 1);
     assert!(t.tasks().iter().any(|x| x["title"] == "新任务" && x["groupId"] == "g"));
     // Zoom out keeps the date at the centre (0.2's e2e: within a few days).
@@ -279,22 +280,38 @@ fn gantt_export_png_and_svg() {
     drop(t);
 }
 
-/// What a screen reader gets (0.2's a11y.mjs ran axe): every control has a name.
+/// What a screen reader gets (0.2's a11y.mjs ran axe on the desk and the Gantt view): every
+/// control has a name, in both views and in the open menu and "+N" list.
 #[test]
 fn every_control_has_a_name() {
     let today = fluentcal_core::date::today();
-    let t = start("a11y", Some(doc_with(&[json!({ "title": "体检", "start": today, "time": "09:00" })], json!({}))));
+    let tasks: Vec<Value> = (0..6).map(|i| json!({ "title": format!("体检{i}"), "start": today, "time": "09:00", "groupId": "g" })).collect();
+    let mut doc = doc_with(&tasks, json!({}));
+    doc["groups"] = json!({ "g": { "id": "g", "name": "项目", "color": "blue", "order": 1 } });
+    let t = start("a11y", Some(doc));
     use i_slint_backend_testing::AccessibleRole as R;
-    let unnamed: Vec<String> = t
-        .w
-        .root_element()
-        .query_descendants()
-        .match_predicate(|e| matches!(e.accessible_role(), Some(R::Button | R::Checkbox | R::Tab | R::ListItem | R::TextInput | R::Switch)) && e.accessible_label().is_none_or(|l| l.trim().is_empty()))
-        .find_all()
-        .iter()
-        .map(|e| format!("{:?} {:?}", e.accessible_role(), e.id()))
-        .collect();
-    assert!(unnamed.is_empty(), "unnamed controls: {unnamed:?}");
+    let unnamed = |t: &T| -> Vec<String> {
+        t.w.root_element()
+            .query_descendants()
+            .match_predicate(|e| matches!(e.accessible_role(), Some(R::Button | R::Checkbox | R::Tab | R::ListItem | R::TextInput | R::Switch | R::RadioButton)) && e.accessible_label().is_none_or(|l| l.trim().is_empty()))
+            .find_all()
+            .iter()
+            .map(|e| format!("{:?} {:?}", e.accessible_role(), e.id()))
+            .collect()
+    };
+    assert!(unnamed(&t).is_empty(), "month view: {:?}", unnamed(&t));
+    // The chip menu (icons, swatches) and the day list.
+    let chip = t.find("体检0");
+    t.right_click_at(t.at(&chip, 40.0, chip.size().height / 2.0));
+    assert!(unnamed(&t).is_empty(), "menu: {:?}", unnamed(&t));
+    t.key(&slint::SharedString::from(Key::Escape));
+    t.click(&t.find_prefix("还有 ").accessible_label().unwrap());
+    assert!(unnamed(&t).is_empty(), "day list: {:?}", unnamed(&t));
+    t.key(&slint::SharedString::from(Key::Escape));
+    with(|a| a.desk_close_popups()).unwrap();
+    with(|a| a.desk_set_view("gantt")).unwrap();
+    settle();
+    assert!(unnamed(&t).is_empty(), "Gantt view: {:?}", unnamed(&t));
 }
 
 /// 0.2's "delete via context menu, then undo"; day colour; group order (the menus' actions).

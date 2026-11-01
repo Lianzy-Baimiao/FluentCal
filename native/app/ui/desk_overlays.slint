@@ -24,6 +24,8 @@ component AddBox inherits Rectangle {
     accessible-role: text-input;
     accessible-label: "添加任务";
     accessible-value: root.text;
+    accessible-placeholder-text: "添加任务，回车保存";
+    forward-focus: input;
     // the bottom border: control-strong-stroke, 2px accent when focused
     Rectangle {
         y: parent.height - (root.active ? 2px : 1px);
@@ -49,6 +51,8 @@ component AddBox inherits Rectangle {
         selection-foreground-color: Theme.c.text-on-accent;
         vertical-alignment: center;
         single-line: true;
+        // the box is the text field for screen readers
+        accessible-role: none;
         changed has-focus => {
             if self.has-focus {
                 root.focused();
