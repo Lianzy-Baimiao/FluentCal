@@ -44,6 +44,8 @@ pub struct GanttUi {
     /// Scroll so this date is at this fraction of the chart, once the view has a size.
     pub center: Option<(String, f64)>,
     pub label: String,
+    /// A smooth scroll under way (0.2: scrollTo behavior 'smooth'): its steps.
+    pub glide: slint::Timer,
 }
 
 fn rc<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
@@ -183,8 +185,44 @@ impl App {
 
     /// Scrolls so `date` is at `frac` of the chart (0.2's scrollToDate).
     pub fn gantt_scroll_to(&mut self, date: &str, frac: f64) {
+        self.desk.gantt.glide.stop();
         self.desk.gantt.center = Some((date.to_owned(), frac));
         self.gantt_scrolled();
+    }
+
+    /// The same, gliding there (0.2's smooth scroll for 今天 and revealing a task): about 300 ms,
+    /// ease in-out; a scroll by the user meanwhile ends it. At once when motion is reduced.
+    pub fn gantt_glide_to(&mut self, date: &str, frac: f64) {
+        let w = f64::from(self.desk.window.get_gantt_view_w());
+        let Some(m) = self.desk.gantt.model.as_ref().filter(|_| w > 0.0 && !self.doc.settings.theme.reduce_motion) else {
+            return self.gantt_scroll_to(date, frac);
+        };
+        let to = -((fluentcal_core::date::diff_days(&m.range.0, date) as f64 * m.dw - w * frac).min(m.chart_w - w).max(0.0)) as f32;
+        let gd = slint::ComponentHandle::global::<crate::GanttData>(&self.desk.window);
+        let from = gd.get_scroll_x();
+        if (to - from).abs() < 1.0 {
+            return;
+        }
+        let start = std::time::Instant::now();
+        let last = std::rc::Rc::new(std::cell::Cell::new(from));
+        self.desk.gantt.glide.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(16), move || {
+            let last = last.clone();
+            crate::app::run(move |app| {
+                let gd = slint::ComponentHandle::global::<crate::GanttData>(&app.desk.window);
+                if (gd.get_scroll_x() - last.get()).abs() > 0.5 {
+                    return app.desk.gantt.glide.stop(); // the user scrolled
+                }
+                let t = (start.elapsed().as_secs_f32() / 0.3).min(1.0);
+                let e = if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 };
+                let x = from + (to - from) * e;
+                gd.set_scroll_x(x);
+                last.set(x);
+                app.gantt_scrolled();
+                if t >= 1.0 {
+                    app.desk.gantt.glide.stop();
+                }
+            });
+        });
     }
 
     pub fn gantt_scrolled(&mut self) {

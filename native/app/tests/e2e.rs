@@ -481,6 +481,25 @@ fn flash_and_toast_animations() {
     assert!(!t.has("测试提示"), "gone after the fade");
 }
 
+/// The Gantt view's 今天 glides there (0.2: scrollTo with behavior 'smooth').
+#[test]
+fn gantt_today_glides() {
+    let today = fluentcal_core::date::today();
+    let t = start("glide", Some(doc_with(&[json!({ "title": "长任务", "start": today, "end": fluentcal_core::date::add_days(&today, 3) })], json!({ "calendar": { "view": "gantt" } }))));
+    let gd = || slint::ComponentHandle::global::<fluentcal_app::GanttData>(&t.w).get_scroll_x();
+    with(|a| a.gantt_scroll_to(&fluentcal_core::date::add_days(&today, -200), 0.3)).unwrap();
+    settle();
+    let far = gd();
+    with(|a| a.gantt_go_today()).unwrap();
+    wait(90);
+    let mid = gd();
+    wait(400);
+    settle();
+    let end = gd();
+    assert!(mid != far && mid != end, "moving: {far} → {mid} → {end}");
+    assert_eq!(with(|a| a.gantt_date_at(0.3)).unwrap(), today, "ends with today at 30%");
+}
+
 /// "+N": the day's tasks in a flyout; adding one there.
 #[test]
 fn day_list_lists_and_adds() {

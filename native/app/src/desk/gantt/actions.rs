@@ -32,7 +32,7 @@ impl App {
 
     pub fn gantt_go_today(&mut self) {
         let today = self.today();
-        self.gantt_scroll_to(&today, 0.3);
+        self.gantt_glide_to(&today, 0.3);
     }
 
     pub fn gantt_select(&mut self, id: &str) {
@@ -47,7 +47,7 @@ impl App {
         let sx = -f64::from(self.gd().get_scroll_x());
         let w = f64::from(self.desk.window.get_gantt_view_w());
         if x < sx || x > sx + w - 40.0 {
-            self.gantt_scroll_to(date, 0.2);
+            self.gantt_glide_to(date, 0.2);
         }
     }
 
