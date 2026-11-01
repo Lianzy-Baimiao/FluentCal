@@ -99,7 +99,14 @@ export component EditorWindow inherits Window {
     property <string> ask-close;
     property <bool> ask-danger;
     property <bool> ask-answered;
-    public function focus-title() { title-box.focus-input(); }
+    // The title box; with the task gone, the window's keys (Esc still closes, as in 0.2).
+    public function focus-title() {
+        if missing {
+            keys.focus();
+        } else {
+            title-box.focus-input();
+        }
+    }
     public function ask(title: string, text: string, primary: string, secondary: string, close: string, danger: bool) {
         ask-title = title;
         ask-text = text;

@@ -257,3 +257,26 @@ fn predecessor_tags_and_repeat_days() {
     t.ctrl(&w, "s");
     assert_eq!(t.task("a").unwrap()["repeat"]["weekdays"], json!([1, 5]));
 }
+
+#[test]
+fn a_task_deleted_elsewhere() {
+    let t = start("gone", &[json!({ "id": "a", "title": "周报", "start": "2026-10-14" })]);
+    // opened on a task that no longer exists: the message, no buttons
+    let w = t.open(|a| a.open_editor_task("nope", None));
+    assert!(w.get_missing());
+    assert!(t.find(&w, "这个任务已被删除。").accessible_label().is_some());
+    t.key(&w, &slint::SharedString::from(Key::Escape));
+    assert!(t.editor().is_none());
+    // deleted while being edited: saving asks to create it again
+    let w = t.open(|a| a.open_editor_task("a", None));
+    t.type_text(&w, "初稿");
+    run(|a| {
+        let edit = fluentcal_core::tasks::delete_task(&a.doc, "a", 5);
+        a.apply(edit, true);
+    });
+    settle();
+    t.ctrl(&w, "s");
+    t.click(&w, &t.find(&w, "重新创建"));
+    assert!(t.editor().is_none());
+    assert_eq!(t.task("a").unwrap()["title"], "周报初稿");
+}
