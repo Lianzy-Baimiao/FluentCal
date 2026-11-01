@@ -1,7 +1,8 @@
 // Fluent controls (0.2's src/fluent/*.vue), drawn by hand to match their CSS.
 
 import { Theme } from "theme.slint";
-import { Icon } from "icons.slint";
+import { Icon, AnyIcon } from "icons.slint";
+import { Overlay, Tip, FocusRing } from "overlay.slint";
 
 // Text with the desk calendar's halo (the CSS `text-shadow: var(--text-glow)`): offset copies in
 // the halo colour behind the text, drawn only while the calendar is see-through.
@@ -69,10 +70,10 @@ export component ElevBorder inherits Rectangle {
     }
 }
 
-export enum ButtonVariant { standard, accent, subtle }
+export enum ButtonVariant { standard, accent, subtle, danger }
 export enum ButtonSize { medium, small, icon }
 
-// 0.2's FButton: an icon and/or a label.
+// 0.2's FButton: an icon and/or a label. `danger` is the dialog's red primary button.
 export component Button inherits Rectangle {
     in property <ButtonVariant> variant: ButtonVariant.standard;
     in property <ButtonSize> size: ButtonSize.medium;
@@ -83,27 +84,47 @@ export component Button inherits Rectangle {
     // Toggle-button state (a selected look).
     in property <bool> pressed-state;
     in property <brush> color-override: transparent;
+    // Tooltip (0.2's title / v-tip) and where it prefers to go.
+    in property <string> tip;
+    in property <bool> tip-bottom;
+    in property <int> tip-layer;
+    // Take the focus (with its ring) when created: 0.2's flyouts focus their first button.
+    in property <bool> autofocus;
     callback clicked();
     out property <bool> hovered: ta.has-hover;
+    out property <bool> has-focus: fs.has-focus;
     property <bool> down: ta.pressed && enabled;
     property <bool> hover: ta.has-hover && enabled;
+    property <bool> strong: variant == ButtonVariant.accent || variant == ButtonVariant.danger;
     property <length> line: size == ButtonSize.small ? 16px : 20px;
-    property <brush> fg: !enabled ? Theme.c.text-disabled
+    property <int> tip-token: -1;
+    property <brush> fg: variant == ButtonVariant.danger ? Theme.c.text-inverse
+        : !enabled ? (strong ? Theme.c.text-on-accent-disabled : Theme.c.text-disabled)
         : variant == ButtonVariant.accent ? (down ? Theme.c.text-on-accent-secondary : Theme.c.text-on-accent)
-        : down && variant != ButtonVariant.accent ? Theme.c.text-secondary
+        : down ? Theme.c.text-secondary
         : color-override != transparent ? color-override
         : variant == ButtonVariant.subtle && pressed-state ? Theme.c.accent-text
         : Theme.c.text-primary;
+    forward-focus: fs;
+    init => {
+        if autofocus {
+            fs.focus();
+            Overlay.keyboard = true;
+        }
+    }
     border-radius: Theme.radius-control;
     background: variant == ButtonVariant.standard ? (!enabled ? Theme.c.control-fill-disabled : down ? Theme.c.control-fill-pressed : hover ? Theme.c.control-fill-hover : Theme.c.control-fill)
         : variant == ButtonVariant.accent ? (!enabled ? Theme.c.accent-fill-disabled : down ? Theme.c.accent-fill-pressed : hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
+        // 0.2: .foot .f-btn.danger outranks the accent :active/:disabled rules
+        : variant == ButtonVariant.danger ? (ta.has-hover ? Theme.c.critical.transparentize(0.1) : Theme.c.critical)
         : (down ? Theme.c.subtle-fill-pressed : hover || pressed-state ? Theme.c.subtle-fill-hover : transparent);
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
     width: size == ButtonSize.icon ? 32px : content.preferred-width;
     height: size == ButtonSize.icon ? 32px : content.preferred-height;
     accessible-role: button;
-    accessible-label: text;
+    accessible-label: text != "" ? text : tip;
     accessible-enabled: enabled;
+    accessible-checked: pressed-state;
     accessible-action-default => { clicked(); }
     if variant == ButtonVariant.standard: ElevBorder {
         top: !enabled || down ? Theme.c.control-stroke : Theme.c.elev-top;
@@ -146,10 +167,35 @@ export component Button inherits Rectangle {
             color: root.fg;
         }
     }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
     ta := TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                Tip.leave(root.tip-token);
+                fs.focus();
+            }
+        }
+        changed has-hover => {
+            if self.has-hover {
+                root.tip-token = Tip.enter-on(root.tip-layer, root.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, root.tip-bottom);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
     }
+    FocusRing { show: fs.has-focus && Overlay.keyboard; }
 }
 
 export struct SegOption { value: string, label: string, icon: string, title: string }
@@ -160,6 +206,7 @@ export component Segmented inherits Rectangle {
     in property <string> value;
     in property <bool> small;
     callback selected(string);
+    forward-focus: sfs;
     border-radius: Theme.radius-control;
     background: Theme.c.control-alt-fill;
     border-width: 1px;
@@ -188,7 +235,7 @@ export component Segmented inherits Rectangle {
                 padding-right: self.padding-left;
                 spacing: 6px;
                 cross-axis-alignment: center;
-                if o.icon != "": Icon {
+                if o.icon != "": AnyIcon {
                     glyph: o.icon;
                     size: root.small ? 14px : 16px;
                     color: on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
@@ -208,9 +255,48 @@ export component Segmented inherits Rectangle {
                 border-radius: 2px;
                 background: Theme.c.accent-fill;
             }
+            property <int> tip-token: -1;
             ita := TouchArea {
                 clicked => { if !on { root.selected(o.value); } }
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        Overlay.keyboard = false;
+                        Tip.leave(item.tip-token);
+                        sfs.focus();
+                    }
+                }
+                changed has-hover => {
+                    if self.has-hover {
+                        item.tip-token = Tip.enter(o.title, item.absolute-position.x, item.absolute-position.y, item.width, item.height, false);
+                    } else {
+                        Tip.leave(item.tip-token);
+                    }
+                }
             }
+            if on && sfs.has-focus && Overlay.keyboard: FocusRing { radius: 3px; }
         }
+    }
+    sfs := FocusScope {
+        width: 0;
+        height: 0;
+        key-pressed(e) => {
+            if e.text == Key.RightArrow || e.text == Key.LeftArrow {
+                let n = root.options.length;
+                let d = e.text == Key.RightArrow ? 1 : -1;
+                let i = root.index-of(root.value);
+                root.selected(root.options[Math.mod(i + d + n, n)].value);
+                return accept;
+            }
+            return reject;
+        }
+    }
+    // (no loops in Slint functions; segmented controls have up to 6 options)
+    pure function index-of(v: string) -> int {
+        return options.length > 0 && options[0].value == v ? 0
+            : options.length > 1 && options[1].value == v ? 1
+            : options.length > 2 && options[2].value == v ? 2
+            : options.length > 3 && options[3].value == v ? 3
+            : options.length > 4 && options[4].value == v ? 4
+            : options.length > 5 && options[5].value == v ? 5 : 0;
     }
 }

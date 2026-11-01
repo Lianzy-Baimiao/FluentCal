@@ -1,0 +1,361 @@
+// Settings cards, info bars, form fields (0.2's FSettingsGroup/Card/Expander/Row, FInfoBar,
+// FField). Slint's named slots are experimental, so a card's control goes in @children and an
+// expander's rows go in a separate SettingsExpanderItems right below its header.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Overlay, FocusRing } from "overlay.slint";
+import { Button, ButtonVariant } from "controls.slint";
+
+// Title and description of a card or row.
+component CardHead inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> enabled: true;
+    alignment: center;
+    Text {
+        text: root.title;
+        color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+        wrap: word-wrap;
+        min-height: 20px;
+        vertical-alignment: center;
+    }
+    if root.description != "": VerticalLayout {
+        padding-top: 1px;
+        Text {
+            text: root.description;
+            font-size: 12px;
+            min-height: 16px;
+            color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// A titled stack of cards; groups after the first keep 28px from the previous one.
+export component SettingsGroup inherits VerticalLayout {
+    in property <string> title;
+    in property <bool> first: true;
+    padding-top: first ? 0 : 28px;
+    spacing: 4px;
+    if root.title != "": HorizontalLayout {
+        padding-left: 1px;
+        padding-bottom: 4px;
+        Text {
+            text: root.title;
+            font-weight: 600;
+            height: 20px;
+            vertical-alignment: center;
+            color: Theme.c.text-primary;
+        }
+    }
+    @children
+}
+
+// A settings card: icon, title and description, the control on the right (@children).
+export component SettingsCard inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> description;
+    in property <bool> clickable;
+    in property <bool> enabled: true;
+    // There is a control in @children (Slint can't tell; the gaps depend on it).
+    in property <bool> has-content: true;
+    callback clicked();
+    border-radius: Theme.radius-control;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    background: clickable && enabled ? (ta.pressed ? Theme.c.control-fill-pressed : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill) : Theme.c.card-fill;
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    min-height: 68px;
+    accessible-role: groupbox;
+    accessible-label: title;
+    accessible-description: description;
+    accessible-enabled: enabled;
+    ta := TouchArea {
+        enabled: root.clickable && root.enabled;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        padding-left: 17px;
+        padding-right: 17px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        cross-axis-alignment: center;
+        if root.icon != "": HorizontalLayout {
+            padding-right: 20px;
+            Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
+        }
+        CardHead {
+            horizontal-stretch: 1;
+            title: root.title;
+            description: root.description;
+            enabled: root.enabled;
+        }
+        HorizontalLayout {
+            padding-left: root.has-content ? 16px : 0;
+            spacing: 8px;
+            alignment: end;
+            cross-axis-alignment: center;
+            horizontal-stretch: 0;
+            @children
+        }
+        if root.clickable: HorizontalLayout {
+            padding-left: 20px;
+            Icon { glyph: Glyph.chevron-right; size: 12px; color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled; }
+        }
+    }
+}
+
+// The header of a settings expander; clicking it (not its control) toggles `expanded`.
+export component SettingsExpander inherits Rectangle {
+    in property <string> icon;
+    in property <string> title;
+    in property <string> description;
+    in property <bool> enabled: true;
+    in property <bool> expanded;
+    in property <bool> has-content: true;
+    callback toggled(bool);
+    property <length> r: Theme.radius-control;
+    border-top-left-radius: r;
+    border-top-right-radius: r;
+    border-bottom-left-radius: expanded ? 0 : r;
+    border-bottom-right-radius: expanded ? 0 : r;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    background: ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill;
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    min-height: 68px;
+    accessible-role: groupbox;
+    accessible-label: title;
+    accessible-expanded: expanded;
+    accessible-expandable: true;
+    accessible-action-expand => { root.toggle(); }
+    function toggle() {
+        if enabled {
+            toggled(!expanded);
+        }
+    }
+    ta := TouchArea {
+        clicked => { root.toggle(); }
+    }
+    HorizontalLayout {
+        padding-left: 17px;
+        padding-right: 9px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        cross-axis-alignment: center;
+        if root.icon != "": HorizontalLayout {
+            padding-right: 20px;
+            Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
+        }
+        CardHead {
+            horizontal-stretch: 1;
+            title: root.title;
+            description: root.description;
+            enabled: root.enabled;
+        }
+        HorizontalLayout {
+            padding-left: root.has-content ? 16px : 0;
+            spacing: 8px;
+            alignment: end;
+            cross-axis-alignment: center;
+            horizontal-stretch: 0;
+            @children
+        }
+        // gap 16px, margin-left -8px
+        Rectangle { width: 8px; }
+        chev := Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: Theme.radius-control;
+            background: root.enabled && cta.pressed ? Theme.c.subtle-fill-pressed : root.enabled && cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            accessible-label: root.title;
+            accessible-expanded: root.expanded;
+            Icon {
+                glyph: root.expanded ? Glyph.chevron-up : Glyph.chevron-down;
+                size: 12px;
+                color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+            }
+            cta := TouchArea {
+                enabled: root.enabled;
+                clicked => { root.toggle(); }
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        Overlay.keyboard = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The rows of an expanded SettingsExpander (put it right after the header, same width).
+export component SettingsExpanderItems inherits Rectangle {
+    in property <bool> expanded;
+    property <float> k: expanded ? 1 : 0;
+    animate k { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+    height: k * (rows.preferred-height + 1px);
+    visible: k > 0;
+    clip: true;
+    Rectangle {
+        y: 0;
+        height: rows.preferred-height + 1px;
+        border-bottom-left-radius: Theme.radius-control;
+        border-bottom-right-radius: Theme.radius-control;
+        border-width: 1px;
+        border-color: Theme.c.card-stroke;
+        background: Theme.c.card-fill-secondary;
+        // no top border: cover it with the fill
+        Rectangle { x: 1px; y: 0; width: parent.width - 2px; height: 1px; background: Theme.c.card-fill-secondary; }
+        rows := VerticalLayout {
+            y: 0;
+            padding-left: 1px;
+            padding-right: 1px;
+            padding-bottom: 1px;
+            @children
+        }
+    }
+}
+
+// A row inside SettingsExpanderItems. `icon-pad`: the expander has an icon (56px indent).
+export component SettingsRow inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> icon-pad: true;
+    // Not the first row: a divider above.
+    in property <bool> divider;
+    min-height: 52px;
+    if root.divider: Rectangle { y: 0; height: 1px; background: Theme.c.card-stroke; }
+    HorizontalLayout {
+        padding-left: root.icon-pad ? 56px : 16px;
+        padding-right: 48px;
+        padding-top: root.divider ? 9px : 8px;
+        padding-bottom: 8px;
+        spacing: 16px;
+        cross-axis-alignment: center;
+        CardHead {
+            horizontal-stretch: 1;
+            title: root.title;
+            description: root.description;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            cross-axis-alignment: center;
+            horizontal-stretch: 0;
+            @children
+        }
+    }
+}
+
+export enum Severity { info, success, warning, error }
+
+// 0.2's FInfoBar. The action (one button) is `action-text`; `closable` shows the × button.
+export component InfoBar inherits Rectangle {
+    in property <Severity> severity: Severity.info;
+    in property <string> title;
+    in property <string> text;
+    in property <bool> closable;
+    in property <string> action-text;
+    in property <bool> action-accent;
+    callback closed();
+    callback action();
+    border-radius: Theme.radius-control;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    background: severity == Severity.success ? Theme.c.success-bg : severity == Severity.warning ? Theme.c.caution-bg
+        : severity == Severity.error ? Theme.c.critical-bg : Theme.c.info-bg;
+    min-height: 48px;
+    accessible-role: groupbox;
+    accessible-label: title;
+    accessible-description: text;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 1px;
+        spacing: 16px;
+        Rectangle {
+            width: 16px;
+            Icon {
+                glyph: Glyph.status-circle;
+                size: 16px;
+                color: root.severity == Severity.success ? Theme.c.success : root.severity == Severity.warning ? Theme.c.caution
+                    : root.severity == Severity.error ? Theme.c.critical : Theme.c.accent-fill;
+            }
+            Icon {
+                glyph: root.severity == Severity.success ? Glyph.status-check : root.severity == Severity.warning ? Glyph.status-exclamation
+                    : root.severity == Severity.error ? Glyph.status-x : Glyph.status-info;
+                size: 16px;
+                color: Theme.c.text-inverse;
+            }
+        }
+        body := HorizontalLayout {
+            horizontal-stretch: 1;
+            padding-top: 13px;
+            padding-bottom: 13px;
+            spacing: 12px;
+            cross-axis-alignment: center;
+            if root.title != "": Text {
+                text: root.title;
+                font-weight: 600;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: root.text;
+                wrap: word-wrap;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+            if root.action-text != "": Button {
+                text: root.action-text;
+                variant: root.action-accent ? ButtonVariant.accent : ButtonVariant.standard;
+                clicked => { root.action(); }
+            }
+        }
+        if root.closable: VerticalLayout {
+            padding-top: 4px;
+            padding-right: 3px;
+            alignment: start;
+            Rectangle {
+                width: 38px;
+                height: 38px;
+                border-radius: Theme.radius-control;
+                background: xta.pressed ? Theme.c.subtle-fill-pressed : xta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: button;
+                accessible-label: "关闭";
+                Icon { glyph: Glyph.close; size: 12px; color: xta.pressed ? Theme.c.text-secondary : Theme.c.text-primary; }
+                xta := TouchArea { clicked => { root.closed(); } }
+            }
+        }
+    }
+}
+
+// 0.2's FField: a label (secondary text, `label-width` wide) and the control(s).
+export component Field inherits HorizontalLayout {
+    in property <string> label;
+    in property <length> label-width: 72px;
+    in property <bool> top;
+    spacing: 12px;
+    min-height: 40px;
+    cross-axis-alignment: top ? CrossAxisAlignment.start : CrossAxisAlignment.center;
+    VerticalLayout {
+        padding-top: root.top ? 6px : 0;
+        width: root.label-width;
+        Text {
+            text: root.label;
+            color: Theme.c.text-secondary;
+            vertical-alignment: center;
+            min-height: 20px;
+        }
+    }
+    HorizontalLayout {
+        horizontal-stretch: 1;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        @children
+    }
+}

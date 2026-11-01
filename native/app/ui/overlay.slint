@@ -1,0 +1,466 @@
+// Popups, tooltips and focus visuals shared by all controls (0.2's src/fluent/placement.ts,
+// tooltip.ts, FFlyout.vue and the :focus-visible ring of base.css).
+//
+// Every window: put `OverlayRoot` around its content (keeps Overlay.win-* and the keyboard
+// state up to date) and `TipLayer {}` as its last child.
+
+import { Theme, BoxShadow } from "theme.slint";
+
+// Where a popup sits relative to its anchor (placement.ts).
+export enum Placement { bottom-start, bottom-end, bottom, top-start, top-end, top, right-start, left-start }
+
+export struct PlacedRect { x: length, y: length, side: string }
+
+// Per-window state (each window has its own copy of a global).
+export global Overlay {
+    in-out property <length> win-w: 800px;
+    in-out property <length> win-h: 600px;
+    // Last input came from the keyboard: focus rings show (CSS :focus-visible).
+    in-out property <bool> keyboard: false;
+
+    // placement.ts `place`: next to the anchor rect (ax, ay, aw, ah) on the preferred side,
+    // flipped when the other side has more room, then shifted to stay 8px inside the window.
+    public pure function place(ax: length, ay: length, aw: length, ah: length, w: length, h: length, p: Placement, offset: length) -> PlacedRect {
+        let margin = 8px;
+        let vertical = p == Placement.bottom-start || p == Placement.bottom-end || p == Placement.bottom
+            || p == Placement.top-start || p == Placement.top-end || p == Placement.top;
+        let want-bottom = p == Placement.bottom-start || p == Placement.bottom-end || p == Placement.bottom;
+        let below = self.win-h - (ay + ah) - offset - margin;
+        let above = ay - offset - margin;
+        let side-v = want-bottom ? (h > below && above > below ? "top" : "bottom") : (h > above && below > above ? "bottom" : "top");
+        let right = self.win-w - (ax + aw) - offset - margin;
+        let left-space = ax - offset - margin;
+        let want-right = p == Placement.right-start;
+        let side-h = want-right ? (w > right && left-space > right ? "left" : "right") : (w > left-space && right > left-space ? "right" : "left");
+        let side = vertical ? side-v : side-h;
+        let x0 = vertical
+            ? (p == Placement.bottom-start || p == Placement.top-start ? ax : p == Placement.bottom-end || p == Placement.top-end ? ax + aw - w : ax + (aw - w) / 2)
+            : (side == "right" ? ax + aw + offset : ax - offset - w);
+        let y0 = vertical ? (side == "bottom" ? ay + ah + offset : ay - offset - h) : ay;
+        return {
+            x: max(margin, min(x0, self.win-w - w - margin)),
+            y: max(margin, min(y0, self.win-h - h - margin)),
+            side: side,
+        };
+    }
+}
+
+// Window content wrapper: tracks the window size and whether the keyboard or the mouse was
+// used last (focus rings only after keyboard use, like :focus-visible).
+export component OverlayRoot inherits FocusScope {
+    in property <length> win-width;
+    in property <length> win-height;
+    focus-on-click: false;
+    init => {
+        Overlay.win-w = win-width;
+        Overlay.win-h = win-height;
+    }
+    changed win-width => { Overlay.win-w = win-width; }
+    changed win-height => { Overlay.win-h = win-height; }
+    capture-key-pressed(e) => {
+        Overlay.keyboard = true;
+        if e.text == Key.Escape {
+            Tip.hide();
+        }
+        return reject;
+    }
+    @children
+}
+
+// The focus visual of 0.2's base.css: 2px outline (offset 1px) over a 1px inner ring, outside
+// the control's border box. Place it last inside the control, same geometry as the control.
+export component FocusRing {
+    in property <bool> show;
+    in property <length> radius: Theme.radius-control;
+    visible: show;
+    // box-shadow: 0 0 0 1px inner, right outside the border
+    Rectangle {
+        x: -1px;
+        y: -1px;
+        width: root.width + 2px;
+        height: root.height + 2px;
+        border-radius: root.radius > 0 ? root.radius + 1px : 0;
+        border-width: 1px;
+        border-color: Theme.c.focus-inner;
+    }
+    // outline: 2px, offset 1px
+    Rectangle {
+        x: -3px;
+        y: -3px;
+        width: root.width + 6px;
+        height: root.height + 6px;
+        border-radius: root.radius > 0 ? root.radius + 3px : 0;
+        border-width: 2px;
+        border-color: Theme.c.focus-outer;
+    }
+}
+
+// The shared tooltip (tooltip.ts): targets call Tip.enter() when the pointer comes in and
+// Tip.leave() when it goes or presses; the window's TipLayer shows it after 600 ms, at once
+// when another tip was visible within the last 400 ms.
+export global Tip {
+    out property <string> text;
+    // Anchor rect in window coordinates.
+    out property <length> ax;
+    out property <length> ay;
+    out property <length> aw;
+    out property <length> ah;
+    out property <bool> prefer-bottom;
+    // 0 = the window's layer, 1 = a popup's (a popup draws over the window's layer).
+    out property <int> layer;
+    // Waiting for the delay / showing.
+    out property <bool> pending;
+    out property <bool> shown;
+    out property <bool> warm;
+    out property <int> token;
+    in-out property <duration> last-hide;
+    public function enter(text: string, x: length, y: length, w: length, h: length, bottom: bool) -> int {
+        return self.enter-on(0, text, x, y, w, h, bottom);
+    }
+    public function enter-on(layer: int, text: string, x: length, y: length, w: length, h: length, bottom: bool) -> int {
+        if text == "" {
+            return -1;
+        }
+        self.warm = self.shown || animation-tick() - self.last-hide < 400ms;
+        self.token += 1;
+        self.text = text;
+        self.ax = x;
+        self.ay = y;
+        self.aw = w;
+        self.ah = h;
+        self.prefer-bottom = bottom;
+        self.layer = layer;
+        self.shown = false;
+        self.pending = true;
+        return self.token;
+    }
+    public function leave(t: int) {
+        if t == self.token {
+            self.hide();
+        }
+    }
+    public function hide() {
+        if self.shown {
+            self.last-hide = animation-tick();
+        }
+        self.pending = false;
+        self.shown = false;
+    }
+    public function reveal() {
+        if self.pending {
+            self.pending = false;
+            self.shown = true;
+        }
+    }
+}
+
+// Draws the tooltip; put it last in the window (layer 0; it also runs the delay) and inside
+// popups (layer 1).
+export component TipLayer {
+    in property <int> layer;
+    property <length> max-text: 320px - 18px;
+    property <length> tw: min(measure.preferred-width, max-text);
+    property <length> w: tw + 18px;
+    property <length> h: wrapped.preferred-height + 13px;
+    property <bool> top-fits: Tip.ay - h - 8px >= 4px;
+    property <bool> bottom-fits: Tip.ay + Tip.ah + h + 8px <= Overlay.win-h - 4px;
+    property <bool> on-top: Tip.prefer-bottom ? !bottom-fits : top-fits;
+    property <length> left: max(4px, min(Tip.ax + Tip.aw / 2 - w / 2, Overlay.win-w - w - 4px));
+    property <length> top: max(4px, min(on-top ? Tip.ay - h - 8px : Tip.ay + Tip.ah + 8px, Overlay.win-h - h - 4px));
+    property <bool> active: Tip.shown && Tip.layer == root.layer;
+    x: 0;
+    y: 0;
+    width: Overlay.win-w;
+    height: Overlay.win-h;
+    timer := Timer {
+        running: Tip.pending && root.layer == 0;
+        interval: Tip.warm ? 1ms : 600ms;
+        triggered => { Tip.reveal(); }
+    }
+    measure := Text {
+        visible: false;
+        text: Tip.text;
+        font-size: 12px;
+    }
+    wrapped := Text {
+        visible: false;
+        width: root.tw;
+        text: Tip.text;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+    if active: Rectangle {
+        x: left;
+        y: top;
+        width: w;
+        height: h;
+        BoxShadow {
+            width: parent.width;
+            height: parent.height;
+            shadow: Theme.shadow-tooltip;
+        }
+        Rectangle {
+            border-radius: 4px;
+            background: Theme.c.tooltip-fill;
+            border-width: 1px;
+            border-color: Theme.c.surface-stroke-flyout;
+        }
+        Text {
+            x: 9px;
+            y: 6px;
+            width: tw;
+            text: Tip.text;
+            font-size: 12px;
+            color: Theme.c.text-primary;
+            wrap: word-wrap;
+            accessible-role: none;
+        }
+    }
+}
+
+// Wraps a TouchArea-less element: shows `text` as its tooltip. Put it inside the element
+// (same geometry) before the element's own TouchArea, or use Tip.enter/leave from that TouchArea.
+export component TipArea inherits TouchArea {
+    in property <string> tip;
+    in property <bool> bottom;
+    in property <int> layer;
+    property <int> t: -1;
+    changed has-hover => {
+        if self.has-hover {
+            t = Tip.enter-on(layer, tip, self.absolute-position.x, self.absolute-position.y, self.width, self.height, bottom);
+        } else {
+            Tip.leave(t);
+        }
+    }
+    pointer-event(e) => {
+        if e.kind == PointerEventKind.down {
+            Tip.leave(t);
+        }
+    }
+}
+
+// 0.2's FFlyout: a panel next to an anchor rect (window coordinates), flipped/shifted to stay in
+// the window, light-dismissed by a press outside it or Esc. Popups render inside the window
+// (winit), so the popup covers the whole window and draws the panel at the placed position;
+// the dismissing press is consumed (like a WinUI flyout). Place it outside layouts.
+//
+//   fly := Flyout { Text { text: "…"; } }
+//   … fly.open-at(x, y, w, h) / fly.close()
+export component Flyout {
+    in property <Placement> placement: Placement.bottom-start;
+    in property <length> offset: 4px;
+    // Fixed panel width; 0 = the content's width, at least `min-panel-width`.
+    in property <length> panel-width: 0;
+    in property <length> min-panel-width: 0;
+    // 16px padding (0.2's .pad) or none.
+    in property <bool> padded: true;
+    in property <string> label;
+    out property <bool> is-open;
+    out property <length> anchor-x;
+    out property <length> anchor-y;
+    out property <length> anchor-w;
+    out property <length> anchor-h;
+    callback closed();
+    // Keys inside the flyout that the content didn't take (Esc is handled here).
+    callback key(KeyEvent) -> EventResult;
+    width: 0;
+    height: 0;
+    public function open-at(x: length, y: length, w: length, h: length) {
+        anchor-x = x;
+        anchor-y = y;
+        anchor-w = w;
+        anchor-h = h;
+        is-open = true;
+        popup.show();
+    }
+    public function close() {
+        if is-open {
+            is-open = false;
+            popup.close();
+            Tip.hide();
+            closed();
+        }
+    }
+    popup := PopupWindow {
+        x: -root.absolute-position.x;
+        y: -root.absolute-position.y;
+        width: Overlay.win-w;
+        height: Overlay.win-h;
+        close-policy: no-auto-close;
+        forward-focus: fs;
+        fs := FocusScope {
+            width: 100%;
+            height: 100%;
+            init => { self.focus(); }
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.close();
+                    return accept;
+                }
+                return root.key(e);
+            }
+            TouchArea {
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        root.close();
+                    }
+                }
+            }
+            panel := Rectangle {
+                property <length> pw: root.panel-width > 0 ? root.panel-width : max(root.min-panel-width, content.preferred-width);
+                property <length> w: min(pw, Overlay.win-w - 16px);
+                property <length> h: min(content.preferred-height, Overlay.win-h - 16px);
+                property <PlacedRect> at: Overlay.place(root.anchor-x, root.anchor-y, root.anchor-w, root.anchor-h, w, h, root.placement, root.offset);
+                // fly-in: opacity over dur-normal, 8px slide over dur-slow
+                property <float> fade: 0;
+                property <float> slide: 0;
+                init => {
+                    fade = 1;
+                    slide = 1;
+                }
+                animate fade { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+                animate slide { duration: Theme.dur-slow; easing: cubic-bezier(0, 0, 0, 1); }
+                x: at.x + (1 - slide) * (at.side == "right" ? -8px : at.side == "left" ? 8px : 0);
+                y: at.y + (1 - slide) * (at.side == "bottom" ? -8px : at.side == "top" ? 8px : 0);
+                width: w;
+                height: h;
+                opacity: fade;
+                accessible-role: groupbox;
+                accessible-label: root.label;
+                BoxShadow {
+                    width: parent.width;
+                    height: parent.height;
+                    shadow: Theme.shadow-flyout;
+                }
+                Rectangle {
+                    border-radius: Theme.radius-overlay;
+                    background: Theme.flyout-solid;
+                    border-width: 1px;
+                    border-color: Theme.c.surface-stroke-flyout;
+                }
+                // Presses on the panel itself must not reach the dismiss area.
+                TouchArea { }
+                // (border-box: the 1px border is inside the 16px padding)
+                content := VerticalLayout {
+                    padding: root.padded ? 17px : 1px;
+                    @children
+                }
+            }
+            TipLayer { layer: 1; }
+        }
+    }
+}
+
+// 0.2's FDialog shell: smoke over the window, a centred box with body and footer. The
+// content and the buttons are the caller's (DialogButtons below for the standard footer).
+export component DialogHost {
+    in property <string> title;
+    in property <length> dialog-width: 0;
+    out property <bool> is-open;
+    callback closed();
+    // Enter outside a button / multi-line box: the primary action.
+    callback primary();
+    width: 0;
+    height: 0;
+    public function open() {
+        is-open = true;
+        popup.show();
+    }
+    public function close() {
+        if is-open {
+            is-open = false;
+            popup.close();
+            closed();
+        }
+    }
+    popup := PopupWindow {
+        x: -root.absolute-position.x;
+        y: -root.absolute-position.y;
+        width: Overlay.win-w;
+        height: Overlay.win-h;
+        close-policy: no-auto-close;
+        forward-focus: fs;
+        fs := FocusScope {
+            width: 100%;
+            height: 100%;
+            property <float> fade: 0;
+            init => {
+                self.focus();
+                fade = 1;
+            }
+            animate fade { duration: Theme.dur-fast; easing: linear; }
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.close();
+                    return accept;
+                }
+                if e.text == Key.Return {
+                    root.primary();
+                    return accept;
+                }
+                return reject;
+            }
+            Rectangle {
+                background: Theme.c.smoke;
+                opacity: fs.fade;
+                // The smoke takes presses (they don't dismiss a dialog).
+                TouchArea { }
+            }
+            box := Rectangle {
+                property <length> w: root.dialog-width > 0 ? root.dialog-width : clamp(inner.preferred-width + 2px, min(320px, Overlay.win-w - 32px), min(548px, Overlay.win-w - 32px));
+                property <length> h: min(inner.preferred-height + 2px, Overlay.win-h - 32px);
+                x: (Overlay.win-w - w) / 2;
+                y: (Overlay.win-h - h) / 2;
+                width: w;
+                height: h;
+                opacity: fs.fade;
+                accessible-role: groupbox;
+                accessible-label: root.title;
+                BoxShadow {
+                    width: parent.width;
+                    height: parent.height;
+                    shadow: Theme.shadow-dialog;
+                }
+                Rectangle { border-radius: Theme.radius-overlay; background: Theme.c.solid-base; }
+                inner := VerticalLayout {
+                    x: 1px;
+                    y: 1px;
+                    width: parent.width - 2px;
+                    height: parent.height - 2px;
+                    @children
+                }
+                // the border over the content's corners (CSS overflow: hidden + radius)
+                Rectangle {
+                    border-radius: Theme.radius-overlay;
+                    border-width: 1px;
+                    border-color: Theme.c.surface-stroke;
+                }
+            }
+            TipLayer { layer: 1; }
+        }
+    }
+}
+
+// The dialog body (0.2's .body): title and content on layer-fill-alt, 24px padding.
+export component DialogBody inherits Rectangle {
+    in property <string> title;
+    background: Theme.c.layer-fill-alt;
+    border-top-left-radius: Theme.radius-overlay - 1px;
+    border-top-right-radius: Theme.radius-overlay - 1px;
+    VerticalLayout {
+        padding: 24px;
+        if root.title != "": VerticalLayout {
+            padding-bottom: 12px;
+            Text {
+                height: 28px;
+                text: root.title;
+                font-family: Theme.font-display;
+                font-size: 20px;
+                font-weight: 600;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+        }
+        @children
+    }
+}

@@ -73,6 +73,14 @@ export global Theme {
     out property <duration> dur-fast: reduce-motion ? 0ms : 83ms;
     out property <duration> dur-normal: reduce-motion ? 0ms : 187ms;
     out property <duration> dur-slow: reduce-motion ? 0ms : 333ms;
+    // Flyouts and menus: 0.2 blurs what is behind them (backdrop-filter: blur(30px)), which the
+    // software renderer can't; the fill over the window background stands in for it.
+    out property <color> flyout-solid: over(c.flyout-fill, c.solid-base);
+    // `top` painted over an opaque `below` (source-over).
+    pure function over(top: color, below: color) -> color {
+        let a = top.alpha / 255;
+        return rgb(top.red * a + below.red * (1 - a), top.green * a + below.green * (1 - a), top.blue * a + below.blue * (1 - a));
+    }
 }
 
 // Draws a ShadowImage around its parent's geometry (place it first, at x: 0; y: 0, with the
@@ -113,3 +121,7 @@ export component BoxShadow {
     Image { x: root.width - cx; y: root.height - cy; width: cx + r; height: cy + b; image-fit: fill; source: shadow.image;
         source-clip-x: iw - shadow.right - pcx; source-clip-y: ih - shadow.bottom - pcy; source-clip-width: shadow.right + pcx; source-clip-height: shadow.bottom + pcy; }
 }
+
+// A colour swatch (menus, colour pickers): palette key or hex, the fill, the check mark's
+// colour on it, a name.
+export struct Swatch { key: string, color: color, fg: color, title: string, selected: bool, none: bool }

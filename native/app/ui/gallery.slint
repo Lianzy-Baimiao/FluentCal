@@ -1,0 +1,542 @@
+// The control gallery (0.2's src/windows/gallery/GalleryApp.vue, `?w=gallery`): every
+// control in its states, for visual parity checks and trying them out. State lives here, like
+// the page's refs.
+
+import { Theme, BoxShadow, Swatch } from "theme.slint";
+import { Glyph, Icon, SvgIcon, AnyIcon } from "icons.slint";
+import { Overlay, OverlayRoot, TipLayer, Flyout, DialogHost, DialogBody } from "overlay.slint";
+import { Button, ButtonVariant, ButtonSize, Segmented, SegOption } from "controls.slint";
+import { Checkbox, Toggle, RadioGroup, RadioOption, Slider, ProgressBar } from "forms.slint";
+import { TextBox, NumberBox, Select, SelectOption, DatePicker, TimePicker, ShortcutBox, CalendarView, DashedBorder, Fluent } from "inputs.slint";
+import { Menu, MenuEntry, MenuLeaf, ColorSwatches } from "menu.slint";
+import { SettingsGroup, SettingsCard, SettingsExpander, SettingsExpanderItems, SettingsRow, InfoBar, Severity, Field } from "cards.slint";
+import { NavView, NavItem } from "nav.slint";
+import { DialogFooter, Cell } from "dialog.slint";
+import { GalleryData } from "gallery_data.slint";
+
+// .gallery > section (border-box: the 1px border is inside the 16/20px padding)
+component Section inherits Rectangle {
+    in property <string> title;
+    border-radius: Theme.radius-overlay;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    background: Theme.c.card-fill;
+    VerticalLayout {
+        padding-top: 17px;
+        padding-left: 21px;
+        padding-right: 21px;
+        padding-bottom: 21px;
+        spacing: 12px;
+        VerticalLayout {
+            padding-bottom: 4px;
+            Text {
+                height: 28px;
+                text: root.title;
+                font-family: Theme.font-display;
+                font-size: 20px;
+                font-weight: 600;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+        }
+        @children
+    }
+}
+
+// .row: wrapping, centred (or top-aligned), 12px gaps
+component Row inherits FlexboxLayout {
+    spacing: 12px;
+    cross-axis-alignment: center;
+}
+
+// .card-surface: a flyout-like panel around a calendar view
+component CardSurface inherits Rectangle {
+    BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+    Rectangle {
+        border-radius: Theme.radius-overlay;
+        border-width: 1px;
+        border-color: Theme.c.surface-stroke-flyout;
+        background: Theme.c.flyout-fill;
+    }
+    VerticalLayout {
+        padding: 1px;
+        @children
+    }
+}
+
+// .ic: icon and its name on control-alt-fill
+component IconTile inherits Rectangle {
+    in property <string> glyph;
+    in property <string> name;
+    in property <bool> svg;
+    height: 32px;
+    border-radius: Theme.radius-control;
+    background: Theme.c.control-alt-fill;
+    // outline: 1px dashed accent (outside the box)
+    if root.svg: DashedBorder {
+        x: -1px;
+        y: -1px;
+        width: parent.width + 2px;
+        height: parent.height + 2px;
+        radius: Theme.radius-control + 1px;
+        color: Theme.c.accent-fill;
+    }
+    AnyIcon { x: 8px; y: 6px; glyph: root.glyph; size: 20px; color: Theme.c.text-primary; }
+    Text {
+        x: 36px;
+        text: root.name;
+        font-size: 11px;
+        color: Theme.c.text-secondary;
+        vertical-alignment: center;
+    }
+}
+
+export component GalleryWindow inherits Window {
+    title: "FluentCal 控件库";
+    background: Theme.c.solid-base;
+    default-font-family: Theme.font-ui;
+    default-font-size: 14px;
+    preferred-width: 1280px;
+    preferred-height: 900px;
+    in-out property <bool> on: true;
+    in-out property <bool> off: false;
+    in-out property <bool> chk: true;
+    in-out property <bool> chk2: false;
+    in-out property <bool> task: true;
+    in-out property <string> radio: "dark";
+    in-out property <float> slider: 60;
+    in-out property <string> select: "month";
+    in-out property <string> text: "";
+    in-out property <string> text2: "写周报";
+    in-out property <string> notes: "多行文本\n第二行";
+    in-out property <float> num: 15;
+    in-out property <string> date: "2026-10-30";
+    in-out property <string> time: "09:30";
+    in-out property <string> swatch: "blue";
+    in-out property <string> accent-pick: "#0078D4";
+    in-out property <string> seg: "month";
+    in-out property <string> seg2: "day";
+    in-out property <string> nav: "appearance";
+    in-out property <string> shortcut: "Ctrl+Alt+D";
+    in-out property <bool> expanded: true;
+    in-out property <bool> info-open: true;
+    in-out property <bool> error-open: true;
+    out property <string> last-action;
+    property <[MenuEntry]> menu-items: [
+        { key: "new", label: "新建任务", icon: Glyph.add, shortcut: "Ctrl+N" },
+        { key: "edit", label: "编辑", icon: Glyph.edit },
+        { kind: "separator" },
+        { key: "completed", label: "显示已完成", checkable: true, checked: true },
+        { key: "view", label: "视图", icon: Glyph.calendar, children-check: true, children: [
+            { key: "view-month", label: "月视图", checkable: true, checked: true, radio: true },
+            { key: "view-weeks", label: "多周视图", checkable: true, checked: false, radio: true },
+            { key: "view-gantt", label: "甘特图", checkable: true, checked: false, radio: true },
+        ] },
+        { key: "color", kind: "swatches", label: "颜色", swatches: GalleryData.menu-swatches },
+        { kind: "separator" },
+        { key: "locked", label: "禁用项", icon: Glyph.lock, disabled: true },
+        { key: "delete", label: "删除", icon: Glyph.delete, danger: true, shortcut: "Del" },
+    ];
+    pure function item-kind(k: string) -> string { return k == "" ? "item" : k; }
+    OverlayRoot {
+        win-width: root.width;
+        win-height: root.height;
+        Flickable {
+            width: 100%;
+            height: 100%;
+            content-height: page.preferred-height;
+            content-width: Overlay.win-w;
+            page := VerticalLayout {
+                // .gallery { max-width: 1200px; margin: 0 auto; padding: 24px 40px 80px }
+                property <length> w: min(1200px, Overlay.win-w);
+                x: (Overlay.win-w - w) / 2;
+                width: w;
+                padding-top: 24px;
+                padding-bottom: 80px;
+                padding-left: 40px;
+                padding-right: 40px;
+                spacing: 16px;
+                Text {
+                    height: 36px;
+                    text: "FluentCal 控件库 · " + (Theme.dark ? "深色" : "浅色");
+                    font-family: Theme.font-display;
+                    font-size: 28px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    color: Theme.c.text-primary;
+                }
+                Section {
+                    title: "按钮";
+                    Row {
+                        Button { text: "标准按钮"; }
+                        Button { text: "强调按钮"; variant: ButtonVariant.accent; }
+                        Button { text: "透明按钮"; variant: ButtonVariant.subtle; icon: Glyph.add; }
+                        Button { text: "带图标"; icon: Glyph.save; }
+                        Button { text: "下拉"; icon-right: Glyph.chevron-down; }
+                        Button { text: "禁用"; enabled: false; }
+                        Button { text: "禁用强调"; variant: ButtonVariant.accent; enabled: false; }
+                        Button { text: "小按钮"; size: ButtonSize.small; }
+                        Button { size: ButtonSize.icon; icon: Glyph.settings; tip: "设置"; }
+                        Button { size: ButtonSize.icon; variant: ButtonVariant.subtle; icon: Glyph.pin; tip: "钉住"; pressed-state: true; }
+                        Button { size: ButtonSize.icon; variant: ButtonVariant.subtle; icon: Glyph.more; tip: "更多"; }
+                    }
+                }
+                Section {
+                    title: "开关 / 复选框 / 单选";
+                    Row {
+                        Toggle { checked: root.on; toggled(v) => { root.on = v; } }
+                        Toggle { checked: root.off; toggled(v) => { root.off = v; } }
+                        Toggle { checked: root.on; text-right: true; toggled(v) => { root.on = v; } }
+                        Toggle { checked: true; enabled: false; }
+                        Toggle { checked: false; enabled: false; }
+                    }
+                    Row {
+                        Checkbox { checked: root.chk; text: "已选中"; toggled(v) => { root.chk = v; } }
+                        Checkbox { checked: root.chk2; text: "未选中"; toggled(v) => { root.chk2 = v; } }
+                        Checkbox { checked: false; indeterminate: true; text: "部分选中"; }
+                        Checkbox { checked: true; enabled: false; text: "禁用"; }
+                        Checkbox { checked: root.task; round: true; size: 16px; toggled(v) => { root.task = v; } }
+                        Checkbox { checked: false; round: true; size: 16px; }
+                        Checkbox { checked: true; round: true; size: 16px; check-color: #D13438; check-fg: #FFFFFF; }
+                    }
+                    RadioGroup {
+                        horizontal: true;
+                        value: root.radio;
+                        options: [
+                            { value: "light", label: "浅色" },
+                            { value: "dark", label: "深色" },
+                            { value: "system", label: "跟随系统" },
+                            { value: "x", label: "禁用", disabled: true },
+                        ];
+                        selected(v) => { root.radio = v; }
+                    }
+                }
+                Section {
+                    title: "输入";
+                    Row {
+                        TextBox { width: 220px; text <=> root.text; placeholder: "搜索任务"; icon: Glyph.search; clearable: true; }
+                        TextBox { width: 200px; text <=> root.text2; clearable: true; }
+                        TextBox { width: 160px; text: "禁用文本"; enabled: false; }
+                        NumberBox { width: 140px; value: root.num; minimum: 0; maximum: 60; suffix: "分钟"; changed-value(v) => { root.num = v; } }
+                        Select {
+                            width: 160px;
+                            value: root.select;
+                            options: [
+                                { value: "month", label: "月视图" },
+                                { value: "weeks", label: "多周视图" },
+                                { value: "gantt", label: "甘特图" },
+                                { value: "x", label: "不可用", disabled: true },
+                            ];
+                            selected(v) => { root.select = v; }
+                        }
+                        Select { width: 140px; value: ""; placeholder: "请选择"; options: [{ value: "1", label: "一" }]; }
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        TextBox { width: 420px; text <=> root.notes; multiline: true; rows: 3; placeholder: "备注"; }
+                    }
+                    Row {
+                        Slider { value: root.slider; show-value: true; suffix: "%"; moved(v) => { root.slider = v; } }
+                        Slider { value: 30; enabled: false; }
+                        ProgressBar { width: 240px; value: root.slider; }
+                        ProgressBar { width: 160px; }
+                    }
+                }
+                Section {
+                    title: "日期与时间";
+                    Row {
+                        cross-axis-alignment: start;
+                        DatePicker { value: root.date; lunar: true; markers: true; changed-value(v) => { root.date = v; } }
+                        DatePicker { value: ""; clearable: true; }
+                        TimePicker { value: root.time; clearable: true; changed-value(v) => { root.time = v; } }
+                        ShortcutBox { value: root.shortcut; changed-value(v) => { root.shortcut = v; } }
+                        ShortcutBox { value: ""; }
+                    }
+                    Row {
+                        cross-axis-alignment: start;
+                        CardSurface { CalendarView { selected: root.date; lunar: true; markers: true; picked(d) => { root.date = d; } } }
+                        CardSurface { CalendarView { selected: root.date; first-day: 0; picked(d) => { root.date = d; } } }
+                    }
+                }
+                Section {
+                    title: "颜色 / 分段";
+                    ColorSwatches {
+                        colors: GalleryData.swatch-colors;
+                        value: root.swatch;
+                        allow-none: true;
+                        custom: true;
+                        custom-value: Fluent.custom-value(root.swatch, GalleryData.swatch-colors);
+                        custom-color: Fluent.hex-color(self.custom-value);
+                        custom-fg: Fluent.text-on(self.custom-value);
+                        picked(v) => { root.swatch = v; }
+                    }
+                    ColorSwatches {
+                        colors: GalleryData.accent-colors;
+                        value: root.accent-pick;
+                        size: 32px;
+                        custom-value: Fluent.custom-value(root.accent-pick, GalleryData.accent-colors);
+                        custom-color: Fluent.hex-color(self.custom-value);
+                        custom-fg: Fluent.text-on(self.custom-value);
+                        picked(v) => { root.accent-pick = v; }
+                    }
+                    Row {
+                        Segmented {
+                            value: root.seg;
+                            options: [{ value: "month", label: "月", icon: Glyph.calendar }, { value: "weeks", label: "多周", icon: Glyph.calendar-week }, { value: "gantt", label: "甘特", icon: "svg:gantt" }];
+                            selected(v) => { root.seg = v; }
+                        }
+                        Segmented {
+                            small: true;
+                            value: root.seg2;
+                            options: [{ value: "day", label: "日" }, { value: "week", label: "周" }, { value: "month", label: "月" }];
+                            selected(v) => { root.seg2 = v; }
+                        }
+                        Segmented {
+                            value: root.seg;
+                            options: [{ value: "month", icon: Glyph.calendar, title: "月" }, { value: "weeks", icon: Glyph.calendar-week, title: "多周" }, { value: "gantt", icon: "svg:gantt", title: "甘特" }];
+                            selected(v) => { root.seg = v; }
+                        }
+                    }
+                }
+                Section {
+                    title: "信息栏";
+                    InfoBar { title: "提示"; text: "拖动标题栏可移动日历，完成后点击锁定。"; closable: true; }
+                    InfoBar { severity: Severity.success; title: "已保存"; text: "数据已备份到本地。"; }
+                    InfoBar { severity: Severity.warning; title: "注意"; text: "快捷键 Ctrl+Alt+D 已被其他程序占用。"; action-text: "更改"; }
+                    InfoBar { severity: Severity.error; title: "错误"; text: "节假日数据更新失败，请检查网络。"; closable: true; }
+                }
+                Section {
+                    title: "设置卡片";
+                    SettingsGroup {
+                        title: "桌面";
+                        SettingsCard {
+                            icon: Glyph.desktop;
+                            title: "嵌入桌面";
+                            description: "日历位于所有窗口之下，显示桌面时仍可见";
+                            Toggle { checked: root.on; toggled(v) => { root.on = v; } }
+                        }
+                        SettingsCard {
+                            icon: Glyph.layers;
+                            title: "窗口层级";
+                            Select {
+                                width: 160px;
+                                value: root.select;
+                                options: [{ value: "month", label: "嵌入桌面" }, { value: "weeks", label: "始终置顶" }, { value: "gantt", label: "普通窗口" }];
+                                selected(v) => { root.select = v; }
+                            }
+                        }
+                        SettingsCard { icon: Glyph.palette; title: "主题与颜色"; description: "浅色、深色、强调色"; clickable: true; has-content: false; }
+                        VerticalLayout {
+                            SettingsExpander {
+                                icon: Glyph.brightness;
+                                title: "背景";
+                                description: "颜色、不透明度与圆角";
+                                expanded: root.expanded;
+                                toggled(v) => { root.expanded = v; }
+                                Button { text: "恢复默认"; }
+                            }
+                            SettingsExpanderItems {
+                                expanded: root.expanded;
+                                SettingsRow {
+                                    title: "背景不透明度";
+                                    Slider { value: root.slider; show-value: true; suffix: "%"; moved(v) => { root.slider = v; } }
+                                }
+                                SettingsRow {
+                                    title: "亚克力效果";
+                                    description: "模糊桌面壁纸";
+                                    divider: true;
+                                    Toggle { checked: root.off; toggled(v) => { root.off = v; } }
+                                }
+                                SettingsRow {
+                                    title: "圆角";
+                                    divider: true;
+                                    NumberBox { value: root.num; minimum: 0; maximum: 20; suffix: "px"; changed-value(v) => { root.num = v; } }
+                                }
+                            }
+                        }
+                        SettingsExpander {
+                            title: "无图标展开项";
+                            description: "没有图标时行左边距对齐";
+                            has-content: false;
+                        }
+                        SettingsCard {
+                            icon: Glyph.lock;
+                            title: "禁用卡片";
+                            enabled: false;
+                            Toggle { checked: false; enabled: false; }
+                        }
+                    }
+                }
+                Section {
+                    title: "导航";
+                    Rectangle {
+                        height: 340px;
+                        border-radius: Theme.radius-overlay;
+                        border-width: 1px;
+                        border-color: Theme.c.card-stroke;
+                        background: Theme.c.solid-base;
+                        clip: true;
+                        NavView {
+                            x: 1px;
+                            y: 1px;
+                            width: parent.width - 2px;
+                            height: parent.height - 2px;
+                            title: "FluentCal 设置";
+                            selected: root.nav;
+                            items: [{ key: "general", label: "常规", icon: Glyph.settings }, { key: "appearance", label: "外观", icon: Glyph.palette }, { key: "calendar", label: "日历", icon: Glyph.calendar }, { key: "gantt", label: "甘特图", icon: "svg:gantt" }];
+                            footer-items: [{ key: "about", label: "关于", icon: Glyph.info }];
+                            navigate(k) => { root.nav = k; }
+                            SettingsCard {
+                                icon: Glyph.brightness;
+                                title: "选择模式";
+                                Select {
+                                    width: 140px;
+                                    value: root.radio;
+                                    options: [{ value: "light", label: "浅色" }, { value: "dark", label: "深色" }];
+                                    selected(v) => { root.radio = v; }
+                                }
+                            }
+                        }
+                    }
+                }
+                Section {
+                    title: "浮出层 / 菜单 / 对话框 / 提示";
+                    Row {
+                        fly-btn := Button {
+                            text: "打开浮出层";
+                            clicked => {
+                                if fly.is-open { fly.close(); } else { fly.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height); }
+                            }
+                        }
+                        menu-btn := Button {
+                            text: "菜单";
+                            icon-right: Glyph.chevron-down;
+                            clicked => { menu.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height); }
+                        }
+                        Button { text: "对话框"; clicked => { dialog.open(); } }
+                        Button { text: "确认框"; clicked => { confirm.open(); } }
+                        Button { text: "悬停提示"; tip: "这是一个工具提示"; }
+                    }
+                }
+                Section {
+                    title: "图标（95）";
+                    Rectangle {
+                        property <int> cols: max(1, floor((self.width + 4px) / (112px + 4px)));
+                        property <length> cw: (self.width - (cols - 1) * 4px) / cols;
+                        property <int> n: GalleryData.icons.length + 2;
+                        height: ceil(n / cols) * 36px - 4px;
+                        for ic[i] in GalleryData.icons: IconTile {
+                            x: Math.mod(i, parent.cols) * (parent.cw + 4px);
+                            y: floor(i / parent.cols) * 36px;
+                            width: parent.cw;
+                            glyph: ic.glyph;
+                            name: ic.name;
+                        }
+                        for s[k] in ["gantt", "milestone"]: IconTile {
+                            property <int> i: GalleryData.icons.length + k;
+                            x: Math.mod(i, parent.cols) * (parent.cw + 4px);
+                            y: floor(i / parent.cols) * 36px;
+                            width: parent.cw;
+                            glyph: "svg:" + s;
+                            name: s;
+                            svg: true;
+                        }
+                    }
+                }
+                Section {
+                    title: "任务颜色";
+                    HorizontalLayout {
+                        spacing: 12px;
+                        for t[ti] in ["light", "dark"]: Rectangle {
+                            horizontal-stretch: 1;
+                            min-width: 280px;
+                            border-radius: Theme.radius-overlay;
+                            background: t == "light" ? #FFFFFF : #202020;
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 6px;
+                                for c in GalleryData.task-colors: HorizontalLayout {
+                                    spacing: 12px;
+                                    alignment: start;
+                                    height: 22px;
+                                    Rectangle {
+                                        width: 120px;
+                                        border-radius: 4px;
+                                        background: c.bar;
+                                        Text {
+                                            x: 8px;
+                                            text: c.label + "色任务条";
+                                            font-size: 12px;
+                                            color: c.fg;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    Text {
+                                        text: c.label + " · 文字示例";
+                                        color: t == "dark" ? c.dark : c.light;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        fly := Flyout {
+            panel-width: 280px;
+            label: "示例浮出层";
+            Text { text: "浮出层标题"; font-weight: 600; height: 20px; vertical-alignment: center; color: Theme.c.text-primary; }
+            VerticalLayout {
+                padding-top: 4px;
+                padding-bottom: 12px;
+                Text { text: "轻触外部或按 Esc 关闭。"; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
+            }
+            HorizontalLayout {
+                alignment: start;
+                Button { text: "知道了"; variant: ButtonVariant.accent; autofocus: true; clicked => { fly.close(); } }
+            }
+        }
+        menu := Menu {
+            items: root.menu-items;
+            has-check: true;
+            has-icon: true;
+            activated(k) => { root.last-action = k; }
+            swatch-picked(k, s) => { root.last-action = k + ":" + s; }
+        }
+        dialog := DialogHost {
+            title: "编辑分组";
+            primary => { dialog.close(); }
+            DialogBody {
+                title: "编辑分组";
+                Field {
+                    label: "分组名称";
+                    TextBox { horizontal-stretch: 1; text <=> root.text2; autofocus: true; }
+                }
+            }
+            DialogFooter {
+                primary-text: "保存";
+                secondary-text: "不保存";
+                primary => { dialog.close(); }
+                secondary => { dialog.close(); }
+                close => { dialog.close(); }
+            }
+        }
+        confirm := DialogHost {
+            title: "删除任务？";
+            primary => { confirm.close(); }
+            DialogBody {
+                title: "删除任务？";
+                Text { text: "“写周报”将被删除，此操作无法撤销。"; wrap: word-wrap; color: Theme.c.text-primary; }
+            }
+            DialogFooter {
+                primary-text: "删除";
+                danger: true;
+                primary => { confirm.close(); }
+                close => { confirm.close(); }
+            }
+        }
+        TipLayer { }
+    }
+}
+

@@ -1,0 +1,162 @@
+// 0.2's FNavView: the settings window's navigation pane and page.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon, AnyIcon } from "icons.slint";
+import { Overlay, Tip, FocusRing } from "overlay.slint";
+
+export struct NavItem { key: string, label: string, icon: string }
+
+component NavRow inherits Rectangle {
+    in property <NavItem> item;
+    in property <bool> compact;
+    in property <bool> selected;
+    callback clicked();
+    property <int> tt: -1;
+    height: 40px;
+    accessible-role: tab;
+    accessible-label: item.label;
+    accessible-item-selected: selected;
+    accessible-action-default => { root.clicked(); }
+    Rectangle {
+        x: 4px;
+        y: 2px;
+        width: root.compact ? 40px : parent.width - 12px;
+        height: 36px;
+        border-radius: Theme.radius-control;
+        background: ta.pressed ? Theme.c.subtle-fill-pressed : root.selected || ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+        animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+        clip: true;
+        HorizontalLayout {
+            padding-left: root.compact ? 12px : 14px;
+            padding-right: root.compact ? 12px : 12px;
+            spacing: 16px;
+            cross-axis-alignment: center;
+            AnyIcon { glyph: root.item.icon; size: 16px; color: ta.pressed ? Theme.c.text-secondary : Theme.c.text-primary; }
+            if !root.compact: Text {
+                horizontal-stretch: 1;
+                text: root.item.label;
+                color: ta.pressed ? Theme.c.text-secondary : Theme.c.text-primary;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+        changed has-hover => {
+            if self.has-hover {
+                root.tt = Tip.enter(root.item.label, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tt);
+            }
+        }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                Tip.leave(root.tt);
+            }
+        }
+    }
+}
+
+
+// Navigation pane (280px; 48px icons only when the view is narrower than 680px) and the page
+// (heading = the selected item's label unless `page-title` is given; content in @children).
+export component NavView {
+    in property <[NavItem]> items;
+    in property <[NavItem]> footer-items;
+    in property <string> selected;
+    in property <string> title;
+    // "" = the selected item's label; " " = no heading.
+    in property <string> page-title;
+    callback navigate(string);
+    property <bool> compact: root.width < 680px;
+    property <length> pane-w: compact ? 48px : 280px;
+    property <length> title-h: title != "" && !compact ? 40px : 0;
+    property <int> sel-main: index-in(items, selected);
+    property <int> sel-foot: index-in(footer-items, selected);
+    property <string> heading: page-title != "" ? (page-title == " " ? "" : page-title)
+        : sel-main >= 0 ? items[sel-main].label : sel-foot >= 0 ? footer-items[sel-foot].label : "";
+    property <length> foot-y: root.height - 8px - footer-items.length * 40px;
+    pure function index-in(list: [NavItem], k: string) -> int {
+        return list.length > 0 && list[0].key == k ? 0 : list.length > 1 && list[1].key == k ? 1
+            : list.length > 2 && list[2].key == k ? 2 : list.length > 3 && list[3].key == k ? 3
+            : list.length > 4 && list[4].key == k ? 4 : list.length > 5 && list[5].key == k ? 5
+            : list.length > 6 && list[6].key == k ? 6 : list.length > 7 && list[7].key == k ? 7
+            : list.length > 8 && list[8].key == k ? 8 : list.length > 9 && list[9].key == k ? 9
+            : list.length > 10 && list[10].key == k ? 10 : list.length > 11 && list[11].key == k ? 11 : -1;
+    }
+    accessible-role: navigation;
+    accessible-label: title != "" ? title : "导航";
+    pane := Rectangle {
+        x: 0;
+        width: root.pane-w;
+        height: root.height;
+        if root.title != "" && !root.compact: Text {
+            x: 16px;
+            y: 4px + 10px;
+            height: 16px;
+            text: root.title;
+            font-size: 12px;
+            color: Theme.c.text-primary;
+            vertical-alignment: center;
+        }
+        for it[i] in root.items: NavRow {
+            y: 4px + root.title-h + i * 40px;
+            width: root.pane-w;
+            item: it;
+            compact: root.compact;
+            selected: it.key == root.selected;
+            clicked => { root.navigate(it.key); }
+        }
+        for it[i] in root.footer-items: NavRow {
+            y: root.foot-y + i * 40px;
+            width: root.pane-w;
+            item: it;
+            compact: root.compact;
+            selected: it.key == root.selected;
+            clicked => { root.navigate(it.key); }
+        }
+        // the selection pill, sliding to the selected row
+        Rectangle {
+            property <length> row-y: root.sel-main >= 0 ? 4px + root.title-h + root.sel-main * 40px : root.foot-y + root.sel-foot * 40px;
+            x: 4px;
+            y: row-y + 20px - 8px;
+            width: 3px;
+            height: 16px;
+            border-radius: 2px;
+            background: Theme.c.accent-fill;
+            opacity: root.sel-main >= 0 || root.sel-foot >= 0 ? 1 : 0;
+            animate y { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+            animate opacity { duration: Theme.dur-fast; }
+        }
+    }
+    Flickable {
+        x: root.pane-w;
+        width: root.width - root.pane-w;
+        height: root.height;
+        content-height: page.preferred-height;
+        page := VerticalLayout {
+            width: parent.width;
+            padding-left: root.compact ? 16px : 28px;
+            padding-right: root.compact ? 20px : 40px;
+            padding-bottom: root.compact ? 24px : 40px;
+            alignment: start;
+            if root.heading != "": VerticalLayout {
+                padding-top: 10px;
+                padding-bottom: 24px;
+                Text {
+                    height: 36px;
+                    text: root.heading;
+                    font-family: Theme.font-display;
+                    font-size: 28px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    color: Theme.c.text-primary;
+                }
+            }
+            @children
+        }
+    }
+}
+

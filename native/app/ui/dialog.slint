@@ -1,0 +1,58 @@
+// The standard dialog footer (0.2's FDialog .foot), for DialogHost + DialogBody.
+
+import { Theme } from "theme.slint";
+import { Button, ButtonVariant } from "controls.slint";
+
+// The dialog footer (0.2's .foot): equal-width buttons, 24px padding, a divider above.
+// A layout cell that takes an equal share and adds nothing to the preferred width.
+export component Cell inherits Rectangle {
+    horizontal-stretch: 1;
+    min-width: 0;
+    preferred-width: 0;
+    height: 33px;
+    @children
+}
+
+export component DialogFooter inherits Rectangle {
+    in property <string> primary-text;
+    in property <string> secondary-text;
+    in property <string> close-text: "取消";
+    in property <bool> danger;
+    in property <bool> primary-enabled: true;
+    callback primary();
+    callback secondary();
+    callback close();
+    background: Theme.c.solid-base;
+    border-bottom-left-radius: Theme.radius-overlay - 1px;
+    border-bottom-right-radius: Theme.radius-overlay - 1px;
+    min-height: 82px;
+    max-height: 82px;
+    preferred-height: 82px;
+    Rectangle { y: 0; height: 1px; background: Theme.c.card-stroke; }
+    // Equal columns that don't count towards the dialog's width (0.2: grid-auto-columns: 1fr).
+    HorizontalLayout {
+        padding: 24px;
+        padding-top: 25px;
+        spacing: 8px;
+        if root.primary-text != "": Cell {
+            Button {
+                width: parent.width;
+                text: root.primary-text;
+                variant: root.danger ? ButtonVariant.danger : ButtonVariant.accent;
+                enabled: root.primary-enabled;
+                clicked => { root.primary(); }
+            }
+        }
+        if root.secondary-text != "": Cell {
+            Button { width: parent.width; text: root.secondary-text; clicked => { root.secondary(); } }
+        }
+        if root.close-text != "": Cell {
+            Button {
+                width: parent.width;
+                text: root.close-text;
+                variant: root.primary-text != "" ? ButtonVariant.standard : ButtonVariant.accent;
+                clicked => { root.close(); }
+            }
+        }
+    }
+}

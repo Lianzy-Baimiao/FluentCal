@@ -4,6 +4,8 @@
 slint::include_modules!();
 
 pub mod desk;
+pub mod fluent;
 pub mod fonts;
+pub mod gallery;
 pub mod shadow;
 pub mod theme;

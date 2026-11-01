@@ -1,0 +1,469 @@
+// Check box, toggle switch, radio group, slider, progress bar (0.2's FCheckbox, FToggle,
+// FRadioGroup, FSlider, FProgressBar). State colours follow 0.2's CSS cascade exactly,
+// including where a more specific rule wins over the obvious one.
+
+import { Theme, BoxShadow } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Overlay, Tip, FocusRing } from "overlay.slint";
+
+export component Checkbox {
+    in property <bool> checked;
+    in property <string> text;
+    in property <bool> indeterminate;
+    in property <bool> enabled: true;
+    // Round variant (task check circles).
+    in property <bool> round;
+    in property <length> size: 20px;
+    // Custom checked colour (a task colour) and the glyph colour on it.
+    in property <color> check-color: transparent;
+    in property <color> check-fg: transparent;
+    callback toggled(bool);
+    property <bool> on: checked || indeterminate;
+    property <bool> custom: check-color != transparent;
+    property <bool> hover: ta.has-hover && enabled;
+    property <bool> down: ta.pressed && enabled;
+    forward-focus: fs;
+    min-height: text != "" ? 32px : size;
+    accessible-role: checkbox;
+    accessible-checked: checked;
+    accessible-label: text;
+    accessible-enabled: enabled;
+    accessible-action-default => { root.toggle(); }
+    function toggle() {
+        if enabled {
+            toggled(!checked);
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        cross-axis-alignment: center;
+        box := Rectangle {
+            width: root.size;
+            height: root.size;
+            border-radius: root.round ? root.size / 2 : Theme.radius-control;
+            border-width: 1px;
+            // .f-check:not(.disabled):active .box outranks .on .box (border and background)
+            border-color: !root.enabled ? (root.on ? transparent : Theme.c.control-strong-stroke-disabled)
+                : root.down ? Theme.c.control-strong-stroke-disabled
+                : root.on ? (root.custom ? root.check-color : Theme.c.accent-fill)
+                : Theme.c.control-strong-stroke;
+            background: !root.enabled ? (root.on ? Theme.c.accent-fill-disabled : Theme.c.control-alt-fill)
+                : root.on && root.hover ? (root.custom ? root.check-color : Theme.c.accent-fill-hover)
+                : root.down ? Theme.c.control-alt-fill-pressed
+                : root.on ? (root.custom ? root.check-color : Theme.c.accent-fill)
+                : root.hover ? Theme.c.control-alt-fill-hover : Theme.c.control-alt-fill;
+            animate background, border-color { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+            if root.on || (root.round && root.hover): Text {
+                text: root.indeterminate ? Glyph.remove : Glyph.check-mark;
+                font-family: Theme.font-icon;
+                font-size: root.size * 0.6;
+                color: !root.on ? Theme.c.text-secondary
+                    : !root.enabled ? Theme.c.text-on-accent-disabled
+                    : root.check-fg != transparent ? root.check-fg : Theme.c.text-on-accent;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+        if root.text != "": Text {
+            text: root.text;
+            color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " {
+                root.toggle();
+                return accept;
+            }
+            return reject;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.toggle(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                fs.focus();
+            }
+        }
+    }
+    FocusRing {
+        show: fs.has-focus && Overlay.keyboard;
+        radius: root.round && root.text == "" ? root.size / 2 : Theme.radius-control;
+    }
+}
+
+// The 开/关 text sits next to the switch (left like Windows Settings, or right).
+export component Toggle {
+    in property <bool> checked;
+    in property <string> on-text: "开";
+    in property <string> off-text: "关";
+    in property <bool> show-text: true;
+    in property <bool> text-right;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    property <bool> hover: ta.has-hover && enabled;
+    property <bool> down: ta.pressed && enabled;
+    forward-focus: fs;
+    min-height: 32px;
+    accessible-role: switch;
+    accessible-checked: checked;
+    accessible-enabled: enabled;
+    accessible-action-default => { root.toggle(); }
+    function toggle() {
+        if enabled {
+            toggled(!checked);
+        }
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: start;
+        cross-axis-alignment: center;
+        if root.show-text && !root.text-right: Text {
+            min-width: 28px;
+            text: root.checked ? root.on-text : root.off-text;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+            accessible-role: none;
+        }
+        track := Rectangle {
+            width: 40px;
+            height: 20px;
+            border-radius: 10px;
+            border-width: 1px;
+            border-color: root.checked ? transparent : root.enabled ? Theme.c.control-strong-stroke : Theme.c.control-strong-stroke-disabled;
+            background: root.checked
+                ? (!root.enabled ? Theme.c.accent-fill-disabled : root.down ? Theme.c.accent-fill-pressed : root.hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
+                : (root.down ? Theme.c.control-alt-fill-pressed : root.hover ? Theme.c.control-alt-fill-hover : Theme.c.control-alt-fill);
+            animate background, border-color { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+            // knob: CSS left/size inside the 1px border (0.2's .knob rules)
+            Rectangle {
+                property <length> left: root.checked ? (root.down ? 19px : root.hover ? 22px : 23px) : (root.down || root.hover ? 2px : 3px);
+                x: 1px + left;
+                y: 10px - self.height / 2;
+                width: root.down ? 17px : root.hover ? 14px : 12px;
+                height: root.down || root.hover ? 14px : 12px;
+                border-radius: 6px;
+                background: root.checked ? (root.enabled ? Theme.c.text-on-accent : Theme.c.text-on-accent-disabled)
+                    : (root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled);
+                animate x { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+                animate width, height, y { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+                animate background { duration: Theme.dur-fast; }
+            }
+            FocusRing {
+                show: fs.has-focus && Overlay.keyboard;
+                radius: 10px;
+            }
+        }
+        if root.show-text && root.text-right: Text {
+            min-width: 28px;
+            text: root.checked ? root.on-text : root.off-text;
+            vertical-alignment: center;
+            color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+            accessible-role: none;
+        }
+    }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == " " || e.text == Key.Return {
+                root.toggle();
+                return accept;
+            }
+            return reject;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.toggle(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+                fs.focus();
+            }
+        }
+    }
+}
+
+export struct RadioOption { value: string, label: string, disabled: bool }
+
+// Radios in a column, or in a wrapping row with 24px between them.
+export component RadioGroup {
+    in property <[RadioOption]> options;
+    in property <string> value;
+    in property <bool> horizontal;
+    in property <bool> enabled: true;
+    callback selected(string);
+    forward-focus: fs;
+    accessible-role: radio-group;
+    function index-of(v: string) -> int {
+        return options.length > 0 && options[0].value == v ? 0 : options.length > 1 && options[1].value == v ? 1
+            : options.length > 2 && options[2].value == v ? 2 : options.length > 3 && options[3].value == v ? 3
+            : options.length > 4 && options[4].value == v ? 4 : options.length > 5 && options[5].value == v ? 5
+            : options.length > 6 && options[6].value == v ? 6 : options.length > 7 && options[7].value == v ? 7 : -1;
+    }
+    // Next enabled option from `i` in direction `d` (wraps; 0.2's onKey).
+    function step(i: int, d: int) -> int {
+        let n = options.length;
+        let a = Math.mod(i + d + n * 2, n);
+        let b = Math.mod(i + 2 * d + n * 2, n);
+        let c = Math.mod(i + 3 * d + n * 2, n);
+        return !options[a].disabled ? a : !options[b].disabled ? b : !options[c].disabled ? c : i;
+    }
+    FlexboxLayout {
+        flex-direction: root.horizontal ? FlexboxLayoutDirection.row : FlexboxLayoutDirection.column;
+        spacing-horizontal: 24px;
+        spacing-vertical: 0;
+        cross-axis-alignment: center;
+        for o in root.options: radio := Rectangle {
+            property <bool> on: o.value == root.value;
+            property <bool> off: o.disabled || !root.enabled;
+            property <bool> hover: rta.has-hover && !off;
+            property <bool> down: rta.pressed && !off;
+            min-height: 32px;
+            accessible-role: radio-button;
+            accessible-checked: on;
+            accessible-label: o.label;
+            accessible-enabled: !off;
+            accessible-action-default => { if !off && !on { root.selected(o.value); } }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                cross-axis-alignment: center;
+                Rectangle {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    border-width: 1px;
+                    border-color: radio.off ? (radio.on ? transparent : Theme.c.control-strong-stroke-disabled)
+                        : radio.on ? Theme.c.accent-fill : Theme.c.control-strong-stroke;
+                    background: radio.off ? (radio.on ? Theme.c.accent-fill-disabled : Theme.c.control-alt-fill)
+                        : radio.on ? (radio.hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
+                        : radio.down ? Theme.c.control-alt-fill-pressed
+                        : radio.hover ? Theme.c.control-alt-fill-hover : Theme.c.control-alt-fill;
+                    animate background, border-color { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+                    Rectangle {
+                        property <length> d: radio.on ? (radio.down ? 8px : radio.hover ? 12px : 10px) : (radio.down ? 10px : 0);
+                        width: d;
+                        height: d;
+                        border-radius: d / 2;
+                        background: !radio.on && radio.down ? Theme.c.text-secondary : Theme.c.text-on-accent;
+                        animate width, height { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+                    }
+                }
+                Text {
+                    text: o.label;
+                    color: radio.off ? Theme.c.text-disabled : Theme.c.text-primary;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+            }
+            rta := TouchArea {
+                enabled: !radio.off;
+                clicked => { if !radio.on { root.selected(o.value); } }
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        Overlay.keyboard = false;
+                        fs.focus();
+                    }
+                }
+            }
+            FocusRing { show: radio.on && fs.has-focus && Overlay.keyboard; }
+        }
+    }
+    fs := FocusScope {
+        width: 0;
+        height: 0;
+        enabled: root.enabled;
+        key-pressed(e) => {
+            let d = e.text == Key.DownArrow || e.text == Key.RightArrow ? 1 : e.text == Key.UpArrow || e.text == Key.LeftArrow ? -1 : 0;
+            if d != 0 && root.options.length > 0 {
+                let i = root.index-of(root.value);
+                let j = root.step(i < 0 ? (d > 0 ? -1 : 0) : i, d);
+                if j >= 0 && j != i {
+                    root.selected(root.options[j].value);
+                }
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+// Horizontal slider with the value next to it. `moved` while dragging/keys, `committed` at
+// the end (0.2's update:modelValue / change).
+export component Slider {
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> step: 1;
+    in property <length> track-width: 200px;
+    in property <bool> show-value;
+    // Text after the number ("%", "px").
+    in property <string> suffix;
+    in property <bool> enabled: true;
+    callback moved(float);
+    callback committed(float);
+    property <float> pct: clamp((value - minimum) / max(0.000001, maximum - minimum), 0, 1);
+    property <bool> dragging;
+    property <string> text: round(value) == value ? "\{round(value)}\{suffix}" : "\{value}\{suffix}";
+    forward-focus: fs;
+    accessible-role: slider;
+    accessible-value: text;
+    accessible-value-minimum: minimum;
+    accessible-value-maximum: maximum;
+    accessible-enabled: enabled;
+    function snap(v: float) -> float {
+        let s = step > 0 ? step : 1;
+        return clamp(round((v - minimum) / s) * s + minimum, minimum, maximum);
+    }
+    function set(v: float) {
+        if v != value {
+            moved(v);
+        }
+    }
+    function from-x(x: length) -> float {
+        return snap(minimum + clamp(x / track-width, 0, 1) * (maximum - minimum));
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: start;
+        cross-axis-alignment: center;
+        hit := Rectangle {
+            width: root.track-width;
+            height: 32px;
+            border-radius: Theme.radius-control;
+            // rail and fill
+            Rectangle {
+                y: 14px;
+                height: 4px;
+                border-radius: 2px;
+                background: root.enabled ? Theme.c.control-strong-fill : Theme.c.control-strong-fill-disabled;
+            }
+            Rectangle {
+                x: 0;
+                y: 14px;
+                width: root.pct * parent.width;
+                height: 4px;
+                border-radius: 2px;
+                background: root.enabled ? Theme.c.accent-fill : Theme.c.accent-fill-disabled;
+            }
+            // thumb: box-shadow 0 0 0 1px stroke, 0 1px 0 1px elev-bottom
+            thumb := Rectangle {
+                property <length> cx: root.pct * hit.width;
+                Rectangle { x: thumb.cx - 11px; y: 6px; width: 22px; height: 22px; border-radius: 11px; background: Theme.c.elev-bottom; }
+                Rectangle { x: thumb.cx - 11px; y: 5px; width: 22px; height: 22px; border-radius: 11px; background: Theme.c.control-stroke; }
+                Rectangle {
+                    x: thumb.cx - 10px;
+                    y: 6px;
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    background: Theme.c.control-solid-fill;
+                    Rectangle {
+                        property <length> d: root.dragging ? 10px : sta.has-hover && root.enabled ? 14px : 12px;
+                        width: d;
+                        height: d;
+                        border-radius: d / 2;
+                        background: !root.enabled ? Theme.c.accent-fill-disabled : root.dragging ? Theme.c.accent-fill-pressed : Theme.c.accent-fill;
+                        animate width, height { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+                    }
+                }
+            }
+            sta := TouchArea {
+                enabled: root.enabled;
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                        Overlay.keyboard = false;
+                        fs.focus();
+                        root.dragging = true;
+                        root.set(root.from-x(self.mouse-x));
+                    } else if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel {
+                        if root.dragging {
+                            root.dragging = false;
+                            root.committed(root.value);
+                        }
+                    }
+                }
+                moved => {
+                    if root.dragging {
+                        root.set(root.from-x(self.mouse-x));
+                    }
+                }
+            }
+            FocusRing { show: fs.has-focus && Overlay.keyboard; }
+            // the value above the thumb while dragging
+            if root.dragging: Rectangle {
+                x: thumb.cx - self.width / 2;
+                y: 6px - 8px - self.height;
+                width: tiptext.preferred-width + 18px;
+                height: 30px;
+                BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-tooltip; }
+                Rectangle {
+                    border-radius: Theme.radius-control;
+                    background: Theme.c.tooltip-fill;
+                    border-width: 1px;
+                    border-color: Theme.c.surface-stroke-flyout;
+                }
+                tiptext := Text { text: root.text; font-size: 12px; color: Theme.c.text-primary; }
+            }
+        }
+        if root.show-value: Text {
+            min-width: 42px;
+            text: root.text;
+            color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
+            vertical-alignment: center;
+        }
+    }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            let big = max(root.step, (root.maximum - root.minimum) / 10);
+            let d = e.text == Key.RightArrow || e.text == Key.UpArrow ? root.step
+                : e.text == Key.LeftArrow || e.text == Key.DownArrow ? -root.step
+                : e.text == Key.PageUp ? big : e.text == Key.PageDown ? -big : 0;
+            if d != 0 || e.text == Key.Home || e.text == Key.End {
+                let v = e.text == Key.Home ? root.minimum : e.text == Key.End ? root.maximum : root.snap(root.value + d);
+                root.set(v);
+                root.committed(v);
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+// Determinate (value 0-100) or indeterminate (value < 0) progress bar, 3px high.
+export component ProgressBar inherits Rectangle {
+    in property <float> value: -1;
+    property <bool> indet: value < 0;
+    property <float> phase: 0;
+    init => { phase = 1; }
+    animate phase { duration: 2s; easing: cubic-bezier(0.4, 0, 0.6, 1); iteration-count: -1; }
+    height: 3px;
+    clip: true;
+    accessible-role: progress-indicator;
+    accessible-value: indet ? "" : "\{round(value)}";
+    if !root.indet: Rectangle {
+        y: 1px;
+        height: 1px;
+        background: Theme.c.control-strong-stroke;
+    }
+    Rectangle {
+        property <length> bw: root.indet ? root.width * 0.4 : root.width * clamp(root.value, 0, 100) / 100;
+        x: root.indet ? (-1 + 3.5 * root.phase) * bw : 0;
+        y: 0;
+        width: bw;
+        height: 3px;
+        border-radius: 1.5px;
+        background: Theme.c.accent-fill;
+        animate width { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+    }
+}

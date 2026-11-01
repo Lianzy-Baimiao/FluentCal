@@ -1,0 +1,750 @@
+// Context menus and colour swatches (0.2's MenuPanel.vue + menu.ts, FColorSwatches.vue). A
+// menu is one popup over the whole window holding the panel and its submenu, so hover moves
+// freely between them; one level of submenus (all 0.2's menus need).
+
+import { Theme, BoxShadow, Swatch } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Overlay, Tip, FocusRing, Flyout, Placement, PlacedRect, TipLayer } from "overlay.slint";
+import { Button, ButtonVariant } from "controls.slint";
+import { TextBox, Fluent } from "inputs.slint";
+import { Cell } from "dialog.slint";
+
+
+// A submenu entry.
+export struct MenuLeaf { key: string, label: string, checked: bool, checkable: bool, radio: bool, disabled: bool, danger: bool }
+
+// A menu entry. kind: "item" | "separator" | "swatches".
+export struct MenuEntry {
+    key: string,
+    kind: string,
+    label: string,
+    icon: string,
+    shortcut: string,
+    checkable: bool,
+    checked: bool,
+    radio: bool,
+    disabled: bool,
+    danger: bool,
+    swatches: [Swatch],
+    children: [MenuLeaf],
+    // The submenu has check marks (column).
+    children-check: bool,
+}
+
+// The row of 20px swatch dots in a menu.
+component SwatchDot inherits Rectangle {
+    in property <Swatch> s;
+    in property <bool> kb;
+    callback picked();
+    width: 20px;
+    height: 20px;
+    accessible-role: radio-button;
+    accessible-checked: s.selected;
+    accessible-label: s.title != "" ? s.title : s.key;
+    property <length> d: ta.has-hover ? 20px * 1.12 : 20px;
+    animate d { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    if s.selected || kb: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.d + 6px;
+        height: self.width;
+        border-radius: self.width / 2;
+        border-width: 2px;
+        border-color: Theme.c.text-primary;
+    }
+    Rectangle {
+        x: (parent.width - root.d) / 2;
+        y: (parent.height - root.d) / 2;
+        width: root.d;
+        height: root.d;
+        border-radius: root.d / 2;
+        border-width: 1px;
+        border-color: s.none ? Theme.c.control-strong-stroke : Theme.c.control-stroke;
+        background: s.none ? transparent : s.color;
+        clip: true;
+        if s.none: Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 20;
+            viewbox-height: 20;
+            commands: "M 3.3 16.7 L 16.7 3.3";
+            stroke: Theme.c.critical;
+            stroke-width: 1.5px;
+        }
+        if s.selected && !s.none: Icon { glyph: Glyph.check-mark; size: 10px; color: s.fg; }
+    }
+    ta := TouchArea {
+        clicked => { root.picked(); }
+        changed has-hover => {
+            if self.has-hover {
+                tt = Tip.enter-on(1, s.title, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(tt);
+            }
+        }
+    }
+    property <int> tt: -1;
+}
+
+// A menu row (item); `open` = its submenu is showing.
+component MenuRow inherits Rectangle {
+    in property <string> label;
+    in property <string> icon;
+    in property <string> shortcut;
+    in property <bool> checkable;
+    in property <bool> checked;
+    in property <bool> radio;
+    in property <bool> disabled;
+    in property <bool> danger;
+    in property <bool> has-sub;
+    in property <bool> col-check;
+    in property <bool> col-icon;
+    in property <bool> hi;
+    in property <bool> open;
+    callback hover();
+    callback activate();
+    out property <bool> pressed: ta.pressed;
+    property <brush> fg: disabled ? Theme.c.text-disabled : ta.pressed ? Theme.c.text-secondary : danger ? Theme.c.critical : Theme.c.text-primary;
+    // vertical margins: 2px each, collapsing with the neighbours' (block layout)
+    in property <length> gap-top: 2px;
+    in property <length> gap-bottom: 0;
+    height: gap-top + 32px + gap-bottom;
+    preferred-width: row.preferred-width + 8px;
+    accessible-role: list-item;
+    accessible-label: label;
+    accessible-enabled: !disabled;
+    accessible-checked: checked;
+    Rectangle {
+        x: 4px;
+        y: root.gap-top;
+        width: parent.width - 8px;
+        height: 32px;
+        border-radius: Theme.radius-control;
+        background: ta.pressed && !root.disabled ? Theme.c.subtle-fill-pressed : root.hi || root.open ? Theme.c.subtle-fill-hover : transparent;
+        row := HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 12px;
+            cross-axis-alignment: center;
+            if root.col-check: Rectangle {
+                width: 16px;
+                if root.checked: Icon {
+                    glyph: root.radio ? Glyph.status-circle-inner : Glyph.check-mark;
+                    size: root.radio ? 8px : 12px;
+                    color: root.fg;
+                }
+            }
+            if root.col-icon: Icon { glyph: root.icon; size: 16px; color: root.fg; }
+            Text {
+                horizontal-stretch: 1;
+                text: root.label;
+                color: root.fg;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if root.shortcut != "": HorizontalLayout {
+                padding-left: 24px;
+                Text {
+                    text: root.shortcut;
+                    font-size: 12px;
+                    color: root.disabled ? Theme.c.text-disabled : Theme.c.text-secondary;
+                    vertical-alignment: center;
+                }
+            }
+            if root.has-sub: HorizontalLayout {
+                padding-left: 8px;
+                Icon { glyph: Glyph.chevron-right; size: 12px; color: Theme.c.text-secondary; }
+            }
+        }
+    }
+    ta := TouchArea {
+        y: root.gap-top;
+        height: 32px;
+        changed has-hover => {
+            if self.has-hover {
+                root.hover();
+            }
+        }
+        clicked => { root.activate(); }
+    }
+}
+
+// The panel background of a menu.
+component MenuSurface inherits Rectangle {
+    BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
+    Rectangle {
+        border-radius: Theme.radius-overlay;
+        background: Theme.flyout-solid;
+        border-width: 1px;
+        border-color: Theme.c.surface-stroke-flyout;
+    }
+    // presses on the panel must not reach the dismiss area
+    TouchArea { }
+    @children
+}
+
+// 0.2's MenuPanel: open with `open-at(x, y, w, h)` (an element: below it; w = h = 0: at a
+// point, e.g. a right click). `activated(key)` for items and submenu entries,
+// `swatch-picked(entry key, swatch key)` for a colour.
+export component Menu {
+    in property <[MenuEntry]> items;
+    // The panel has check marks / icons (column), like hasCheck / hasIcon.
+    in property <bool> has-check;
+    in property <bool> has-icon;
+    in property <Placement> placement: Placement.bottom-start;
+    out property <bool> is-open;
+    callback activated(string);
+    callback swatch-picked(string, string);
+    callback closed();
+    property <length> ax;
+    property <length> ay;
+    property <length> aw;
+    property <length> ah;
+    property <int> hi: -1;
+    property <int> sub: -1;
+    property <int> sub-hi: -1;
+    property <int> swatch-hi: -1;
+    property <int> pending-sub: -1;
+    // window y of the item that opens the submenu, and of the highlighted item
+    property <length> sub-y;
+    property <length> hi-y;
+    // hover delays: open a submenu after 250 ms, close it 300 ms after leaving
+    property <bool> want-open;
+    property <bool> want-close;
+    width: 0;
+    height: 0;
+    Timer {
+        interval: 250ms;
+        running: root.want-open;
+        triggered => {
+            root.want-open = false;
+            root.sub = root.pending-sub;
+            root.sub-hi = -1;
+        }
+    }
+    Timer {
+        interval: 300ms;
+        running: root.want-close;
+        triggered => {
+            root.want-close = false;
+            root.sub = -1;
+        }
+    }
+    public function open-at(x: length, y: length, w: length, h: length) {
+        // Clicking the anchor again closes the menu (WinUI flyout behaviour).
+        if is-open {
+            close();
+            return;
+        }
+        ax = x;
+        ay = y;
+        aw = w;
+        ah = h;
+        hi = -1;
+        sub = -1;
+        sub-hi = -1;
+        swatch-hi = -1;
+        is-open = true;
+        popup.show();
+    }
+    public function close() {
+        if is-open {
+            is-open = false;
+            popup.close();
+            Tip.hide();
+            closed();
+        }
+    }
+    function enabled-at(i: int) -> bool {
+        return i >= 0 && i < items.length && items[i].kind != "separator" && !items[i].disabled;
+    }
+    function step(from: int, d: int) -> int {
+        let n = items.length;
+        let a = Math.mod(from + d + 2 * n, n);
+        let b = Math.mod(from + 2 * d + 2 * n, n);
+        let c = Math.mod(from + 3 * d + 2 * n, n);
+        return enabled-at(a) ? a : enabled-at(b) ? b : enabled-at(c) ? c : -1;
+    }
+    function sub-step(from: int, d: int) -> int {
+        let kids = items[sub].children;
+        let n = kids.length;
+        let a = Math.mod(from + d + 2 * n, n);
+        let b = Math.mod(from + 2 * d + 2 * n, n);
+        return !kids[a].disabled ? a : !kids[b].disabled ? b : from;
+    }
+    function activate(i: int) {
+        if !enabled-at(i) || items[i].kind == "swatches" {
+            return;
+        }
+        if items[i].children.length > 0 {
+            sub-y = hi-y;
+            sub = i;
+            return;
+        }
+        let k = items[i].key;
+        close();
+        activated(k);
+    }
+    function activate-sub(j: int) {
+        let leaf = items[sub].children[j];
+        if leaf.disabled {
+            return;
+        }
+        close();
+        activated(leaf.key);
+    }
+    function pick-swatch(i: int, s: string) {
+        let k = items[i].key;
+        close();
+        swatch-picked(k, s);
+    }
+    popup := PopupWindow {
+        x: -root.absolute-position.x;
+        y: -root.absolute-position.y;
+        width: Overlay.win-w;
+        height: Overlay.win-h;
+        close-policy: no-auto-close;
+        forward-focus: fs;
+        fs := FocusScope {
+            width: 100%;
+            height: 100%;
+            init => { self.focus(); }
+            key-pressed(e) => {
+                if root.sub >= 0 {
+                    if e.text == Key.DownArrow || e.text == Key.UpArrow {
+                        root.sub-hi = root.sub-step(root.sub-hi, e.text == Key.DownArrow ? 1 : -1);
+                        return accept;
+                    }
+                    if e.text == Key.LeftArrow || e.text == Key.Escape {
+                        root.sub = -1;
+                        root.sub-hi = -1;
+                        return accept;
+                    }
+                    if (e.text == Key.Return || e.text == " ") && root.sub-hi >= 0 {
+                        root.activate-sub(root.sub-hi);
+                        return accept;
+                    }
+                }
+                if e.text == Key.Escape || e.text == Key.Tab {
+                    root.close();
+                    return accept;
+                }
+                if e.text == Key.DownArrow || e.text == Key.UpArrow {
+                    let j = root.step(root.hi < 0 && e.text == Key.UpArrow ? 0 : root.hi, e.text == Key.DownArrow ? 1 : -1);
+                    if j >= 0 {
+                        root.hi = j;
+                        root.swatch-hi = root.items[j].kind == "swatches" ? 0 : -1;
+                    }
+                    return accept;
+                }
+                if e.text == Key.Home || e.text == Key.End {
+                    let j = root.step(e.text == Key.Home ? -1 : 0, e.text == Key.Home ? 1 : -1);
+                    root.hi = j;
+                    return accept;
+                }
+                if e.text == Key.RightArrow && root.hi >= 0 {
+                    if root.items[root.hi].kind == "swatches" {
+                        root.swatch-hi = min(root.items[root.hi].swatches.length - 1, root.swatch-hi + 1);
+                    } else if root.items[root.hi].children.length > 0 {
+                        root.sub-y = root.hi-y;
+                        root.sub = root.hi;
+                        root.sub-hi = root.sub-step(-1, 1);
+                    }
+                    return accept;
+                }
+                if e.text == Key.LeftArrow && root.hi >= 0 && root.items[root.hi].kind == "swatches" {
+                    root.swatch-hi = max(0, root.swatch-hi - 1);
+                    return accept;
+                }
+                if (e.text == Key.Return || e.text == " ") && root.hi >= 0 {
+                    if root.items[root.hi].kind == "swatches" && root.swatch-hi >= 0 {
+                        root.pick-swatch(root.hi, root.items[root.hi].swatches[root.swatch-hi].key);
+                    } else if root.items[root.hi].children.length > 0 {
+                        root.sub-y = root.hi-y;
+                        root.sub = root.hi;
+                        root.sub-hi = root.sub-step(-1, 1);
+                    } else {
+                        root.activate(root.hi);
+                    }
+                    return accept;
+                }
+                return accept;
+            }
+            TouchArea {
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        root.close();
+                    }
+                }
+            }
+            panel := MenuSurface {
+                property <length> w: clamp(rows.preferred-width, 160px, min(360px, Overlay.win-w - 16px));
+                property <length> h: min(rows.preferred-height, Overlay.win-h - 16px);
+                property <PlacedRect> at: Overlay.place(root.ax, root.ay, root.aw, root.ah, w, h, root.placement, root.aw > 0 ? 4px : 0);
+                // At a point with no room on the right: open to the left of it.
+                property <length> left: root.aw == 0 && at.x < root.ax ? max(8px, root.ax - w) : at.x;
+                property <float> fade: 0;
+                init => { fade = 1; }
+                animate fade { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+                x: left + (1 - fade) * (at.side == "right" ? -6px : at.side == "left" ? 6px : 0);
+                y: at.y + (1 - fade) * (at.side == "top" ? 6px : at.side == "bottom" ? -6px : 0);
+                width: w;
+                height: h;
+                opacity: fade;
+                accessible-role: list;
+                rows := VerticalLayout {
+                    padding-top: 3px;
+                    padding-bottom: 3px;
+                    padding-left: 1px;
+                    padding-right: 1px;
+                    for it[i] in root.items: Rectangle {
+                        property <bool> sep: it.kind == "separator";
+                        property <bool> sws: it.kind == "swatches";
+                        // CSS margins of block siblings collapse: the gap above is the larger
+                        // of the two margins; the last row keeps its own bottom margin.
+                        property <length> m: sep ? 3px : 2px;
+                        property <length> prev-m: i == 0 ? 0 : root.items[i - 1].kind == "separator" ? 3px : 2px;
+                        property <length> top: max(m, prev-m);
+                        property <length> bottom: i == root.items.length - 1 ? m : 0;
+                        property <length> body: sep ? 1px : sws ? (it.label != "" ? 22px : 0) + 20px + 14px : 32px;
+                        height: top + body + bottom;
+                        preferred-width: sws ? 8px + 24px + it.swatches.length * 26px - 6px : 0;
+                        if sep: Rectangle { y: parent.top; height: 1px; background: Theme.c.divider; }
+                        if sws: Rectangle {
+                            x: 4px;
+                            width: parent.width - 8px;
+                            y: parent.top;
+                            height: parent.body;
+                            accessible-role: groupbox;
+                            accessible-label: it.label;
+                            TouchArea {
+                                changed has-hover => {
+                                    if self.has-hover {
+                                        root.hi = i;
+                                        root.swatch-hi = -1;
+                                        root.want-close = root.sub >= 0;
+                                    }
+                                }
+                            }
+                            if it.label != "": Text {
+                                x: 12px;
+                                y: 6px;
+                                height: 16px;
+                                text: it.label;
+                                font-size: 12px;
+                                color: Theme.c.text-secondary;
+                                vertical-alignment: center;
+                            }
+                            for s[k] in it.swatches: SwatchDot {
+                                x: 12px + k * 26px;
+                                y: it.label != "" ? 28px : 6px;
+                                s: s;
+                                kb: i == root.hi && k == root.swatch-hi;
+                                picked => { root.pick-swatch(i, s.key); }
+                            }
+                        }
+                        if !sep && !sws: row := MenuRow {
+                            width: parent.width;
+                            gap-top: parent.top;
+                            gap-bottom: parent.bottom;
+                            label: it.label;
+                            icon: it.icon;
+                            shortcut: it.shortcut;
+                            checkable: it.checkable;
+                            checked: it.checked;
+                            radio: it.radio;
+                            disabled: it.disabled;
+                            danger: it.danger;
+                            has-sub: it.children.length > 0;
+                            col-check: root.has-check;
+                            col-icon: root.has-icon;
+                            hi: i == root.hi;
+                            open: i == root.sub;
+                            changed hi => {
+                                if self.hi {
+                                    root.hi-y = self.absolute-position.y + self.gap-top;
+                                }
+                            }
+                            hover => {
+                                if !it.disabled {
+                                    root.hi = i;
+                                    root.swatch-hi = -1;
+                                    if it.children.length > 0 {
+                                        root.want-close = false;
+                                        if root.sub != i {
+                                            root.sub-y = self.absolute-position.y + self.gap-top;
+                                            root.pending-sub = i;
+                                            root.want-open = true;
+                                        }
+                                    } else {
+                                        root.want-open = false;
+                                        root.want-close = root.sub >= 0;
+                                    }
+                                }
+                            }
+                            activate => {
+                                if it.children.length > 0 {
+                                    root.sub-y = self.absolute-position.y + self.gap-top;
+                                    root.sub = i;
+                                    root.want-open = false;
+                                } else {
+                                    root.activate(i);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if root.sub >= 0: subpanel := MenuSurface {
+                property <[MenuLeaf]> kids: root.items[root.sub].children;
+                property <length> w: clamp(subrows.preferred-width, 160px, min(360px, Overlay.win-w - 16px));
+                property <length> h: subrows.preferred-height;
+                property <PlacedRect> at: Overlay.place(panel.x + 5px, root.sub-y - 5px, panel.width - 10px, 32px, w, h, Placement.right-start, -2px);
+                property <float> fade: 0;
+                init => { fade = 1; }
+                animate fade { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+                x: at.x + (1 - fade) * (at.side == "right" ? -6px : 6px);
+                y: at.y;
+                width: w;
+                height: h;
+                opacity: fade;
+                TouchArea {
+                    changed has-hover => {
+                        if self.has-hover {
+                            root.want-close = false;
+                            root.hi = root.sub;
+                        }
+                    }
+                }
+                subrows := VerticalLayout {
+                    padding-top: 3px;
+                    padding-bottom: 3px;
+                    padding-left: 1px;
+                    padding-right: 1px;
+                    for leaf[j] in subpanel.kids: MenuRow {
+                        gap-top: 2px;
+                        gap-bottom: j == subpanel.kids.length - 1 ? 2px : 0;
+                        label: leaf.label;
+                        checkable: leaf.checkable;
+                        checked: leaf.checked;
+                        radio: leaf.radio;
+                        disabled: leaf.disabled;
+                        danger: leaf.danger;
+                        col-check: root.items[root.sub].children-check;
+                        hi: j == root.sub-hi;
+                        hover => {
+                            root.want-close = false;
+                            root.hi = root.sub;
+                            if !leaf.disabled {
+                                root.sub-hi = j;
+                            }
+                        }
+                        activate => { root.activate-sub(j); }
+                    }
+                }
+            }
+            TipLayer { layer: 1; }
+        }
+    }
+}
+
+// One swatch of ColorSwatches: fill, "none" (red diagonal) or "+" (dashed).
+component SwatchCell inherits Rectangle {
+    in property <length> size: 24px;
+    in property <color> fill;
+    in property <color> fg;
+    in property <bool> selected;
+    in property <bool> none;
+    in property <bool> add;
+    in property <bool> focused;
+    in property <string> label;
+    callback picked();
+    property <length> d: ta.has-hover ? size * 1.08 : size;
+    animate d { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    width: size;
+    height: size;
+    accessible-role: radio-button;
+    accessible-checked: selected;
+    accessible-label: label;
+    // outline: 2px solid text-primary, offset 2px
+    if root.selected || root.focused: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.d + (root.focused && root.selected ? 10px : 8px);
+        height: self.width;
+        border-radius: self.width / 2;
+        border-width: root.focused && root.selected ? 3px : 2px;
+        border-color: Theme.c.text-primary;
+    }
+    Rectangle {
+        x: (parent.width - root.d) / 2;
+        y: (parent.height - root.d) / 2;
+        width: root.d;
+        height: root.d;
+        border-radius: root.d / 2;
+        border-width: root.add ? 0 : 1px;
+        border-color: root.none ? Theme.c.control-strong-stroke : Theme.c.control-stroke;
+        background: root.add ? (ta.has-hover ? Theme.c.subtle-fill-hover : transparent) : root.none ? transparent : root.fill;
+        clip: true;
+        if root.none: Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 24;
+            viewbox-height: 24;
+            commands: "M 3.5 20.5 L 20.5 3.5";
+            stroke: Theme.c.critical;
+            stroke-width: 1.5px;
+        }
+        if root.add: Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 24;
+            viewbox-height: 24;
+            commands: "M 12.00 0.50 A 11.5 11.5 0 0 1 14.98 0.89 M 17.75 2.04 A 11.5 11.5 0 0 1 20.13 3.87 M 21.96 6.25 A 11.5 11.5 0 0 1 23.11 9.02 M 23.50 12.00 A 11.5 11.5 0 0 1 23.11 14.98 M 21.96 17.75 A 11.5 11.5 0 0 1 20.13 20.13 M 17.75 21.96 A 11.5 11.5 0 0 1 14.98 23.11 M 12.00 23.50 A 11.5 11.5 0 0 1 9.02 23.11 M 6.25 21.96 A 11.5 11.5 0 0 1 3.87 20.13 M 2.04 17.75 A 11.5 11.5 0 0 1 0.89 14.98 M 0.50 12.00 A 11.5 11.5 0 0 1 0.89 9.02 M 2.04 6.25 A 11.5 11.5 0 0 1 3.87 3.87 M 6.25 2.04 A 11.5 11.5 0 0 1 9.02 0.89";
+            stroke: Theme.c.control-strong-stroke;
+            stroke-width: 1px;
+            fill: transparent;
+        }
+        if root.add: Icon { glyph: Glyph.add; size: round(root.size * 0.5 / 1px) * 1px; color: Theme.c.text-secondary; }
+        if root.selected && !root.none && !root.add: Icon { glyph: Glyph.check-mark; size: round(root.size * 0.5 / 1px) * 1px; color: root.fg; }
+    }
+    ta := TouchArea {
+        clicked => { root.picked(); }
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                Overlay.keyboard = false;
+            }
+        }
+        changed has-hover => {
+            if self.has-hover {
+                tt = Tip.enter(root.label, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(tt);
+            }
+        }
+    }
+    property <int> tt: -1;
+}
+
+// 0.2's FColorSwatches: round swatches (`size` px), optionally "none" first and "+" (a custom
+// colour, typed as hex) last. `value` is a key, a hex, or "" for none.
+export component ColorSwatches {
+    in property <[Swatch]> colors;
+    in property <string> value;
+    in property <bool> allow-none;
+    in property <bool> custom;
+    in property <length> size: 24px;
+    callback picked(string);
+    // A selected custom colour not among the presets (normalized hex) and its look.
+    in property <string> custom-value;
+    in property <color> custom-color;
+    in property <color> custom-fg;
+    property <string> draft: "#0078D4";
+    property <int> cursor: -1;
+    forward-focus: fs;
+    accessible-role: radio-group;
+    accessible-label: "颜色";
+    FlexboxLayout {
+        spacing: 6px;
+        cross-axis-alignment: center;
+        if root.allow-none: SwatchCell {
+            size: root.size;
+            none: true;
+            selected: root.value == "";
+            label: "无";
+            picked => { root.picked(""); }
+        }
+        for c[i] in root.colors: SwatchCell {
+            size: root.size;
+            fill: c.color;
+            fg: c.fg;
+            selected: root.value == c.key;
+            label: c.title != "" ? c.title : c.key;
+            focused: root.cursor == i && fs.has-focus && Overlay.keyboard;
+            picked => { root.picked(c.key); }
+        }
+        if root.custom-value != "": SwatchCell {
+            size: root.size;
+            fill: root.custom-color;
+            fg: root.custom-fg;
+            selected: true;
+            label: root.custom-value;
+        }
+        if root.custom: add := SwatchCell {
+            size: root.size;
+            add: true;
+            label: "自定义颜色";
+            picked => {
+                root.draft = root.custom-value != "" ? root.custom-value : "#0078D4";
+                fly.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height);
+            }
+        }
+    }
+    fs := FocusScope {
+        width: 0;
+        height: 0;
+        key-pressed(e) => {
+            let d = e.text == Key.RightArrow || e.text == Key.DownArrow ? 1 : e.text == Key.LeftArrow || e.text == Key.UpArrow ? -1 : 0;
+            if d != 0 && root.colors.length > 0 {
+                root.cursor = Math.mod(max(0, root.cursor) + d + root.colors.length, root.colors.length);
+                return accept;
+            }
+            if (e.text == " " || e.text == Key.Return) && root.cursor >= 0 {
+                root.picked(root.colors[root.cursor].key);
+                return accept;
+            }
+            return reject;
+        }
+    }
+    fly := Flyout {
+        panel-width: 232px;
+        label: "自定义颜色";
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+            cross-axis-alignment: center;
+            Rectangle {
+                width: 48px;
+                height: 32px;
+                border-radius: Theme.radius-control;
+                border-width: 1px;
+                border-color: Theme.c.control-stroke;
+                background: Fluent.hex-color(root.draft);
+            }
+            TextBox {
+                width: 120px;
+                text <=> root.draft;
+                accepted => {
+                    if Fluent.normalize-hex(root.draft) != "" {
+                        root.picked(Fluent.normalize-hex(root.draft));
+                        fly.close();
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-top: 16px;
+            spacing: 8px;
+            Cell {
+                Button {
+                    width: parent.width;
+                    text: "确定";
+                    variant: ButtonVariant.accent;
+                    enabled: Fluent.normalize-hex(root.draft) != "";
+                    clicked => {
+                        root.picked(Fluent.normalize-hex(root.draft));
+                        fly.close();
+                    }
+                }
+            }
+            Cell {
+                Button {
+                    width: parent.width;
+                    text: "取消";
+                    clicked => { fly.close(); }
+                }
+            }
+        }
+    }
+}
+
