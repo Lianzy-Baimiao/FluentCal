@@ -29,11 +29,17 @@ pub fn job<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: i
 impl App {
     /// What the pages show from the app (view::Info).
     pub fn settings_info(&self) -> Info {
-        let mons = crate::platform::screens::monitors();
-        let cur = crate::shell::current_screen(self);
-        let screens = mons.iter().enumerate().map(|(i, m)| (i.to_string(), crate::platform::screens::title(m, i), cur == Some(i))).collect();
-        let snap = self.store.snapshot();
-        let holiday_years = snap.get("holidays").and_then(Value::as_object).map(|o| o.keys().cloned().collect()).unwrap_or_default();
+        // Screens and the holiday years are on 常规 only (the document snapshot isn't free).
+        let general = self.settings_win.as_ref().is_some_and(|s| s.local.page == "general");
+        let (screens, holiday_years) = if general {
+            let mons = crate::platform::screens::monitors();
+            let cur = crate::shell::current_screen(self);
+            let screens = mons.iter().enumerate().map(|(i, m)| (i.to_string(), crate::platform::screens::title(m, i), cur == Some(i))).collect();
+            let snap = self.store.snapshot();
+            (screens, snap.get("holidays").and_then(Value::as_object).map(|o| o.keys().cloned().collect()).unwrap_or_default())
+        } else {
+            (Vec::new(), Vec::new())
+        };
         Info {
             version: env!("CARGO_PKG_VERSION").into(),
             build: self.sys.build,
@@ -72,7 +78,7 @@ impl App {
     /// link changes).
     pub fn settings_load_web(&mut self) {
         let info = self.web_info();
-        let scale = self.settings_win.as_ref().map_or(1.0, |s| slint::ComponentHandle::window(&s.window).scale_factor());
+        let scale = self.settings_win.as_ref().map_or(1.0, |s| super::view::scale_of(&s.window, self));
         let Some(l) = self.local() else { return };
         let link = info.addresses.first().map(|a| a.3.clone());
         let qr = match (link, l.web.qr.take()) {

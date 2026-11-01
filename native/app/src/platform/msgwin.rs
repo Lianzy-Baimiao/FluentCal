@@ -41,6 +41,28 @@ pub fn instance_id() -> String {
     })
 }
 
+/// A restart (`--restart`, after the data folder changed): waits for the old copy to exit and
+/// let go of the single-instance mutex, at most `ms` milliseconds. A mutex we only opened
+/// keeps it alive, so close ours each round.
+pub fn wait_for_exit(id: &str, ms: u64) {
+    use windows::Win32::Foundation::CloseHandle;
+    let name = HSTRING::from(format!("{id}-sim"));
+    let until = std::time::Instant::now() + std::time::Duration::from_millis(ms);
+    loop {
+        unsafe {
+            let h = CreateMutexW(None, false, &name);
+            let busy = GetLastError() == ERROR_ALREADY_EXISTS;
+            if let Ok(h) = h {
+                let _ = CloseHandle(h);
+            }
+            if !busy || std::time::Instant::now() >= until {
+                return;
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
 /// Claims the single instance. Returns false after handing our arguments to the running
 /// instance: the caller exits.
 pub fn claim(id: &str) -> bool {

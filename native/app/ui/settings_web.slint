@@ -10,14 +10,25 @@ import { AboutSlint } from "std-widgets.slint";
 import { SetState } from "settings_state.slint";
 import { PageMsg } from "settings_data.slint";
 
-// One bullet of the notes list (ul.note.list: 12px, line-height 1.7, 20px indent).
-component Bullet inherits HorizontalLayout {
+// One bullet of the notes list (ul.note.list: 12px, line-height 1.7, 20px indent). Not a
+// HorizontalLayout: that would measure the wrapping text at its own whole width.
+component Bullet inherits Rectangle {
     in property <string> text;
-    Rectangle {
-        width: 20px;
-        Rectangle { x: 8px; y: 8px; width: 4px; height: 4px; border-radius: 2px; background: Theme.c.text-secondary; }
+    preferred-height: t.preferred-height;
+    min-height: t.preferred-height;
+    Rectangle { x: 8px; y: 8px; width: 4px; height: 4px; border-radius: 2px; background: Theme.c.text-secondary; }
+    t := Text {
+        x: 20px;
+        y: 0;
+        width: root.width - 20px;
+        height: self.preferred-height;
+        text: root.text;
+        font-size: 12px;
+        color: Theme.c.text-secondary;
+        wrap: word-wrap;
+        line-height-factor: 1.29;
+        vertical-alignment: top;
     }
-    Text { horizontal-stretch: 1; text: root.text; font-size: 12px; color: Theme.c.text-secondary; wrap: word-wrap; line-height-factor: 1.29; }
 }
 
 export component WebPage inherits VerticalLayout {
@@ -105,8 +116,8 @@ export component WebPage inherits VerticalLayout {
             NumberBox { width: 120px; value: SetState.web.port; minimum: 1024; maximum: 65535; changed-value(v) => { SetState.set-num("web.port", v); } }
         }
     }
+    // ul.note.list: the scoped .note { margin: 0 } comes after .list's margin-top, so none
     VerticalLayout {
-        padding-top: 8px;
         Bullet { text: "第一次打开“允许局域网内的设备查看”时 Windows 防火墙会询问是否允许 FluentCal 访问网络，请勾选“专用网络”并允许，否则手机连不上。"; }
         Bullet { text: "链接里带有访问码，知道链接的人都能查看你的日程；不小心发给了别人就点“更换访问码”。"; }
         Bullet { text: "局域网内传输没有加密，只在家里、公司等信任的网络中使用。"; }
@@ -124,7 +135,7 @@ export component AboutPage inherits VerticalLayout {
         Image { width: 64px; height: 64px; source: SetState.icon; accessible-role: none; }
         VerticalLayout {
             alignment: center;
-            Text { text: "FluentCal 桌面日历"; font-size: 20px; font-weight: 600; height: 28px; vertical-alignment: center; color: Theme.c.text-primary; }
+            Text { text: "FluentCal 桌面日历"; font-size: 20px; font-weight: 600; height: 20px; vertical-alignment: center; color: Theme.c.text-primary; }
             Rectangle { height: 4px; }
             Text { text: "版本 " + SetState.about.version + " · Windows 内部版本 " + SetState.about.build; font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
             Text { text: "钉在桌面上的 Windows 11 风格日历与甘特图。数据只保存在本机。"; font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }

@@ -196,9 +196,16 @@ pub fn setup_with(w: &SettingsWindow, scale: f32) {
 }
 
 pub fn setup(w: &SettingsWindow, app: &crate::app::App) {
-    let scale = app.aux_screen().map_or(1.0, |m| m.scale) as f32;
-    let scale = if w.window().scale_factor() > 0.0 && w.window().is_visible() { w.window().scale_factor() } else { scale };
-    setup_with(w, scale);
+    setup_with(w, scale_of(w, app));
+}
+
+/// The window's scale; before Windows has created it (just shown), the screen it opens on.
+pub fn scale_of(w: &SettingsWindow, app: &crate::app::App) -> f32 {
+    if crate::platform::window::hwnd(w.window()).is_some() {
+        w.window().scale_factor()
+    } else {
+        app.aux_screen().map_or(1.0, |m| m.scale) as f32
+    }
 }
 
 fn s(v: &str) -> SharedString {
