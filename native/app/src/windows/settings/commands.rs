@@ -132,11 +132,9 @@ impl App {
     }
 
     fn settings_delete_group(&mut self, id: &str) {
-        let Some(g) = self.doc.groups.get(id).cloned() else { return };
-        let n = self.doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(id)).count();
-        let content = if n > 0 { format!("组内 {n} 个任务会移到“未分组”，不会被删除。") } else { String::new() };
+        let Some((title, content)) = delete_group_question(&self.doc, id) else { return };
         let id = id.to_owned();
-        self.settings_confirm(&format!("删除分组“{}”？", g.name), &content, "删除", "", true, move |app, r| {
+        self.settings_confirm(&title, &content, "删除", "", true, move |app, r| {
             if r == "primary" {
                 let edit = tasks::delete_group(&app.doc, &id, fluentcal_core::date::now_ms());
                 app.apply(edit, false);
@@ -212,6 +210,14 @@ impl App {
             }
         });
     }
+}
+
+/// GanttPage remove(): the question before deleting a group (title, content).
+pub fn delete_group_question(doc: &fluentcal_core::tasks::Doc, id: &str) -> Option<(String, String)> {
+    let g = doc.groups.get(id)?;
+    let n = doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(id)).count();
+    let content = if n > 0 { format!("组内 {n} 个任务会移到“未分组”，不会被删除。") } else { String::new() };
+    Some((format!("删除分组“{}”？", g.name), content))
 }
 
 /// The edit that writes a merge plan's items (0.2: put('groups' / 'tasks' / 'dayMarks')).

@@ -641,6 +641,10 @@ export component ColorSwatches {
     in property <color> custom-fg;
     property <string> draft: "#0078D4";
     property <int> cursor: -1;
+    // One line wide, as CSS measures a wrapping flex row (Slint's FlexboxLayout would say
+    // about a square); it still wraps when it gets less.
+    property <int> cells: colors.length + (allow-none ? 1 : 0) + (custom-value != "" ? 1 : 0) + (custom ? 1 : 0);
+    preferred-width: cells * (size + 6px) - 6px;
     forward-focus: fs;
     accessible-role: radio-group;
     accessible-label: "颜色";

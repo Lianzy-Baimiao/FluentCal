@@ -52,21 +52,21 @@ component Card inherits Rectangle {
 // .thumb with the mini window (.win): light, dark or split for "system".
 component ModeThumb inherits Rectangle {
     in property <string> mode;
-    border-radius: 4px;
     clip: true;
-    background: mode == "dark" ? @linear-gradient(160deg, #0b2a5b 0%, #1b4f9c 100%)
-        : mode == "system" ? @linear-gradient(115deg, #cfe2fb 50%, #0b2a5b 50%)
-        : @linear-gradient(160deg, #cfe2fb 0%, #5d93e0 100%);
+    Image {
+        width: 100%;
+        height: 100%;
+        image-fit: fill;
+        source: root.mode == "dark" ? SetState.thumb-dark : root.mode == "system" ? SetState.thumb-system : SetState.thumb-light;
+    }
     win := Rectangle {
         x: (parent.width - 92px) / 2;
         y: (parent.height - 56px) / 2;
         width: 92px;
         height: 56px;
         BoxShadow { width: parent.width; height: parent.height; shadow: SetState.thumb-shadow; }
-        Rectangle {
-            border-radius: 4px;
-            background: root.mode == "dark" ? #202020 : root.mode == "system" ? @linear-gradient(115deg, #f3f3f3 50%, #202020 50%) : #f3f3f3;
-        }
+        if root.mode != "system": Rectangle { border-radius: 4px; background: root.mode == "dark" ? #202020 : #f3f3f3; }
+        if root.mode == "system": Image { width: 100%; height: 100%; image-fit: fill; source: SetState.thumb-split-win; }
         // 6px padding, 5px gaps: accent bar (40%), two bars, a short one (60%)
         Rectangle { x: 6px; y: 6px; width: (92px - 12px) * 0.4; height: 6px; border-radius: 2px; background: Theme.c.accent-fill; }
         Rectangle { x: 6px; y: 17px; width: 92px - 12px; height: 5px; border-radius: 2px; background: rgba(128, 128, 128, 0.45); }
@@ -80,9 +80,8 @@ component PresetThumb inherits Rectangle {
     in property <float> bg;
     in property <float> cell;
     in property <bool> dark;
-    border-radius: 4px;
     clip: true;
-    background: @linear-gradient(160deg, #0b2a5b 0%, #1b4f9c 55%, #3a7bd5 100%);
+    Image { width: 100%; height: 100%; image-fit: fill; source: SetState.thumb-wall; }
     property <length> mw: root.width * 0.84;
     property <length> mh: 5px * 2 + 14px * 3 + 2px * 2;
     property <length> cw: (mw - 10px - 6 * 2px) / 7;

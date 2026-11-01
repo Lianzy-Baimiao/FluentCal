@@ -79,17 +79,19 @@ export component AppearancePage inherits VerticalLayout {
     SettingsGroup {
         first: false;
         title: "强调色";
-        SettingsExpander {
-            icon: Glyph.color;
-            title: "跟随 Windows 强调色";
-            description: "今日高亮、按钮、选中状态使用的颜色";
-            expanded: root.open-accent;
-            toggled(v) => { root.open-accent = v; }
-            Toggle { checked: SetState.appearance.follow-accent; toggled(v) => { SetState.set-bool("follow-accent", v); } }
-        }
-        SettingsExpanderItems {
-            expanded: root.open-accent;
-            AccentRow { }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.color;
+                title: "跟随 Windows 强调色";
+                description: "今日高亮、按钮、选中状态使用的颜色";
+                expanded: root.open-accent;
+                toggled(v) => { root.open-accent = v; }
+                Toggle { checked: SetState.appearance.follow-accent; toggled(v) => { SetState.set-bool("follow-accent", v); } }
+            }
+                SettingsExpanderItems {
+                expanded: root.open-accent;
+                AccentRow { }
+            }
         }
     }
     SettingsGroup {
@@ -135,51 +137,55 @@ export component AppearancePage inherits VerticalLayout {
             severity: Severity.warning;
             text: "系统已关闭“透明效果”（设置 › 个性化 › 颜色），亚克力将不会生效。";
         }
-        SettingsExpander {
-            icon: Glyph.font;
-            title: "布局与文字";
-            description: "圆角、阴影、字号与间距";
-            has-content: false;
-            expanded: root.open-layout;
-            toggled(v) => { root.open-layout = v; }
-        }
-        SettingsExpanderItems {
-            expanded: root.open-layout;
-            SliderRow { title: "圆角"; path: "desk.radius"; value: SetState.appearance.radius; min: 0; max: 16; suffix: "px"; }
-            SettingsRow {
-                divider: true;
-                title: "窗口阴影";
-                Toggle { checked: SetState.appearance.shadow; toggled(v) => { SetState.set-bool("desk.shadow", v); } }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.font;
+                title: "布局与文字";
+                description: "圆角、阴影、字号与间距";
+                has-content: false;
+                expanded: root.open-layout;
+                toggled(v) => { root.open-layout = v; }
             }
-            SettingsRow {
-                divider: true;
-                title: "文字阴影";
-                description: "背景较透明时为文字加阴影，保证在壁纸上清晰可读";
-                Select {
-                    width: 120px;
-                    value: SetState.appearance.text-shadow;
-                    options: [{ value: "auto", label: "自动" }, { value: "on", label: "开启" }, { value: "off", label: "关闭" }];
-                    selected(v) => { SetState.set-str("desk.textShadow", v); }
+                SettingsExpanderItems {
+                expanded: root.open-layout;
+                SliderRow { title: "圆角"; path: "desk.radius"; value: SetState.appearance.radius; min: 0; max: 16; suffix: "px"; }
+                SettingsRow {
+                    divider: true;
+                    title: "窗口阴影";
+                    Toggle { checked: SetState.appearance.shadow; toggled(v) => { SetState.set-bool("desk.shadow", v); } }
                 }
+                SettingsRow {
+                    divider: true;
+                    title: "文字阴影";
+                    description: "背景较透明时为文字加阴影，保证在壁纸上清晰可读";
+                    Select {
+                        width: 120px;
+                        value: SetState.appearance.text-shadow;
+                        options: [{ value: "auto", label: "自动" }, { value: "on", label: "开启" }, { value: "off", label: "关闭" }];
+                        selected(v) => { SetState.set-str("desk.textShadow", v); }
+                    }
+                }
+                SliderRow { divider: true; title: "字号"; path: "desk.fontScale"; value: SetState.appearance.font-scale; min: 80; max: 140; step: 5; suffix: "%"; }
+                SliderRow { divider: true; title: "日期格间隙"; path: "desk.cellGap"; value: SetState.appearance.cell-gap; min: 0; max: 10; suffix: "px"; }
+                SliderRow { divider: true; title: "任务行距"; path: "desk.lineSpacing"; value: SetState.appearance.line-spacing; min: 0; max: 8; suffix: "px"; }
             }
-            SliderRow { divider: true; title: "字号"; path: "desk.fontScale"; value: SetState.appearance.font-scale; min: 80; max: 140; step: 5; suffix: "%"; }
-            SliderRow { divider: true; title: "日期格间隙"; path: "desk.cellGap"; value: SetState.appearance.cell-gap; min: 0; max: 10; suffix: "px"; }
-            SliderRow { divider: true; title: "任务行距"; path: "desk.lineSpacing"; value: SetState.appearance.line-spacing; min: 0; max: 8; suffix: "px"; }
         }
-        SettingsExpander {
-            icon: Glyph.color;
-            title: "细节颜色";
-            description: "今日、休息日、节假日和节气的颜色；留空为自动";
-            has-content: false;
-            expanded: root.open-detail;
-            toggled(v) => { root.open-detail = v; }
-        }
-        SettingsExpanderItems {
-            expanded: root.open-detail;
-            SettingsRow { title: "今日高亮"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-color; size: 22px; picked(v) => { SetState.set-str("desk.todayColor", v == "" ? "accent" : v); } } }
-            SettingsRow { divider: true; title: "休息日背景"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.rest-color; size: 22px; picked(v) => { SetState.set-str("desk.restBgColor", v == "" ? "auto" : v); } } }
-            SettingsRow { divider: true; title: "节假日文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.holiday-color; size: 22px; picked(v) => { SetState.set-str("desk.holidayTextColor", v == "" ? "auto" : v); } } }
-            SettingsRow { divider: true; title: "节日与节气文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.term-color; size: 22px; picked(v) => { SetState.set-str("desk.termTextColor", v == "" ? "auto" : v); } } }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.color;
+                title: "细节颜色";
+                description: "今日、休息日、节假日和节气的颜色；留空为自动";
+                has-content: false;
+                expanded: root.open-detail;
+                toggled(v) => { root.open-detail = v; }
+            }
+                SettingsExpanderItems {
+                expanded: root.open-detail;
+                SettingsRow { title: "今日高亮"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-color; size: 22px; picked(v) => { SetState.set-str("desk.todayColor", v == "" ? "accent" : v); } } }
+                SettingsRow { divider: true; title: "休息日背景"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.rest-color; size: 22px; picked(v) => { SetState.set-str("desk.restBgColor", v == "" ? "auto" : v); } } }
+                SettingsRow { divider: true; title: "节假日文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.holiday-color; size: 22px; picked(v) => { SetState.set-str("desk.holidayTextColor", v == "" ? "auto" : v); } } }
+                SettingsRow { divider: true; title: "节日与节气文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.term-color; size: 22px; picked(v) => { SetState.set-str("desk.termTextColor", v == "" ? "auto" : v); } } }
+            }
         }
     }
     SettingsGroup {

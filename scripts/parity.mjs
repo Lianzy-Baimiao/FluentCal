@@ -60,11 +60,11 @@ const SCENES = [
   settingsScene('settings-general-dark', 'general', { dark: true }),
   settingsScene('settings-appearance-dark', 'appearance', { dark: true }),
   settingsScene('settings-sync-webdav', 'sync', { settings: { sync: { provider: 'webdav', webdav: { url: 'https://dav.jianguoyun.com/dav/', user: 'me@example.com' } } } }),
-  settingsScene('settings-sync-help', 'sync', { settings: { sync: { provider: 'github' } }, steps: [['click', '.f-exp .hdr:has-text("怎样创建 GitHub")']] }),
+  settingsScene('settings-sync-help', 'sync', { settings: { sync: { provider: 'github' } }, steps: [['click', '.f-exp:has-text("怎样创建 GitHub") .chev-btn']] }),
   settingsScene('settings-web-lan', 'web', { settings: { web: { enabled: true } } }),
   settingsScene('settings-general-select', 'general', { steps: [['click', '.f-select >> nth=0']] }),
   settingsScene('settings-gantt-delete', 'gantt', { steps: [['click', 'button[title="删除分组 官网改版"]']] }),
-  settingsScene('settings-appearance-open', 'appearance', { steps: [['click', '.f-exp .hdr:has-text("布局与文字")'], ['click', '.f-exp .hdr:has-text("细节颜色")']] }),
+  settingsScene('settings-appearance-open', 'appearance', { steps: [['click', '.f-exp:has-text("布局与文字") .chev-btn'], ['click', '.f-exp:has-text("细节颜色") .chev-btn']] }),
   { name: 'gallery-focus', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'input[placeholder="搜索任务"]'], ['type', '', '周报'], ['key', '', 'Tab']] },
 ];
 const only = process.argv.slice(2);

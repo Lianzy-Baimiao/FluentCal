@@ -117,23 +117,25 @@ export component DataPage inherits VerticalLayout {
     SettingsGroup {
         first: false;
         title: "自动备份";
-        SettingsExpander {
-            icon: Glyph.sync;
-            title: "备份文件";
-            description: SetState.data.backups-desc;
-            expanded: root.open-backups;
-            toggled(v) => { root.open-backups = v; }
-            Button { text: "立即备份"; clicked => { SetState.action("backup-now"); } }
-        }
-        SettingsExpanderItems {
-            expanded: root.open-backups;
-            for b[i] in SetState.backups: SettingsRow {
-                divider: i > 0;
-                title: b.name;
-                description: b.desc;
-                Button { text: "恢复"; size: ButtonSize.small; clicked => { SetState.action-arg("restore", b.name); } }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.sync;
+                title: "备份文件";
+                description: SetState.data.backups-desc;
+                expanded: root.open-backups;
+                toggled(v) => { root.open-backups = v; }
+                Button { text: "立即备份"; clicked => { SetState.action("backup-now"); } }
             }
-            if SetState.backups.length == 0: SettingsRow { title: "还没有备份"; }
+                SettingsExpanderItems {
+                expanded: root.open-backups;
+                for b[i] in SetState.backups: SettingsRow {
+                    divider: i > 0;
+                    title: b.name;
+                    description: b.desc;
+                    Button { text: "恢复"; size: ButtonSize.small; clicked => { SetState.action-arg("restore", b.name); } }
+                }
+                if SetState.backups.length == 0: SettingsRow { title: "还没有备份"; }
+            }
         }
         SettingsCard {
             icon: Glyph.folder;

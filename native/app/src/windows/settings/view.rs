@@ -130,6 +130,43 @@ pub fn qr_image(text: &str, px: u32) -> Image {
     Image::from_rgb8(buf)
 }
 
+/// A CSS linear-gradient(`deg`, stops…) as a `w`×`h` image with `radius` px rounded corners
+/// (the software renderer draws hard stops and some 3-stop gradients wrongly). Stops are
+/// (position 0..1, "#rrggbb").
+pub fn gradient_image(w: u32, h: u32, radius: f64, deg: f64, stops: &[(f64, &str)]) -> Image {
+    let (w, h) = (w.max(1), h.max(1));
+    let a = deg.to_radians();
+    let (dx, dy) = (a.sin(), -a.cos());
+    let (fw, fh) = (f64::from(w), f64::from(h));
+    let len = (fw * dx).abs() + (fh * dy).abs();
+    let cols: Vec<(f64, Rgba)> = stops.iter().map(|(p, c)| (*p, Rgba::hex(c))).collect();
+    let mut buf = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(w, h);
+    let data = buf.make_mut_slice();
+    for y in 0..h {
+        for x in 0..w {
+            let (px, py) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+            let t = (((px - fw / 2.0) * dx + (py - fh / 2.0) * dy) / len + 0.5).clamp(0.0, 1.0);
+            let i = cols.iter().position(|(p, _)| *p > t).unwrap_or(cols.len());
+            let c = if i == 0 {
+                cols[0].1
+            } else if i == cols.len() {
+                cols[cols.len() - 1].1
+            } else {
+                let ((p0, c0), (p1, c1)) = (cols[i - 1], cols[i]);
+                c0.lerp(c1, if p1 > p0 { (t - p0) / (p1 - p0) } else { 1.0 })
+            };
+            // rounded corners: coverage of the pixel by the corner's circle
+            let cx = px.clamp(radius, fw - radius);
+            let cy = py.clamp(radius, fh - radius);
+            let d = ((px - cx).powi(2) + (py - cy).powi(2)).sqrt();
+            let cover = if radius > 0.0 { (radius - d + 0.5).clamp(0.0, 1.0) } else { 1.0 };
+            let u = |v: f64| v.round().clamp(0.0, 255.0) as u8;
+            data[(y * w + x) as usize] = slint::Rgba8Pixel { r: u(c.r), g: u(c.g), b: u(c.b), a: u(cover * 255.0) };
+        }
+    }
+    Image::from_rgba8(buf)
+}
+
 /// What doesn't change while the window is open: swatches, the icon; the thumbnails' shadow
 /// (0 2px 6px rgba(0,0,0,.25)) for the window's scale.
 pub fn setup_with(w: &SettingsWindow, scale: f32) {
@@ -143,6 +180,15 @@ pub fn setup_with(w: &SettingsWindow, scale: f32) {
     let sh = [fluentcal_core::theme::Shadow { x: 0.0, y: 2.0, blur: 6.0, color: Rgba::new(0.0, 0.0, 0.0, 0.25) }];
     g.set_thumb_shadow(crate::shadow::render(&sh, 4.0, scale));
     g.set_icon(icon());
+    // ThemeCards' thumbnails (aspect 132:80, drawn at twice that) and the split mini window
+    let (tw, th) = ((264.0 * scale / 1.25) as u32, (160.0 * scale / 1.25) as u32);
+    let r = 4.0 * f64::from(tw) / 132.0;
+    g.set_thumb_light(gradient_image(tw, th, r, 160.0, &[(0.0, "#cfe2fb"), (1.0, "#5d93e0")]));
+    g.set_thumb_dark(gradient_image(tw, th, r, 160.0, &[(0.0, "#0b2a5b"), (1.0, "#1b4f9c")]));
+    g.set_thumb_system(gradient_image(tw, th, r, 115.0, &[(0.0, "#cfe2fb"), (0.5, "#cfe2fb"), (0.5, "#0b2a5b"), (1.0, "#0b2a5b")]));
+    g.set_thumb_wall(gradient_image(tw, th, r, 160.0, &[(0.0, "#0b2a5b"), (0.55, "#1b4f9c"), (1.0, "#3a7bd5")]));
+    let (ww, wh) = ((92.0 * scale).round() as u32, (56.0 * scale).round() as u32);
+    g.set_thumb_split_win(gradient_image(ww, wh, 4.0 * f64::from(scale), 115.0, &[(0.0, "#f3f3f3"), (0.5, "#f3f3f3"), (0.5, "#202020"), (1.0, "#202020")]));
     g.set_groups(model(Vec::new()));
     g.set_backups(model(Vec::new()));
     g.set_upcoming(model(Vec::new()));

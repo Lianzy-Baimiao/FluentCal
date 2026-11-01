@@ -149,42 +149,48 @@ export component SyncPage inherits VerticalLayout {
     if SetState.sync.cloud: SettingsGroup {
         first: true;
         title: "帮助";
-        if root.dav: Help {
-            title: "怎样获取坚果云的 WebDAV 密码";
-            expanded: root.help-open;
-            toggled(v) => { root.help-open = v; }
-        }
-        if root.dav: SettingsExpanderItems {
-            expanded: root.help-open;
-            SettingsRow { title: "坚果云网页版 › 右上角账户名 › 账户信息 › 安全选项 › 第三方应用管理 › 添加应用，生成的密码填到上面（不是登录密码）。用户名是坚果云的登录邮箱。"; }
-        }
-        if SetState.sync.provider == "github": Help {
-            title: "怎样创建 GitHub 仓库和 Token";
-            expanded: root.help-open;
-            toggled(v) => { root.help-open = v; }
-        }
-        if SetState.sync.provider == "github": SettingsExpanderItems {
-            expanded: root.help-open;
-            SettingsRow { title: "1. 新建一个私有仓库（Private），例如 fluentcal-data"; }
-            SettingsRow {
-                divider: true;
-                title: "2. Settings › Developer settings › Fine-grained tokens › Generate new token：只选这个仓库，Repository permissions 里 Contents 选 Read and write";
-                Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://github.com/settings/personal-access-tokens/new"); } }
+        if root.dav: VerticalLayout {
+                Help {
+                title: "怎样获取坚果云的 WebDAV 密码";
+                expanded: root.help-open;
+                toggled(v) => { root.help-open = v; }
             }
-            SettingsRow { divider: true; title: "每次上传是一次提交，可以在仓库里查看历史版本。修改后等 1 分钟左右再上传，减少提交次数。"; }
+                SettingsExpanderItems {
+                expanded: root.help-open;
+                SettingsRow { title: "坚果云网页版 › 右上角账户名 › 账户信息 › 安全选项 › 第三方应用管理 › 添加应用，生成的密码填到上面（不是登录密码）。用户名是坚果云的登录邮箱。"; }
+            }
         }
-        if SetState.sync.provider == "gitee": Help {
-            title: "怎样创建 Gitee 仓库和令牌";
-            expanded: root.help-open;
-            toggled(v) => { root.help-open = v; }
+        if SetState.sync.provider == "github": VerticalLayout {
+                Help {
+                title: "怎样创建 GitHub 仓库和 Token";
+                expanded: root.help-open;
+                toggled(v) => { root.help-open = v; }
+            }
+                SettingsExpanderItems {
+                expanded: root.help-open;
+                SettingsRow { title: "1. 新建一个私有仓库（Private），例如 fluentcal-data"; }
+                SettingsRow {
+                    divider: true;
+                    title: "2. Settings › Developer settings › Fine-grained tokens › Generate new token：只选这个仓库，Repository permissions 里 Contents 选 Read and write";
+                    Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://github.com/settings/personal-access-tokens/new"); } }
+                }
+                SettingsRow { divider: true; title: "每次上传是一次提交，可以在仓库里查看历史版本。修改后等 1 分钟左右再上传，减少提交次数。"; }
+            }
         }
-        if SetState.sync.provider == "gitee": SettingsExpanderItems {
-            expanded: root.help-open;
-            SettingsRow { title: "1. 新建一个私有仓库"; }
-            SettingsRow {
-                divider: true;
-                title: "2. 设置 › 私人令牌 › 生成新令牌，勾选 projects";
-                Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://gitee.com/profile/personal_access_tokens"); } }
+        if SetState.sync.provider == "gitee": VerticalLayout {
+                Help {
+                title: "怎样创建 Gitee 仓库和令牌";
+                expanded: root.help-open;
+                toggled(v) => { root.help-open = v; }
+            }
+                SettingsExpanderItems {
+                expanded: root.help-open;
+                SettingsRow { title: "1. 新建一个私有仓库"; }
+                SettingsRow {
+                    divider: true;
+                    title: "2. 设置 › 私人令牌 › 生成新令牌，勾选 projects";
+                    Button { text: "打开"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", "https://gitee.com/profile/personal_access_tokens"); } }
+                }
             }
         }
     }

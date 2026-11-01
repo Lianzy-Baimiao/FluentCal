@@ -13,6 +13,17 @@ use crate::{SetState, SettingsWindow, Severity};
 use slint::ComponentHandle;
 use view::Local;
 
+/// Opens the window's confirmation dialog (0.2's confirm(); the answer comes back through
+/// SetState.confirm-answer).
+pub fn show_confirm(w: &SettingsWindow, title: &str, content: &str, primary: &str, secondary: &str, danger: bool) {
+    w.set_confirm_title(title.into());
+    w.set_confirm_content(content.into());
+    w.set_confirm_primary(primary.into());
+    w.set_confirm_secondary(secondary.into());
+    w.set_confirm_danger(danger);
+    w.invoke_open_confirm();
+}
+
 /// What a confirmation's answer runs with: "primary", "secondary" or "close".
 pub type Answer = Box<dyn FnOnce(&mut App, &str)>;
 
@@ -101,13 +112,7 @@ impl App {
         let Some(s) = &mut self.settings_win else { return };
         s.asked += 1;
         s.pending = Some((s.asked, Box::new(then)));
-        let w = &s.window;
-        w.set_confirm_title(title.into());
-        w.set_confirm_content(content.into());
-        w.set_confirm_primary(primary.into());
-        w.set_confirm_secondary(secondary.into());
-        w.set_confirm_danger(danger);
-        w.invoke_open_confirm();
+        show_confirm(&s.window, title, content, primary, secondary, danger);
     }
 
     fn settings_answer(&mut self, r: &str) {

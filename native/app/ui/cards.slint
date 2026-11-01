@@ -55,6 +55,9 @@ export component SettingsGroup inherits VerticalLayout {
 }
 
 // A settings card: icon, title and description, the control on the right (@children).
+// As 0.2's flex-wrap: when the controls don't fit beside a 200px title, they go on a second
+// line, right-aligned. (Placed by hand: a HorizontalLayout measures wrapping text at its own
+// whole width, and @children can't move between layouts.)
 export component SettingsCard inherits Rectangle {
     in property <string> icon;
     in property <string> title;
@@ -64,12 +67,21 @@ export component SettingsCard inherits Rectangle {
     // There is a control in @children (Slint can't tell; the gaps depend on it).
     in property <bool> has-content: true;
     callback clicked();
+    // inside the 1px border and 16px padding; the icon takes 20 + 4 + 16
+    property <length> inner: root.width - 34px;
+    property <length> iw: root.icon != "" ? 40px : 0;
+    property <length> cw: root.clickable ? 32px : 0;
+    // the controls with the 16px gap before them (not a padding: it would depend on `wrapped`)
+    property <length> ctl-w: root.has-content ? ctl.preferred-width + 16px : 0;
+    out property <bool> wrapped: root.has-content && iw + 200px + ctl-w + cw > inner;
+    property <length> hw: max(0, inner - iw - cw - (wrapped ? 0 : ctl-w));
+    property <length> h1: max(head.preferred-height, wrapped ? 0 : ctl.preferred-height);
     border-radius: Theme.radius-control;
     border-width: 1px;
     border-color: Theme.c.card-stroke;
     background: clickable && enabled ? (ta.pressed ? Theme.c.control-fill-pressed : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.card-fill) : Theme.c.card-fill;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
-    min-height: max(68px, 28px + max(head.preferred-height, ctl.preferred-height));
+    min-height: max(68px, 28px + h1 + (wrapped ? 8px + ctl.preferred-height : 0));
     preferred-height: self.min-height;
     accessible-role: groupbox;
     accessible-label: title;
@@ -79,33 +91,39 @@ export component SettingsCard inherits Rectangle {
         enabled: root.clickable && root.enabled;
         clicked => { root.clicked(); }
     }
-    HorizontalLayout {
-        padding-left: 17px;
-        padding-right: 17px;
-        padding-top: 14px;
-        padding-bottom: 14px;
-        if root.icon != "": HorizontalLayout {
-            padding-right: 20px;
-            Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
-        }
-        head := CardHead {
-            horizontal-stretch: 1;
-            title: root.title;
-            description: root.description;
-            enabled: root.enabled;
-        }
-        ctl := HorizontalLayout {
-            padding-left: root.has-content ? 16px : 0;
-            spacing: 8px;
-            alignment: end;
-            cross-axis-alignment: center;
-            horizontal-stretch: 0;
-            @children
-        }
-        if root.clickable: HorizontalLayout {
-            padding-left: 20px;
-            Icon { glyph: Glyph.chevron-right; size: 12px; color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled; }
-        }
+    // the first line is centred in the card when there is only one
+    property <length> top: wrapped ? 14px : (root.height - h1) / 2;
+    if root.icon != "": Icon {
+        x: 17px;
+        y: root.top + (root.h1 - 20px) / 2;
+        glyph: root.icon;
+        size: 20px;
+        color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+    }
+    head := CardHead {
+        x: 17px + root.iw;
+        y: root.top + (root.h1 - self.preferred-height) / 2;
+        width: root.hw;
+        height: self.preferred-height;
+        title: root.title;
+        description: root.description;
+        enabled: root.enabled;
+    }
+    ctl := HorizontalLayout {
+        x: root.wrapped ? 17px + root.inner - self.preferred-width : 17px + root.iw + root.hw + 16px;
+        y: root.wrapped ? 14px + root.h1 + 8px : root.top + (root.h1 - self.preferred-height) / 2;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        @children
+    }
+    if root.clickable: Icon {
+        x: root.width - 17px - 12px;
+        y: root.top + (root.h1 - 12px) / 2;
+        glyph: Glyph.chevron-right;
+        size: 12px;
+        color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
     }
 }
 
@@ -142,51 +160,57 @@ export component SettingsExpander inherits Rectangle {
     ta := TouchArea {
         clicked => { root.toggle(); }
     }
-    HorizontalLayout {
-        padding-left: 17px;
-        padding-right: 9px;
-        padding-top: 14px;
-        padding-bottom: 14px;
-        if root.icon != "": HorizontalLayout {
-            padding-right: 20px;
-            Icon { glyph: root.icon; size: 20px; color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled; }
+    // Placed like SettingsCard's (a stretching layout would spread the title and description);
+    // right: the 32px chevron button 8px after the controls, 8px from the edge.
+    property <length> iw: root.icon != "" ? 40px : 0;
+    property <length> ctl-w: root.has-content ? ctl.preferred-width + 16px : 0;
+    property <length> hw: max(0, root.width - 17px - 9px - iw - ctl-w - 40px);
+    head := CardHead {
+        x: 17px + root.iw;
+        y: (root.height - self.preferred-height) / 2;
+        width: root.hw;
+        height: self.preferred-height;
+        title: root.title;
+        description: root.description;
+        enabled: root.enabled;
+    }
+    if root.icon != "": Icon {
+        x: 17px;
+        y: (root.height - 20px) / 2;
+        glyph: root.icon;
+        size: 20px;
+        color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
+    }
+    ctl := HorizontalLayout {
+        x: 17px + root.iw + root.hw + 16px;
+        y: (root.height - self.preferred-height) / 2;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        @children
+    }
+    chev := Rectangle {
+        x: root.width - 9px - 32px;
+        y: (root.height - 32px) / 2;
+        width: 32px;
+        height: 32px;
+        border-radius: Theme.radius-control;
+        background: root.enabled && cta.pressed ? Theme.c.subtle-fill-pressed : root.enabled && cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+        accessible-role: button;
+        accessible-label: root.title;
+        accessible-expanded: root.expanded;
+        Icon {
+            glyph: root.expanded ? Glyph.chevron-up : Glyph.chevron-down;
+            size: 12px;
+            color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
         }
-        head := CardHead {
-            horizontal-stretch: 1;
-            title: root.title;
-            description: root.description;
+        cta := TouchArea {
             enabled: root.enabled;
-        }
-        ctl := HorizontalLayout {
-            padding-left: root.has-content ? 16px : 0;
-            spacing: 8px;
-            alignment: end;
-            cross-axis-alignment: center;
-            horizontal-stretch: 0;
-            @children
-        }
-        // gap 16px, margin-left -8px
-        Rectangle { width: 8px; }
-        chev := Rectangle {
-            width: 32px;
-            height: 32px;
-            border-radius: Theme.radius-control;
-            background: root.enabled && cta.pressed ? Theme.c.subtle-fill-pressed : root.enabled && cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
-            accessible-role: button;
-            accessible-label: root.title;
-            accessible-expanded: root.expanded;
-            Icon {
-                glyph: root.expanded ? Glyph.chevron-up : Glyph.chevron-down;
-                size: 12px;
-                color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
-            }
-            cta := TouchArea {
-                enabled: root.enabled;
-                clicked => { root.toggle(); }
-                pointer-event(e) => {
-                    if e.kind == PointerEventKind.down {
-                        Overlay.keyboard = false;
-                    }
+            clicked => { root.toggle(); }
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down {
+                    Overlay.keyboard = false;
                 }
             }
         }
@@ -222,33 +246,40 @@ export component SettingsExpanderItems inherits Rectangle {
 }
 
 // A row inside SettingsExpanderItems. `icon-pad`: the expander has an icon (56px indent).
+// Controls that don't fit beside a 200px title go on a second line (0.2's flex-wrap).
 export component SettingsRow inherits Rectangle {
     in property <string> title;
     in property <string> description;
     in property <bool> icon-pad: true;
     // Not the first row: a divider above.
     in property <bool> divider;
-    min-height: max(52px, (root.divider ? 17px : 16px) + max(head.preferred-height, ctl.preferred-height));
+    property <length> left: root.icon-pad ? 56px : 16px;
+    property <length> inner: root.width - left - 48px;
+    property <length> ctl-w: ctl.preferred-width;
+    out property <bool> wrapped: ctl-w > 0 && 200px + 16px + ctl-w > inner;
+    property <length> hw: max(0, inner - (wrapped || ctl-w == 0 ? 0 : 16px + ctl-w));
+    property <length> h1: max(head.preferred-height, wrapped ? 0 : ctl.preferred-height);
+    property <length> pt: root.divider ? 9px : 8px;
+    min-height: max(52px, pt + 8px + h1 + (wrapped ? 8px + ctl.preferred-height : 0));
     preferred-height: self.min-height;
     if root.divider: Rectangle { y: 0; height: 1px; background: Theme.c.card-stroke; }
-    HorizontalLayout {
-        padding-left: root.icon-pad ? 56px : 16px;
-        padding-right: 48px;
-        padding-top: root.divider ? 9px : 8px;
-        padding-bottom: 8px;
-        spacing: 16px;
-        head := CardHead {
-            horizontal-stretch: 1;
-            title: root.title;
-            description: root.description;
-        }
-        ctl := HorizontalLayout {
-            spacing: 8px;
-            alignment: end;
-            cross-axis-alignment: center;
-            horizontal-stretch: 0;
-            @children
-        }
+    property <length> top: wrapped ? pt : pt + (root.height - pt - 8px - h1) / 2;
+    head := CardHead {
+        x: root.left;
+        y: root.top + (root.h1 - self.preferred-height) / 2;
+        width: root.hw;
+        height: self.preferred-height;
+        title: root.title;
+        description: root.description;
+    }
+    ctl := HorizontalLayout {
+        x: root.left + root.inner - self.preferred-width;
+        y: root.wrapped ? root.pt + root.h1 + 8px : root.top + (root.h1 - self.preferred-height) / 2;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 8px;
+        cross-axis-alignment: center;
+        @children
     }
 }
 

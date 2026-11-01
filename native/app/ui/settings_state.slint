@@ -83,6 +83,12 @@ export global SetState {
     in property <[Swatch]> task-swatches;
     in property <ShadowImage> thumb-shadow;
     in property <image> icon;
+    // ThemeCards' gradients, drawn in Rust (view.rs gradient_image)
+    in property <image> thumb-light;
+    in property <image> thumb-dark;
+    in property <image> thumb-system;
+    in property <image> thumb-wall;
+    in property <image> thumb-split-win;
     callback set-bool(string, bool);
     callback set-num(string, float);
     callback set-str(string, string);
