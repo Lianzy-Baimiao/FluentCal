@@ -48,6 +48,8 @@ export component GanttView inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.filter;
                 accessible-label: "显示选项";
+                tip: "显示选项";
+                tip-bottom: true;
                 clicked => { GanttData.options(opt.absolute-position.x, opt.absolute-position.y, opt.width, opt.height); }
             }
         }

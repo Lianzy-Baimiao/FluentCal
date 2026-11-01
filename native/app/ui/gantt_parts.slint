@@ -3,6 +3,7 @@
 
 import { Theme, BoxShadow } from "theme.slint";
 import { GBar, GSummary, GLink, GanttData } from "gantt_types.slint";
+import { Tip } from "overlay.slint";
 
 // Chart-local pointer position of a TouchArea inside an item placed at (ix, iy).
 export component GBarItem {
@@ -11,6 +12,7 @@ export component GBarItem {
     property <bool> sel: GanttData.selected == b.task-id;
     property <bool> hover: ta.has-hover || hl.has-hover || hr.has-hover || hp.has-hover || lk.has-hover;
     property <bool> edit: !b.rep && !GanttData.read-only;
+    property <int> tip-token: -1;
     x: b.x + 1px;
     y: b.row * rh + 6px;
     width: max(4px, b.w - 2px);
@@ -64,8 +66,16 @@ export component GBarItem {
     }
     ta := TouchArea {
         mouse-cursor: b.rep ? pointer : grab;
+        changed has-hover => {
+            if self.has-hover && !GanttData.tip-show {
+                root.tip-token = Tip.enter(root.b.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
         pointer-event(e) => {
             if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                Tip.leave(root.tip-token);
                 GanttData.bar-down(b, "move", root.x + self.mouse-x, root.y + self.mouse-y);
             } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
                 GanttData.bar-up();
@@ -173,10 +183,18 @@ export component GMilestone {
             commands: "M9.59 2.51 Q11 1.1 12.41 2.51 L19.49 9.59 Q20.9 11 19.49 12.41 L12.41 19.49 Q11 20.9 9.59 19.49 L2.51 12.41 Q1.1 11 2.51 9.59 Z"; }
         Text { x: 39.95px; y: -7.95px; height: 20px; text: b.title; color: b.text; font-size: 12px; font-weight: 500; vertical-alignment: center; accessible-role: none; }
     }
+    property <int> tip-token: -1;
     TouchArea {
+        changed has-hover => {
+            if self.has-hover && !GanttData.tip-show {
+                root.tip-token = Tip.enter(root.b.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
         mouse-cursor: grab;
         pointer-event(e) => {
-            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { GanttData.bar-down(b, "move", root.x + self.mouse-x, root.y + self.mouse-y); }
+            if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { Tip.leave(root.tip-token); GanttData.bar-down(b, "move", root.x + self.mouse-x, root.y + self.mouse-y); }
             if e.button == PointerEventButton.left && e.kind == PointerEventKind.up { GanttData.bar-up(); }
             if e.button == PointerEventButton.right && e.kind == PointerEventKind.up { GanttData.bar-menu(b, root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
         }
