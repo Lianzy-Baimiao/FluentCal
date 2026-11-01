@@ -6,6 +6,7 @@ pub mod desk;
 pub mod dialog;
 pub mod msgwin;
 pub mod net;
+pub mod outside;
 pub mod package;
 pub mod screens;
 pub mod sysinfo;

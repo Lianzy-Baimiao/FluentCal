@@ -163,7 +163,7 @@ pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &T
             chips.sort_by_key(|c| c.col);
             WeekData {
                 cells: model(cells),
-                chips: model(chips.into_iter().map(|ch| chip(doc, ch, today, t)).collect()),
+                chips: model(chips.into_iter().map(|ch| chip_data(doc, ch, today, t)).collect()),
                 more: model(layout.overflow.iter().map(|&n| n as i32).collect()),
                 more_lane: model(layout.overflow_lane.iter().map(|&n| n as i32).collect()),
                 week_no: if c.show_week_numbers { iso_week(&add_days(w, if c.week_start == 0 { 1 } else { 0 })) as i32 } else { 0 },
@@ -231,7 +231,7 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
     }
 }
 
-fn chip(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
+pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
     let task = ch.occ.task;
     let col = task_color(task.color.as_deref(), t);
     let mut tip = vec![task.title.clone(), format_range(&ch.occ.start, &ch.occ.end, today) + &task.time.as_deref().map_or(String::new(), |tm| format!(" {tm}"))];

@@ -330,6 +330,141 @@ fn menu_actions_and_undo() {
     assert_eq!((t.task("看牙")["countdown"].clone(), t.task("看牙")["color"].clone()), (json!(true), json!("purple")));
 }
 
+impl T {
+    fn right_click_at(&self, position: LogicalPosition) {
+        let button = PointerEventButton::Right;
+        self.ev(WindowEvent::PointerMoved { position });
+        self.ev(WindowEvent::PointerPressed { position, button });
+        wait(30);
+        self.ev(WindowEvent::PointerReleased { position, button });
+        settle();
+    }
+
+    fn click(&self, label: &str) {
+        let e = self.find(label);
+        let s = e.size();
+        self.click_at(self.at(&e, s.width / 2.0, s.height / 2.0));
+    }
+
+    fn has(&self, label: &str) -> bool {
+        ElementHandle::find_by_accessible_label(&self.w, label).next().is_some()
+    }
+}
+
+/// The Fluent context menu: right click a chip, a colour from the swatch row, an entry; Esc.
+#[test]
+fn context_menu_on_a_chip() {
+    let today = fluentcal_core::date::today();
+    let t = start("ctxmenu", Some(doc_with(&[json!({ "title": "体检", "start": today })], json!({}))));
+    let chip = t.find("体检");
+    t.right_click_at(t.at(&chip, 40.0, chip.size().height / 2.0));
+    assert!(t.w.get_any_popup(), "the menu is open");
+    assert!(t.has("标记为完成") && t.has("编辑…"), "the chip menu's entries");
+    t.click("紫");
+    assert_eq!(t.task("体检")["color"], json!("purple"));
+    assert!(!t.w.get_any_popup(), "a colour closes the menu");
+    t.right_click_at(t.at(&t.find("体检"), 40.0, chip.size().height / 2.0));
+    t.click("标记为完成");
+    assert_eq!(t.task("体检")["done"], json!(true));
+    // Esc closes it without acting.
+    t.right_click_at(t.at(&t.find("体检，已完成"), 40.0, chip.size().height / 2.0));
+    assert!(t.w.get_any_popup());
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert!(!t.w.get_any_popup());
+    // A press outside the window (the mouse hook's report) closes it too.
+    t.right_click_at(t.at(&t.find("体检，已完成"), 40.0, chip.size().height / 2.0));
+    with(|a| a.desk_close_popups()).unwrap();
+    settle();
+    assert!(!t.w.get_any_popup());
+}
+
+/// "+N": the day's tasks in a flyout; adding one there.
+#[test]
+fn day_list_lists_and_adds() {
+    let day = fluentcal_core::date::today();
+    let tasks: Vec<Value> = (0..8).map(|i| json!({ "title": format!("事项{i}"), "start": day })).collect();
+    let t = start("daylist", Some(doc_with(&tasks, json!({}))));
+    t.click(&t.find_prefix("还有 ").accessible_label().unwrap());
+    assert!(t.w.get_any_popup(), "the day list is open");
+    let chips = t.w.get_day_list_chips();
+    assert_eq!(chips.row_count(), 8);
+    t.click_at(t.at(&t.find("添加任务"), 20.0, 15.0));
+    t.type_text("新事项");
+    t.key("\n");
+    assert_eq!(t.task("新事项")["start"], json!(day));
+    // The open list follows the data.
+    assert_eq!(t.w.get_day_list_chips().row_count(), 9);
+}
+
+/// The year/month picker under the title: next year, March.
+#[test]
+fn year_month_picker() {
+    let t = start("ympicker", Some(doc_with(&[], json!({}))));
+    let (y, _, _) = fluentcal_core::date::parts(&t.today());
+    t.click(&t.find_prefix(&format!("{y}年")).accessible_label().unwrap());
+    assert!(t.w.get_any_popup());
+    t.click("下一年");
+    t.click("3月");
+    assert_eq!(with(|a| a.desk.ui.cursor.clone()).unwrap(), format!("{}-03-01", y + 1));
+    assert!(!t.w.get_any_popup(), "picking closes it");
+}
+
+/// Ctrl+F: the search panel finds a task in another month and jumps there.
+#[test]
+fn search_finds_and_jumps() {
+    let today = fluentcal_core::date::today();
+    let later = fluentcal_core::date::add_months(&today, 2);
+    let t = start("search", Some(doc_with(&[json!({ "title": "年度体检", "start": later })], json!({}))));
+    t.ctrl("f");
+    assert!(t.w.get_search_open());
+    let _ = t.find("搜索任务");
+    t.type_text("体检");
+    let hits = t.w.get_search_hits();
+    assert_eq!(hits.row_count(), 1);
+    assert_eq!(hits.row_data(0).unwrap().date, later);
+    t.key("\n");
+    assert!(!t.w.get_search_open(), "Enter jumps and closes");
+    assert_eq!(with(|a| a.desk.ui.cursor.clone()).unwrap(), fluentcal_core::date::start_of_month(&later));
+}
+
+/// A Fluent confirmation (deleting a group): 取消 keeps it, 删除 removes it.
+#[test]
+fn confirm_dialog_for_deleting_a_group() {
+    use fluentcal_app::desk::menus::Target;
+    let today = fluentcal_core::date::today();
+    let mut doc = doc_with(&[json!({ "id": "a", "title": "设计", "start": today, "groupId": "g" })], json!({ "calendar": { "view": "gantt" } }));
+    doc["groups"] = json!({ "g": { "id": "g", "name": "项目", "color": "blue", "order": 1 } });
+    let t = start("confirm", Some(doc));
+    with(|a| a.menu_act(&Target::Group("g".into()), "deleteGroup")).unwrap();
+    settle();
+    assert!(t.has("组内 1 个任务会移到“未分组”，不会被删除。"));
+    t.click("取消");
+    assert!(with(|a| a.doc.groups.contains_key("g")).unwrap());
+    with(|a| a.menu_act(&Target::Group("g".into()), "deleteGroup")).unwrap();
+    settle();
+    t.click("删除");
+    assert!(!with(|a| a.doc.groups.contains_key("g")).unwrap());
+    assert!(t.task("设计").get("groupId").is_none_or(Value::is_null));
+}
+
+/// The welcome bar (sample tasks, not onboarded) and the adjust-mode bar.
+#[test]
+fn welcome_and_adjust_bars() {
+    let today = fluentcal_core::date::today();
+    let mut doc = doc_with(&[json!({ "title": "示例", "start": today, "sample": true })], json!({}));
+    doc["settings"]["general"]["onboarded"] = json!(false);
+    let t = start("bars", Some(doc));
+    assert!(t.w.get_welcome());
+    t.click("知道了");
+    assert!(with(|a| a.doc.settings.general.onboarded).unwrap());
+    assert!(!t.w.get_welcome());
+    with(|a| a.desk_toggle_lock()).unwrap();
+    settle();
+    assert!(t.has("调整模式"));
+    t.click("完成");
+    assert!(with(|a| a.doc.settings.desk.locked).unwrap());
+}
+
 #[test]
 #[ignore]
 fn dump_labels() {

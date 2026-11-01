@@ -162,8 +162,25 @@ pub fn init(app: &mut App, headless: bool) {
         show_desk_window(app);
     }
     seed_if_first_run(app);
+    startup_notice(app);
     events::auto_postpone(app);
     app.schedule_reminders();
+}
+
+/// The warning bar at start (0.2's DeskApp): a custom data folder not reachable, or a data
+/// file that was damaged and replaced.
+fn startup_notice(app: &mut App) {
+    let mut text = app.data_dir.missing.as_ref().map(|m| format!("找不到数据文件夹 {m}（同步盘未启动？），本次使用本机默认文件夹。")).unwrap_or_default();
+    if let Some(r) = app.store.take_recovered() {
+        text = if r == "last-saved.json" {
+            "数据文件已损坏，已恢复到最后一次保存的内容。".to_owned()
+        } else if !r.is_empty() {
+            format!("数据文件已损坏，已从备份 {r} 恢复。")
+        } else {
+            "数据文件已损坏且没有可用备份，已重新开始。".to_owned()
+        };
+    }
+    app.desk_set_notice(&text);
 }
 
 /// The parts that touch Windows: tray, hotkeys, notifications' name, autostart, the web

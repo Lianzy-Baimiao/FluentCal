@@ -32,11 +32,12 @@ pub struct DeskLive {
     /// Scale factor the theme images (shadows) were rendered for.
     pub scale: f32,
     pub gantt: super::gantt::GanttUi,
+    pub popups: super::popups::Popups,
 }
 
 impl DeskLive {
     pub fn new(window: DeskWindow, ui: DeskUi) -> DeskLive {
-        DeskLive { window, ui, capacity: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default() }
+        DeskLive { window, ui, capacity: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
     }
 }
 
@@ -48,6 +49,7 @@ impl App {
         super::push_all(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
         self.desk_refresh_status();
         self.gantt_refresh();
+        self.desk_refresh_overlays();
     }
 
     /// The parts that follow tasks (week rows, countdowns).
@@ -56,6 +58,14 @@ impl App {
         let d = &self.desk;
         super::push_weeks(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
         self.gantt_refresh();
+        self.desk_refresh_overlays();
+    }
+
+    /// The open day list and search results, and the info bars.
+    pub fn desk_refresh_overlays(&mut self) {
+        self.desk_refresh_day_list();
+        self.desk_search_refresh();
+        self.desk_refresh_bars();
     }
 
     /// Title, paging and selection (after paging or a view switch).

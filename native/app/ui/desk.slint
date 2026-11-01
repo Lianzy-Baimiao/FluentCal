@@ -5,6 +5,15 @@ import { Theme, BoxShadow } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
 import { GText, Button, ButtonVariant, ButtonSize, Segmented, SegOption } from "controls.slint";
 import { GanttView } from "gantt.slint";
+import { ChipData, TaskChip } from "chip.slint";
+import { Overlay, OverlayRoot, Tip, TipLayer, Flyout, DialogHost, DialogBody, Placement } from "overlay.slint";
+import { Menu, MenuEntry } from "menu.slint";
+import { InfoBar, Severity } from "cards.slint";
+import { DialogFooter } from "dialog.slint";
+import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData } from "desk_overlays.slint";
+import { Swatch } from "theme.slint";
+export { MenuEntry, SearchHitData }
+export { ChipData }
 
 export struct CellData {
     date: string,
@@ -23,30 +32,6 @@ export struct CellData {
     aria: string,
 }
 
-export struct ChipData {
-    key: string,
-    task-id: string,
-    date: string,
-    title: string,
-    time: string,
-    col: int,
-    span: int,
-    lane: int,
-    cont-left: bool,
-    cont-right: bool,
-    multi-day: bool,
-    done: bool,
-    milestone: bool,
-    repeat: bool,
-    // Task colour resolved for the theme: bar fill, text off the bar, text on the bar.
-    bar: color,
-    text: color,
-    on-bar: color,
-    // Pre-mixed CSS color-mix() values.
-    bar-hover: color,
-    check-ring: color,
-    tip: string,
-}
 
 export struct WeekData {
     cells: [CellData],
@@ -65,126 +50,6 @@ export struct CountdownData {
     // A task's countdown (flag icon) or the next holiday (calendar icon).
     task: bool,
     tip: string,
-}
-
-// One task occurrence in a week row: a chip (single day) or a bar (multi-day).
-component TaskChip inherits Rectangle {
-    in property <ChipData> chip;
-    in property <bool> dragging;
-    in property <bool> read-only;
-    callback toggle();
-    callback open();
-    callback menu(length, length);
-    callback press(length, length);
-    callback drag-move(length, length);
-    callback release(length, length);
-    property <float> fs: Theme.desk.fs;
-    property <bool> bar: chip.multi-day;
-    property <bool> hover: ta.has-hover;
-    property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.c.text-primary : chip.text;
-    property <length> l-radius: chip.cont-left ? 0 : 4px;
-    property <length> r-radius: chip.cont-right ? 0 : 4px;
-    border-top-left-radius: l-radius;
-    border-bottom-left-radius: l-radius;
-    border-top-right-radius: r-radius;
-    border-bottom-right-radius: r-radius;
-    background: bar && chip.done ? chip.bar.transparentize(0.68)
-        : bar ? (hover ? chip.bar-hover : chip.bar)
-        : hover ? Theme.c.subtle-fill-hover : transparent;
-    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
-    opacity: dragging ? 0.35 : 1;
-    clip: true;
-    accessible-role: groupbox;
-    accessible-label: chip.title + (chip.done ? "，已完成" : "");
-    ta := TouchArea {
-        double-clicked => { root.open(); }
-        clicked => { if root.read-only { root.open(); } }
-        pointer-event(e) => {
-            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
-                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
-            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
-                root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
-            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
-                root.release(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
-            }
-        }
-        moved => { root.drag-move(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
-        HorizontalLayout {
-            width: parent.width;
-            height: parent.height;
-            padding-left: bar ? 4px : 3px;
-            padding-right: 4px;
-            spacing: 4px;
-            alignment: start;
-            cross-axis-alignment: center;
-            check := Rectangle {
-                property <length> s: 12px * fs;
-                width: s;
-                height: s;
-                border-radius: s / 2;
-                border-width: 1px;
-                border-color: bar ? chip.on-bar : chip.check-ring;
-                background: cta.has-hover ? chip.bar.transparentize(0.75) : chip.done ? chip.bar : transparent;
-                if chip.done: Path {
-                    x: 1px;
-                    y: 1px;
-                    width: check.s - 2px;
-                    height: check.s - 2px;
-                    viewbox-width: 12;
-                    viewbox-height: 12;
-                    commands: "M2.6 6.2 5 8.5l4.4-4.9";
-                    stroke: chip.on-bar;
-                    stroke-width: 1.6px * (check.s - 2px) / 12px;
-                    fill: transparent;
-                }
-                cta := TouchArea {
-                    clicked => { if !root.read-only { root.toggle(); } }
-                    double-clicked => { }
-                }
-            }
-            if chip.time != "" && !chip.cont-left: GText {
-                text: chip.time;
-                color: fg;
-                font-size: 12px * fs;
-                opacity: 0.8;
-                glow: Theme.desk.glow && !bar;
-            }
-            title-box := Rectangle {
-                height: root.height;
-                min-width: 0;
-                horizontal-stretch: 1;
-                preferred-width: title-row.preferred-width;
-                opacity: chip.done ? (bar ? 0.7 : 0.6) : 1;
-                title-row := HorizontalLayout {
-                    if chip.milestone: GText {
-                        text: "◆ ";
-                        color: bar ? fg : chip.bar;
-                        font-size: 12px * fs;
-                        glow: Theme.desk.glow && !bar;
-                    }
-                    title := GText {
-                        text: chip.title;
-                        color: fg;
-                        font-size: 12px * fs;
-                        overflow: elide;
-                        glow: Theme.desk.glow && !bar;
-                    }
-                }
-                if chip.done: Rectangle {
-                    x: 0;
-                    y: round((parent.height / 2 + 0.8px * fs) / 1phx) * 1phx;
-                    width: min(parent.width, title-row.preferred-width);
-                    height: max(1px, round(0.9px * fs / 1phx) * 1phx);
-                    background: fg;
-                }
-            }
-            if chip.repeat: Icon {
-                glyph: Glyph.repeat;
-                size: 10px;
-                color: fg.transparentize(0.3);
-            }
-        }
-    }
 }
 
 // A day cell: date number, lunar text, 休/班 badge; tinted for rest days, marks and today.
@@ -221,6 +86,14 @@ component DayCell inherits Rectangle {
         border-radius: 4px;
         border-width: 2px;
         border-color: Theme.c.accent-fill;
+    }
+    property <int> tip-token: -1;
+    changed head-hover => {
+        if head-hover {
+            tip-token = Tip.enter(cell.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.head-h, false);
+        } else {
+            Tip.leave(tip-token);
+        }
     }
     ta := TouchArea {
         clicked => { root.select(); }
@@ -623,8 +496,16 @@ component TitleBar inherits Rectangle {
                         color: Theme.c.text-primary.transparentize(0.3);
                     }
                 }
+                property <int> tip-token: -1;
                 tta := TouchArea {
                     enabled: title-btn.is-button;
+                    changed has-hover => {
+                        if self.has-hover && title-btn.is-button {
+                            title-btn.tip-token = Tip.enter("选择年月", title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height, false);
+                        } else {
+                            Tip.leave(title-btn.tip-token);
+                        }
+                    }
                     clicked => { root.pick-month(title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height); }
                 }
             }
@@ -634,6 +515,8 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.chevron-left;
                 accessible-label: root.view == "weeks" ? "上一周" : "上个月";
+                tip: self.accessible-label;
+                tip-bottom: true;
                 clicked => { root.page(-1); }
             }
             if root.view != "gantt": Button {
@@ -641,12 +524,15 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.chevron-right;
                 accessible-label: root.view == "weeks" ? "下一周" : "下个月";
+                tip: self.accessible-label;
+                tip-bottom: true;
                 clicked => { root.page(1); }
             }
             if root.view != "gantt" && wide: Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.small;
                 text: "今天";
+                tip: root.today-tip;
                 clicked => { root.go-today(); }
             }
         }
@@ -672,6 +558,8 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.search;
                 accessible-label: "搜索 (Ctrl+F)";
+                tip: self.accessible-label;
+                tip-bottom: true;
                 clicked => { root.search(); }
             }
             if root.sync-enabled && wide: Button {
@@ -680,6 +568,8 @@ component TitleBar inherits Rectangle {
                 icon: root.sync-failed ? Glyph.warning : Glyph.sync;
                 color-override: root.sync-failed ? Theme.c.caution : transparent;
                 accessible-label: root.sync-tip;
+                tip: root.sync-tip;
+                tip-bottom: true;
                 clicked => { root.sync-now(); }
             }
             Button {
@@ -688,6 +578,8 @@ component TitleBar inherits Rectangle {
                 icon: root.locked ? Glyph.lock : Glyph.unlock;
                 color-override: root.locked ? transparent : Theme.c.accent-text;
                 accessible-label: root.locked ? "解锁以调整位置和大小" : "完成调整并锁定";
+                tip: self.accessible-label;
+                tip-bottom: true;
                 clicked => { root.toggle-lock(); }
             }
             if wide: Button {
@@ -695,6 +587,8 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.settings;
                 accessible-label: "设置";
+                tip: "设置";
+                tip-bottom: true;
                 clicked => { root.settings(); }
             }
             more-btn := Button {
@@ -702,6 +596,8 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: Glyph.more;
                 accessible-label: "更多";
+                tip: "更多";
+                tip-bottom: true;
                 clicked => { root.more-menu(more-btn.absolute-position.x, more-btn.absolute-position.y, more-btn.width, more-btn.height); }
             }
         }
@@ -756,23 +652,35 @@ component CountdownBar inherits Rectangle {
                 if c.days != 0: GText { text: c.days; font-size: 12px * fs; font-weight: 700; color: Theme.c.accent-text; }
                 if c.days != 0: GText { text: "天"; font-size: 12px * fs; color: pill.fg; }
             }
+            property <int> tip-token: -1;
             cta := TouchArea {
+                changed has-hover => {
+                    if self.has-hover {
+                        pill.tip-token = Tip.enter(c.tip, pill.absolute-position.x, pill.absolute-position.y, pill.width, pill.height, false);
+                    } else {
+                        Tip.leave(pill.tip-token);
+                    }
+                }
                 clicked => { root.jump(c.date); }
             }
         }
     }
 }
 
-// Adjust mode outline: CSS `outline: 2px dashed` (dash = twice the width).
+// Adjust mode outline: CSS `outline: 2px dashed` as Chromium draws it (measured in 0.2):
+// dashes 3× the width, gaps about 2×, spread so each side starts and ends with a dash.
 component DashedOutline {
     in property <brush> color;
     property <length> t: 2px;
-    property <int> nx: max(1, floor(root.width / (2 * t)));
-    property <int> ny: max(1, floor(root.height / (2 * t)));
-    for i in nx: Rectangle { x: i * root.width / nx; y: 0; width: root.width / nx / 2; height: t; background: root.color; }
-    for i in nx: Rectangle { x: i * root.width / nx; y: root.height - t; width: root.width / nx / 2; height: t; background: root.color; }
-    for i in ny: Rectangle { x: 0; y: i * root.height / ny; width: t; height: root.height / ny / 2; background: root.color; }
-    for i in ny: Rectangle { x: root.width - t; y: i * root.height / ny; width: t; height: root.height / ny / 2; background: root.color; }
+    property <length> d: 3 * t;
+    property <int> nx: max(2, round((root.width + 2 * t) / (d + 2 * t)));
+    property <int> ny: max(2, round((root.height + 2 * t) / (d + 2 * t)));
+    property <length> gx: (root.width - nx * d) / (nx - 1);
+    property <length> gy: (root.height - ny * d) / (ny - 1);
+    for i in nx: Rectangle { x: i * (d + gx); y: 0; width: d; height: t; background: root.color; }
+    for i in nx: Rectangle { x: i * (d + gx); y: root.height - t; width: d; height: t; background: root.color; }
+    for i in ny: Rectangle { x: 0; y: i * (d + gy); width: t; height: d; background: root.color; }
+    for i in ny: Rectangle { x: root.width - t; y: i * (d + gy); width: t; height: d; background: root.color; }
 }
 
 // Resize grip of the adjust mode (the .grip elements of 0.2): `edge` is the winit
@@ -854,6 +762,73 @@ export component DeskWindow inherits Window {
     // Keys not taken by a text box: (text, ctrl, shift, alt) → handled.
     callback key(string, bool, bool, bool) -> bool;
     public function focus-root() { keys.focus(); }
+
+    // The context menus and "更多" (one Fluent menu; Rust fills it before opening).
+    in property <[MenuEntry]> menu-items;
+    in property <bool> menu-has-check;
+    in property <bool> menu-has-icon;
+    in property <bool> menu-bottom-end;
+    callback menu-activated(string);
+    callback menu-swatch(string, string);
+    public function open-menu(x: length, y: length, w: length, h: length) {
+        menu.close();
+        menu.open-at(x, y, w, h);
+    }
+    public function close-menu() { menu.close(); }
+    // "+N": the day's tasks.
+    in property <string> day-list-date;
+    in property <string> day-list-title;
+    in property <string> day-list-lunar;
+    in property <[ChipData]> day-list-chips;
+    in-out property <string> day-list-text;
+    callback day-list-toggle(ChipData);
+    callback day-list-open(ChipData);
+    callback day-list-menu(ChipData, length, length);
+    callback day-list-add(string);
+    callback day-list-closed();
+    public function open-day-list(x: length, y: length, w: length, h: length) { day-fly.open-at(x, y, w, h); }
+    public function close-day-list() { day-fly.close(); }
+    // The year/month picker.
+    in-out property <int> ym-year;
+    in property <string> ym-cursor;
+    in property <string> ym-now;
+    callback ym-pick(int, int);
+    public function open-ym(x: length, y: length, w: length, h: length) { ym-fly.open-at(x, y, w, h); }
+    public function close-ym() { ym-fly.close(); }
+    // Task search.
+    in property <bool> search-open;
+    in-out property <string> search-query;
+    in-out property <string> search-range: "all";
+    in-out property <string> search-status: "all";
+    in-out property <string> search-color;
+    in property <[SearchHitData]> search-hits;
+    in property <string> search-empty;
+    in property <[Swatch]> search-colors;
+    callback search-changed();
+    callback search-go(SearchHitData);
+    callback search-open-task(SearchHitData);
+    callback search-close();
+    callback wants-keyboard();
+    // A confirmation (0.2's confirm()): "primary" / "close".
+    in property <string> confirm-title;
+    in property <string> confirm-text;
+    in property <string> confirm-primary: "确定";
+    in property <bool> confirm-danger;
+    callback confirm-result(string);
+    public function open-confirm() { confirm.open(); }
+    public function close-confirm() { confirm.close(); }
+    // Info bars under the title bar (adjust mode comes from `locked`).
+    in property <bool> welcome;
+    in property <string> notice;
+    in property <string> save-error;
+    callback lock();
+    callback clear-samples();
+    callback onboarded();
+    callback notice-closed();
+    // A menu or flyout is open (Rust then watches for presses outside the window).
+    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open;
+    callback popups-changed(bool);
+    changed any-popup => { root.popups-changed(self.any-popup); }
     title: "FluentCal";
     no-frame: true;
     background: transparent;
@@ -862,6 +837,9 @@ export component DeskWindow inherits Window {
     min-width: 360px;
     min-height: 280px;
     property <length> pad: Theme.desk.pad;
+    OverlayRoot {
+    win-width: root.width;
+    win-height: root.height;
     keys := FocusScope {
         init => { self.focus(); }
         key-pressed(e) => {
@@ -910,7 +888,31 @@ export component DeskWindow inherits Window {
                     pick-month(x, y, w, h) => { root.pick-month(x, y, w, h); }
                     start-move => { root.start-move(); }
                 }
-                Rectangle {
+                if !root.locked: InfoBar {
+                    severity: Severity.info;
+                    title: "调整模式";
+                    text: "按住日历任意位置拖动来移动（可拖到其他屏幕），拖动四边或四角调整大小。";
+                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: "完成"; clicked => { root.lock(); } }
+                }
+                if root.welcome && root.locked: InfoBar {
+                    severity: Severity.info;
+                    title: "欢迎使用 FluentCal";
+                    text: "双击日期添加任务，右键任务可完成、改颜色、删除；Ctrl+Alt+D 唤出日历。现在显示的是示例任务。";
+                    Button { size: ButtonSize.small; text: "清除示例数据"; clicked => { root.clear-samples(); } }
+                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: "知道了"; clicked => { root.onboarded(); } }
+                }
+                if root.notice != "": InfoBar {
+                    severity: Severity.warning;
+                    text: root.notice;
+                    closable: true;
+                    closed => { root.notice-closed(); }
+                }
+                if root.save-error != "": InfoBar {
+                    severity: Severity.error;
+                    title: "无法保存";
+                    text: "数据暂存在内存中，正在重试。请检查磁盘空间或是否有程序占用数据文件。（" + root.save-error + "）";
+                }
+                body := Rectangle {
                 vertical-stretch: 1;
                 month := MonthView {
                     visible: root.view != "gantt";
@@ -950,7 +952,7 @@ export component DeskWindow inherits Window {
             // Adjust mode: the calendar ignores the mouse; a press anywhere below the title
             // bar moves the window (in 0.2 everything but the title bar, bars and grips).
             if !root.locked: TouchArea {
-                y: tb.y + tb.height;
+                y: body.y;
                 height: parent.height - self.y;
                 mouse-cursor: move;
                 pointer-event(e) => {
@@ -972,6 +974,25 @@ export component DeskWindow inherits Window {
             if !root.locked: Grip { x: 0; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthWest"; mouse-cursor: nesw-resize; resize(e) => { root.start-resize(e); } }
             if !root.locked: Grip { x: 0; y: 0; width: 16px; height: 16px; edge: "NorthWest"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
             if !root.locked: Grip { x: parent.width - 16px; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthEast"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
+            if root.search-open: SearchPanel {
+                property <length> w: min(360px, parent.width - 16px);
+                x: parent.width - 8px - w;
+                y: 44px;
+                width: w;
+                max-h: parent.height - 56px;
+                query <=> root.search-query;
+                range <=> root.search-range;
+                status <=> root.search-status;
+                color-key <=> root.search-color;
+                hits: root.search-hits;
+                empty-text: root.search-empty;
+                colors: root.search-colors;
+                filters-changed => { root.search-changed(); }
+                go(h) => { root.search-go(h); }
+                open(h) => { root.search-open-task(h); }
+                close => { root.search-close(); }
+                wants-keyboard => { root.wants-keyboard(); }
+            }
             // Toast (the .toast of 0.2): bottom centre of the card.
             if root.toast-text != "": Rectangle {
                 x: (parent.width - self.width) / 2;
@@ -1031,5 +1052,57 @@ export component DeskWindow inherits Window {
                 overflow: elide;
             }
         }
+        menu := Menu {
+            items: root.menu-items;
+            has-check: root.menu-has-check;
+            has-icon: root.menu-has-icon;
+            placement: root.menu-bottom-end ? Placement.bottom-end : Placement.bottom-start;
+            activated(k) => { root.menu-activated(k); }
+            swatch-picked(k, sw) => { root.menu-swatch(k, sw); }
+        }
+        day-fly := Flyout {
+            panel-width: 280px;
+            label: root.day-list-title;
+            closed => { root.day-list-closed(); }
+            DayListPanel {
+                title: root.day-list-title;
+                lunar: root.day-list-lunar;
+                chips: root.day-list-chips;
+                read-only: root.read-only;
+                add-text <=> root.day-list-text;
+                toggle(c) => { root.day-list-toggle(c); }
+                open(c) => { root.day-list-open(c); }
+                menu(c, x, y) => { root.day-list-menu(c, x, y); }
+                add(t) => { root.day-list-add(t); }
+                wants-keyboard => { root.wants-keyboard(); }
+            }
+        }
+        ym-fly := Flyout {
+            panel-width: 248px;
+            label: "选择年月";
+            YearMonthPanel {
+                year <=> root.ym-year;
+                cursor: root.ym-cursor;
+                now: root.ym-now;
+                pick(y, m) => { ym-fly.close(); root.ym-pick(y, m); }
+            }
+        }
+        confirm := DialogHost {
+            title: root.confirm-title;
+            primary => { root.confirm-result("primary"); }
+            closed => { root.confirm-result("close"); }
+            DialogBody {
+                title: root.confirm-title;
+                if root.confirm-text != "": Text { text: root.confirm-text; wrap: word-wrap; color: Theme.c.text-primary; }
+            }
+            DialogFooter {
+                primary-text: root.confirm-primary;
+                danger: root.confirm-danger;
+                primary => { root.confirm-result("primary"); }
+                close => { root.confirm-result("close"); }
+            }
+        }
+        TipLayer { }
+    }
     }
 }

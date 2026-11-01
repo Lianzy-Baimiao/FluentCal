@@ -4,6 +4,8 @@
 import { Theme, BoxShadow } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { OverlayRoot, TipLayer, Placement } from "overlay.slint";
+import { Menu } from "menu.slint";
 
 export struct ReminderCard { key: string, title: string, body: string }
 
@@ -65,7 +67,12 @@ export component ReminderWindow inherits Window {
     callback done(string);
     callback snooze(string, int);
     callback dismiss(string);
-    callback later(string, length, length, length, length);
+    // 其他时间 (0.2: a Fluent menu below the button, inside this window).
+    property <string> later-key;
+    out property <bool> any-popup: later-menu.is-open;
+    callback popups-changed(bool);
+    changed any-popup => { root.popups-changed(self.any-popup); }
+    public function close-menu() { later-menu.close(); }
     title: "FluentCal 提醒";
     no-frame: true;
     background: transparent;
@@ -73,6 +80,9 @@ export component ReminderWindow inherits Window {
     default-font-size: 14px;
     accessible-role: groupbox;
     accessible-label: "任务提醒";
+    OverlayRoot {
+    win-width: root.width;
+    win-height: root.height;
     Flickable {
         x: 4px;
         y: 4px;
@@ -89,8 +99,23 @@ export component ReminderWindow inherits Window {
                 done => { root.done(r.key); }
                 snooze(m) => { root.snooze(r.key, m); }
                 dismiss => { root.dismiss(r.key); }
-                later(x, y, w, h) => { root.later(r.key, x, y, w, h); }
+                later(x, y, w, h) => {
+                    root.later-key = r.key;
+                    later-menu.open-at(x, y, w, h);
+                }
             }
         }
+    }
+    later-menu := Menu {
+        placement: Placement.bottom-end;
+        items: [
+            { key: "5", kind: "item", label: "5 分钟后" },
+            { key: "30", kind: "item", label: "30 分钟后" },
+            { key: "60", kind: "item", label: "1 小时后" },
+            { key: "180", kind: "item", label: "3 小时后" },
+        ];
+        activated(k) => { root.snooze(root.later-key, round(k.to-float())); }
+    }
+    TipLayer { }
     }
 }

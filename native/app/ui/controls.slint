@@ -120,7 +120,8 @@ export component Button inherits Rectangle {
         : (down ? Theme.c.subtle-fill-pressed : hover || pressed-state ? Theme.c.subtle-fill-hover : transparent);
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
     width: size == ButtonSize.icon ? 32px : content.preferred-width;
-    height: size == ButtonSize.icon ? 32px : content.preferred-height;
+    // 0.2: .s-small has min-height 24px (its content is 21px, centred).
+    height: size == ButtonSize.icon ? 32px : size == ButtonSize.small ? max(24px, content.preferred-height) : content.preferred-height;
     accessible-role: button;
     accessible-label: text != "" ? text : tip;
     accessible-enabled: enabled;

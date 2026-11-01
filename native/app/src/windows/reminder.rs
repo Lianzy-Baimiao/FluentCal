@@ -3,7 +3,7 @@
 //! while there are cards.
 
 use crate::app::{run, App};
-use crate::platform::{screens, tray, window};
+use crate::platform::{screens, window};
 use crate::theme::{apply, Look};
 use crate::{ReminderCard, ReminderWindow};
 use fluentcal_core::date::now_ms;
@@ -19,7 +19,17 @@ fn wire(w: &ReminderWindow) {
     w.on_done(|k| run(move |a| a.reminder_done(&k)));
     w.on_snooze(|k, m| run(move |a| a.reminder_snooze(&k, i64::from(m))));
     w.on_dismiss(|k| run(move |a| a.reminder_dismiss(&k)));
-    w.on_later(|k, _, _, _, _| run(move |a| a.reminder_later(&k)));
+    let weak = w.as_weak();
+    w.on_popups_changed(move |on| {
+        let (hw, close) = (weak.clone(), weak.clone());
+        let hwnd: Box<dyn Fn() -> Option<windows::Win32::Foundation::HWND>> = Box::new(move || hw.upgrade().and_then(|w| window::hwnd(w.window())));
+        let close: std::rc::Rc<dyn Fn()> = std::rc::Rc::new(move || {
+            if let Some(w) = close.upgrade() {
+                w.invoke_close_menu();
+            }
+        });
+        crate::platform::outside::watch("reminder", on.then_some((hwnd, close)));
+    });
 }
 
 impl App {
@@ -35,6 +45,7 @@ impl App {
         }
         let list = self.reminders.popup_list();
         if list.is_empty() {
+            crate::platform::outside::watch("reminder", None);
             self.reminder_win = None; // dropping the window closes it
             return;
         }
@@ -83,19 +94,5 @@ impl App {
     fn reminder_snooze(&mut self, key: &str, minutes: i64) {
         self.reminders.snooze(key, minutes);
         self.reminder_cards_changed();
-    }
-
-    /// "其他时间": 5 minutes … 3 hours.
-    fn reminder_later(&mut self, key: &str) {
-        let Some(h) = self.reminder_win.as_ref().and_then(|w| window::hwnd(w.window())) else { return };
-        let opts = [(5, "5 分钟后"), (30, "30 分钟后"), (60, "1 小时后"), (180, "3 小时后")];
-        let items: Vec<tray::Item> = opts.iter().map(|(m, l)| tray::Item::Command { id: m.to_string(), title: (*l).into() }).collect();
-        let key = key.to_owned();
-        // The menu runs its own message loop: not while the app is borrowed.
-        slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-            if let Some(m) = tray::track(h, &items).and_then(|m| m.parse().ok()) {
-                run(move |a| a.reminder_snooze(&key, m));
-            }
-        });
     }
 }

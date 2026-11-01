@@ -210,7 +210,15 @@ fn main() {
         }
     }
     let _ = render(&sw, size);
-    if let Some(events) = scenario.get("events").and_then(Value::as_array) {
+    // A desk overlay opened directly (0.2 opened it with its steps; their events aren't
+    // replayed here, the offscreen desk has no app behind its callbacks).
+    let native = scenario.get("native").filter(|_| kind == "desk");
+    if let (Some(spec), Some(d)) = (native, desk.as_mut()) {
+        d.open(spec);
+        player.tick(16);
+        // creates what the overlay shows under `if`, so its transitions start now
+        let _ = render(&sw, size);
+    } else if let Some(events) = scenario.get("events").and_then(Value::as_array) {
         player.play(events);
     }
     let _ = render(&sw, size);

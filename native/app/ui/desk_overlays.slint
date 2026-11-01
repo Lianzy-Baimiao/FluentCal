@@ -1,0 +1,381 @@
+// The desk's flyouts and panels (0.2's DayListFlyout, YearMonthPicker, SearchPanel). The
+// window hosts them; Rust fills them (src/desk/overlays.rs).
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Tip, TipArea } from "overlay.slint";
+import { TextBox, Select, SelectOption } from "inputs.slint";
+import { ColorSwatches } from "menu.slint";
+import { Swatch } from "theme.slint";
+import { ChipData, TaskChip } from "chip.slint";
+
+// The day list's add box (0.2's .add input: 30px, 13px text, the accent line when focused).
+component AddBox inherits Rectangle {
+    in-out property <string> text;
+    callback accepted(string);
+    callback focused();
+    property <bool> active: input.has-focus;
+    height: 30px;
+    border-radius: 4px;
+    background: active ? Theme.c.control-fill-input-active : Theme.c.control-fill;
+    border-width: 1px;
+    border-color: Theme.c.control-stroke;
+    accessible-role: text-input;
+    accessible-label: "添加任务";
+    accessible-value: root.text;
+    // the bottom border: control-strong-stroke, 2px accent when focused
+    Rectangle {
+        y: parent.height - (root.active ? 2px : 1px);
+        height: root.active ? 2px : 1px;
+        background: root.active ? Theme.c.accent-fill : Theme.c.control-strong-stroke;
+    }
+    if root.text == "" && input.preedit-text == "": Text {
+        x: 9px;
+        width: parent.width - 18px;
+        text: "添加任务，回车保存";
+        font-size: 13px;
+        color: Theme.c.text-secondary;
+        vertical-alignment: center;
+    }
+    input := TextInput {
+        x: 9px;
+        width: parent.width - 18px;
+        height: parent.height;
+        text <=> root.text;
+        font-size: 13px;
+        color: Theme.c.text-primary;
+        selection-background-color: Theme.c.accent-fill;
+        selection-foreground-color: Theme.c.text-on-accent;
+        vertical-alignment: center;
+        single-line: true;
+        changed has-focus => {
+            if self.has-focus {
+                root.focused();
+            }
+        }
+        accepted => {
+            root.accepted(self.text);
+        }
+        edited => {
+            if self.text.character-count > 200 {
+                self.text = root.text;
+            }
+        }
+    }
+}
+
+// "+N": every task of one day (inside a Flyout with panel-width 280px).
+export component DayListPanel inherits VerticalLayout {
+    in property <string> title;
+    in property <string> lunar;
+    in property <[ChipData]> chips;
+    in property <bool> read-only;
+    in-out property <string> add-text;
+    callback toggle(ChipData);
+    callback open(ChipData);
+    callback menu(ChipData, length, length);
+    callback add(string);
+    callback wants-keyboard();
+    spacing: 8px;
+    Rectangle {
+        height: 20px;
+        title-t := Text {
+            x: 0;
+            width: self.preferred-width;
+            text: root.title;
+            font-weight: 600;
+            vertical-alignment: center;
+            color: Theme.c.text-primary;
+        }
+        // baseline-aligned with the 14px title (align-items: baseline)
+        if root.lunar != "": Text {
+            x: title-t.width + 8px;
+            y: 1.5px;
+            text: "农历" + root.lunar;
+            font-size: 12px;
+            vertical-alignment: center;
+            color: Theme.c.text-secondary;
+        }
+    }
+    if root.chips.length > 0: list := Flickable {
+        property <length> content: root.chips.length * 26px + (root.chips.length - 1) * 2px;
+        height: min(260px, content);
+        content-height: content;
+        // overflow-y: auto: the wheel scrolls, dragging doesn't
+        mouse-drag-pan-enabled: false;
+        for c[i] in root.chips: TaskChip {
+            y: i * 28px;
+            width: parent.width;
+            height: 26px;
+            chip: c;
+            read-only: root.read-only;
+            fs: 1;
+            text-size: 13px;
+            plain: true;
+            toggle => { root.toggle(c); }
+            open => { root.open(c); }
+            menu(x, y) => { root.menu(c, x, y); }
+        }
+    }
+    if root.chips.length == 0: VerticalLayout {
+        padding-top: 4px;
+        padding-bottom: 4px;
+        Text {
+            height: 20px;
+            text: "这一天还没有任务";
+            font-size: 12px;
+            vertical-alignment: center;
+            color: Theme.c.text-tertiary;
+        }
+    }
+    if !root.read-only: HorizontalLayout {
+        spacing: 4px;
+        cross-axis-alignment: start;
+        AddBox {
+            horizontal-stretch: 1;
+            text <=> root.add-text;
+            focused => { root.wants-keyboard(); }
+            accepted(t) => { root.add(t); }
+        }
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.icon;
+            icon: Glyph.add;
+            tip: "添加";
+            tip-layer: 1;
+            accessible-label: "添加";
+            clicked => { root.add(root.add-text); }
+        }
+    }
+}
+
+// The year/month picker under the title (inside a Flyout with panel-width 248px): `year` is
+// the shown year (the arrows change it here), `cursor` / `now` "YYYY-MM".
+export component YearMonthPanel inherits VerticalLayout {
+    in-out property <int> year;
+    in property <string> cursor;
+    in property <string> now;
+    callback pick(int, int);
+    HorizontalLayout {
+        height: 32px;
+        spacing: 2px;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            padding-left: 6px;
+            Text {
+                text: root.year + "年";
+                font-weight: 600;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+        }
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.icon;
+            icon: Glyph.chevron-up;
+            tip: "上一年";
+            tip-layer: 1;
+            accessible-label: "上一年";
+            clicked => { root.year -= 1; }
+        }
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.icon;
+            icon: Glyph.chevron-down;
+            tip: "下一年";
+            tip-layer: 1;
+            accessible-label: "下一年";
+            clicked => { root.year += 1; }
+        }
+    }
+    Rectangle { height: 6px; }
+    Rectangle {
+        height: 3 * 48px + 2 * 4px;
+        accessible-role: list;
+        accessible-label: root.year + "年";
+        for m[i] in 12: Rectangle {
+            property <string> key: root.year + "-" + (i < 9 ? "0" : "") + (i + 1);
+            property <bool> cur: key == root.cursor;
+            property <bool> is-now: key == root.now;
+            x: mod(i, 4) * (parent.width - 3 * 4px) / 4 + mod(i, 4) * 4px;
+            y: floor(i / 4) * 52px;
+            width: (parent.width - 3 * 4px) / 4;
+            height: 48px;
+            border-radius: 4px;
+            background: cur ? Theme.c.accent-fill : mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: list-item;
+            accessible-label: (i + 1) + "月";
+            accessible-item-selected: cur;
+            accessible-item-selectable: true;
+            Text {
+                text: (i + 1) + "月";
+                font-weight: is-now ? 600 : 400;
+                color: cur ? Theme.c.text-on-accent : is-now ? Theme.c.accent-text : Theme.c.text-primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            mta := TouchArea { clicked => { root.pick(root.year, i + 1); } }
+        }
+    }
+}
+
+export struct SearchHitData { task-id: string, date: string, title: string, done: bool, color: color, when: string }
+
+// Task search (0.2's SearchPanel): a panel at the card's top right, not light-dismissed.
+// The window positions it; `filters-changed` asks Rust for `hits` again.
+export component SearchPanel inherits Rectangle {
+    in-out property <string> query;
+    in-out property <string> range: "all";
+    in-out property <string> status: "all";
+    in-out property <string> color-key;
+    in property <[SearchHitData]> hits;
+    in property <string> empty-text;
+    in property <[Swatch]> colors;
+    // The panel's room (0.2: max-height calc(100% - 56px) of the card).
+    in property <length> max-h;
+    callback filters-changed();
+    callback go(SearchHitData);
+    callback open(SearchHitData);
+    callback close();
+    callback wants-keyboard();
+    public function focus-box() { box.focus-input(); }
+    property <length> fixed: 1px + 12px + 33px + 8px + filters.preferred-height + 8px + 12px + 1px;
+    property <length> list-h: root.hits.length > 0 ? min(root.hits.length * 32px, max(0, root.max-h - fixed)) : 28px;
+    height: fixed + list-h;
+    border-radius: 8px;
+    background: Theme.flyout-solid;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    accessible-role: groupbox;
+    accessible-label: "搜索任务";
+    // presses on the panel don't reach the calendar below
+    TouchArea { }
+    VerticalLayout {
+        padding: 13px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 4px;
+            box := TextBox {
+                horizontal-stretch: 1;
+                text <=> root.query;
+                icon: Glyph.search;
+                placeholder: "搜索任务、备注或分组";
+                clearable: true;
+                autofocus: true;
+                edited => { root.filters-changed(); }
+                focus-changed(f) => { if f { root.wants-keyboard(); } }
+                escape => { root.close(); }
+                accepted => { if root.hits.length > 0 { root.go(root.hits[0]); } }
+            }
+            Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.close;
+                tip: "关闭 (Esc)";
+                accessible-label: "关闭 (Esc)";
+                clicked => { root.close(); }
+            }
+        }
+        filters := FlexboxLayout {
+            spacing-horizontal: 6px;
+            spacing-vertical: 6px;
+            cross-axis-alignment: center;
+            Select {
+                width: 120px;
+                value: root.range;
+                options: [
+                    { value: "all", label: "全部时间" },
+                    { value: "1m", label: "前后一月" },
+                    { value: "3m", label: "前后三月" },
+                    { value: "1y", label: "前后一年" },
+                ];
+                selected(v) => { root.range = v; root.filters-changed(); }
+            }
+            Select {
+                width: 120px;
+                value: root.status;
+                options: [
+                    { value: "all", label: "全部" },
+                    { value: "undone", label: "未完成" },
+                    { value: "done", label: "已完成" },
+                ];
+                selected(v) => { root.status = v; root.filters-changed(); }
+            }
+            // one flex item at its max-content width (it wraps under the selects as a whole)
+            ColorSwatches {
+                width: (root.colors.length + 1) * 18px + root.colors.length * 6px;
+                colors: root.colors;
+                value: root.color-key;
+                allow-none: true;
+                size: 18px;
+                picked(k) => { root.color-key = k; root.filters-changed(); }
+            }
+        }
+        if root.hits.length == 0: VerticalLayout {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            padding-left: 2px;
+            padding-right: 2px;
+            Text {
+                height: 20px;
+                text: root.empty-text;
+                font-size: 12px;
+                vertical-alignment: center;
+                color: Theme.c.text-tertiary;
+            }
+        }
+        if root.hits.length > 0: Flickable {
+            height: root.list-h;
+            content-height: root.hits.length * 32px;
+            mouse-drag-pan-enabled: false;
+            accessible-role: list;
+            accessible-label: "搜索结果";
+            for h[i] in root.hits: Rectangle {
+                y: i * 32px;
+                width: parent.width;
+                height: 32px;
+                border-radius: 4px;
+                background: hta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                accessible-role: list-item;
+                accessible-label: h.title;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 8px;
+                    cross-axis-alignment: center;
+                    Rectangle { width: 8px; height: 8px; border-radius: 4px; background: h.color; }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        min-width: 0;
+                        height: 20px;
+                        t := Text {
+                            width: parent.width;
+                            text: h.title;
+                            overflow: elide;
+                            vertical-alignment: center;
+                            color: h.done ? Theme.c.text-secondary : Theme.c.text-primary;
+                        }
+                        if h.done: Rectangle {
+                            x: 0;
+                            y: round((parent.height / 2 + 1px) / 1phx) * 1phx;
+                            width: min(parent.width, t.preferred-width);
+                            height: 1px;
+                            background: Theme.c.text-secondary;
+                        }
+                    }
+                    Text {
+                        text: h.when;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        color: Theme.c.text-secondary;
+                    }
+                }
+                hta := TouchArea {
+                    clicked => { root.go(h); }
+                    double-clicked => { root.open(h); }
+                }
+            }
+        }
+    }
+}

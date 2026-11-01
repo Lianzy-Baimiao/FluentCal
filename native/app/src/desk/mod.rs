@@ -8,6 +8,7 @@ pub mod live;
 pub mod menus;
 pub mod menus_act;
 pub mod menus_build;
+pub mod overlays;
 pub mod popups;
 pub mod sync;
 pub mod vm;
@@ -72,8 +73,49 @@ impl Desk {
 
     pub fn refresh(&mut self) {
         push_all(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
+        self.window.set_welcome(overlays::welcome(&self.doc, false));
         if self.doc.settings.calendar.view == "gantt" {
             self.gantt_view().push();
+        }
+    }
+
+    /// Opens a flyout or panel as the parity scene says (`{"open": "dayList" | "ym" | "search"
+    /// | "confirm", "anchor": [x, y, w, h], …}`), with the same view models as the app.
+    pub fn open(&mut self, spec: &serde_json::Value) {
+        let s = |k: &str| spec.get(k).and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+        let a: Vec<f32> = spec.get("anchor").and_then(serde_json::Value::as_array).map_or(vec![0.0; 4], |v| v.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect());
+        let w = &self.window;
+        match s("open").as_str() {
+            "dayList" => {
+                let (title, lunar, chips) = overlays::day_list(&self.doc, &s("date"), &self.today, &self.tokens);
+                w.set_day_list_title(title.into());
+                w.set_day_list_lunar(lunar.into());
+                w.set_day_list_chips(chips);
+                w.invoke_open_day_list(a[0], a[1], a[2], a[3]);
+            }
+            "ym" => {
+                w.set_ym_year(fluentcal_core::date::parts(&self.ui.cursor).0);
+                w.set_ym_cursor(self.ui.cursor[..7].into());
+                w.set_ym_now(self.today[..7].into());
+                w.invoke_open_ym(a[0], a[1], a[2], a[3]);
+            }
+            "search" => {
+                let o = fluentcal_core::search::SearchOptions { q: s("query"), range: "all".into(), status: "all".into(), color: String::new() };
+                let (hits, empty) = overlays::search(&self.doc, &o, &self.today, &self.tokens);
+                w.set_search_colors(overlays::search_colors(&self.tokens));
+                w.set_search_query(o.q.into());
+                w.set_search_hits(hits);
+                w.set_search_empty(empty.into());
+                w.set_search_open(true);
+            }
+            "confirm" => {
+                w.set_confirm_title(s("title").into());
+                w.set_confirm_text(s("text").into());
+                w.set_confirm_primary(s("primary").into());
+                w.set_confirm_danger(true);
+                w.invoke_open_confirm();
+            }
+            other => eprintln!("unknown overlay {other}"),
         }
     }
 

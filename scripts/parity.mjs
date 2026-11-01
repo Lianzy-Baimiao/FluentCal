@@ -24,6 +24,7 @@ mkdirSync(outDir, { recursive: true });
 
 const glass = { bgOpacity: 18, cellOpacity: 38, shadow: false };
 const month = { width: 880, height: 640 };
+const small = { width: 560, height: 430 };
 const gallery = { width: 1280, height: 900 };
 // Gallery steps: [action, target, extra]. Targets are Playwright selectors on 0.2's page.
 const SCENES = [
@@ -33,6 +34,15 @@ const SCENES = [
   { name: 'month-small', url: '?w=desk&theme=light', size: { width: 560, height: 430 }, settings: { theme: { mode: 'light' }, calendar: { showWeekNumbers: true } } },
   { name: 'gantt-light', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } } },
   { name: 'gantt-dark', url: '?w=desk&theme=dark', size: { width: 1040, height: 548 }, dark: true, settings: { theme: { mode: 'dark' }, calendar: { view: 'gantt' }, gantt: { scale: 'week' } } },
+  // Desk overlays: 0.2 opens them with its steps; the native snapshot opens the same one
+  // (`native.open`) at the anchor element's rectangle measured in 0.2 (`native.anchor`).
+  { name: 'desk-daylist', url: '?w=desk&theme=light', size: small, settings: { theme: { mode: 'light' } }, steps: [['click', '.cell[data-date="2026-10-12"] .more']], native: { open: 'dayList', date: '2026-10-12', anchor: '.cell[data-date="2026-10-12"] .more' } },
+  { name: 'desk-daylist-dark', url: '?w=desk&theme=dark', size: small, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['click', '.cell[data-date="2026-10-12"] .more']], native: { open: 'dayList', date: '2026-10-12', anchor: '.cell[data-date="2026-10-12"] .more' } },
+  { name: 'desk-ym', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } }, steps: [['click', '.titlebar .title']], native: { open: 'ym', anchor: '.titlebar .title' } },
+  { name: 'desk-search', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } }, steps: [['key', '', 'Control+f'], ['type', '', '周']], native: { open: 'search', query: '周' } },
+  { name: 'desk-search-empty', url: '?w=desk&theme=dark', size: month, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['key', '', 'Control+f']], native: { open: 'search', query: '' } },
+  { name: 'desk-adjust', url: '?w=desk&theme=light', size: small, settings: { theme: { mode: 'light' }, desk: { locked: false } } },
+  { name: 'desk-welcome', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, general: { onboarded: false } }, doc: (d) => { Object.values(d.tasks)[0].sample = true; } },
   { name: 'gallery-light', window: 'gallery', url: '?w=gallery&theme=light', size: gallery },
   { name: 'gallery-dark', window: 'gallery', url: '?w=gallery&theme=dark', size: gallery, dark: true },
   { name: 'gallery-menu', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'button:has-text("菜单")']] },
@@ -97,6 +107,7 @@ try {
     const ctx = await browser.newContext({ viewport: s.size, deviceScaleFactor: SCALE, timezoneId: 'Asia/Shanghai', locale: 'zh-CN', colorScheme: s.dark ? 'dark' : 'light' });
     await ctx.clock.setFixedTime(NOW);
     const doc = isGallery ? demoDoc({ theme: { mode: s.dark ? 'dark' : 'light' } }) : demoDoc(s.settings);
+    s.doc?.(doc);
     await ctx.addInitScript((d) => localStorage.setItem('fluentcal.mock.doc', d), JSON.stringify(doc));
     const page = await ctx.newPage();
     const errors = [];
@@ -112,19 +123,28 @@ try {
       await page.waitForTimeout(100);
     }
     await page.waitForTimeout(600);
+    // The native opener's anchor, measured before the steps change the page.
+    let native;
+    if (s.native) {
+      const { anchor, ...rest } = s.native;
+      const box = anchor ? await page.locator(anchor).first().boundingBox() : null;
+      if (anchor && !box) throw new Error(`anchor not found: ${anchor}`);
+      native = { ...rest, ...(box ? { anchor: [box.x, box.y, box.width, box.height] } : {}) };
+    }
     const events = await runSteps(page, s.steps);
     if (s.steps?.length) await page.waitForTimeout(600);
     const base = path.join(outDir, s.name);
     await page.screenshot({ path: `${base}.ref.png` });
     if (!isGallery) {
-      await page.addStyleTag({ content: '#app { visibility: hidden !important; }' });
+      // Flyouts, menus and the tooltip are mounted on <body>, outside #app.
+      await page.addStyleTag({ content: 'body > * { visibility: hidden !important; }' });
       await page.waitForTimeout(100);
       await page.screenshot({ path: `${base}.wall.png` });
     }
     const scenario = {
       window: s.window ?? 'desk',
       doc, now: NOW.getTime(), offset: 480, width: size.width, height: size.height, scale: SCALE,
-      dark: !!s.dark, systemAccent: s.accent ?? '#0078D4', events,
+      dark: !!s.dark, systemAccent: s.accent ?? '#0078D4', events, ...(native ? { native } : {}),
       ...(isGallery ? {} : { wallpaper: `${base}.wall.png` }),
     };
     writeFileSync(`${base}.json`, JSON.stringify(scenario, null, 1));

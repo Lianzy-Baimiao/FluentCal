@@ -1,0 +1,168 @@
+// A task occurrence as the desk draws it (0.2's TaskChip.vue): a chip on one day or a bar
+// across days, in the week rows and in the "+N" day list.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { GText } from "controls.slint";
+import { Tip } from "overlay.slint";
+
+export struct ChipData {
+    key: string,
+    task-id: string,
+    date: string,
+    title: string,
+    time: string,
+    col: int,
+    span: int,
+    lane: int,
+    cont-left: bool,
+    cont-right: bool,
+    multi-day: bool,
+    done: bool,
+    milestone: bool,
+    repeat: bool,
+    // Task colour resolved for the theme: bar fill, text off the bar, text on the bar.
+    bar: color,
+    text: color,
+    on-bar: color,
+    // Pre-mixed CSS color-mix() values.
+    bar-hover: color,
+    check-ring: color,
+    tip: string,
+}
+
+// One task occurrence in a week row: a chip (single day) or a bar (multi-day).
+export component TaskChip inherits Rectangle {
+    in property <ChipData> chip;
+    in property <bool> dragging;
+    in property <bool> read-only;
+    callback toggle();
+    callback open();
+    callback menu(length, length);
+    callback press(length, length);
+    callback drag-move(length, length);
+    callback release(length, length);
+    // The desk's font scale, the text size, no text glow: the "+N" day list uses 1, 13px, plain.
+    in property <float> fs: Theme.desk.fs;
+    in property <length> text-size: 12px * fs;
+    in property <bool> plain;
+    property <float> k: text-size / 12px;
+    // 1 inside a popup (the day list): its tooltip draws on the popup's layer.
+    in property <int> tip-layer;
+    property <int> tip-token: -1;
+    property <bool> glow: Theme.desk.glow && !bar && !plain;
+    property <bool> bar: chip.multi-day;
+    property <bool> hover: ta.has-hover;
+    property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.c.text-primary : chip.text;
+    property <length> l-radius: chip.cont-left ? 0 : 4px;
+    property <length> r-radius: chip.cont-right ? 0 : 4px;
+    border-top-left-radius: l-radius;
+    border-bottom-left-radius: l-radius;
+    border-top-right-radius: r-radius;
+    border-bottom-right-radius: r-radius;
+    background: bar && chip.done ? chip.bar.transparentize(0.68)
+        : bar ? (hover ? chip.bar-hover : chip.bar)
+        : hover ? Theme.c.subtle-fill-hover : transparent;
+    animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    opacity: dragging ? 0.35 : 1;
+    clip: true;
+    accessible-role: groupbox;
+    accessible-label: chip.title + (chip.done ? "，已完成" : "");
+    ta := TouchArea {
+        changed has-hover => {
+            if self.has-hover {
+                root.tip-token = Tip.enter-on(root.tip-layer, chip.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
+        double-clicked => { root.open(); }
+        clicked => { if root.read-only { root.open(); } }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                Tip.leave(root.tip-token);
+                root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.release(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            }
+        }
+        moved => { root.drag-move(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
+        HorizontalLayout {
+            width: parent.width;
+            height: parent.height;
+            padding-left: bar ? 4px : 3px;
+            padding-right: 4px;
+            spacing: 4px;
+            alignment: start;
+            cross-axis-alignment: center;
+            check := Rectangle {
+                property <length> s: 12px * fs;
+                width: s;
+                height: s;
+                border-radius: s / 2;
+                border-width: 1px;
+                border-color: bar ? chip.on-bar : chip.check-ring;
+                background: cta.has-hover ? chip.bar.transparentize(0.75) : chip.done ? chip.bar : transparent;
+                if chip.done: Path {
+                    x: 1px;
+                    y: 1px;
+                    width: check.s - 2px;
+                    height: check.s - 2px;
+                    viewbox-width: 12;
+                    viewbox-height: 12;
+                    commands: "M2.6 6.2 5 8.5l4.4-4.9";
+                    stroke: chip.on-bar;
+                    stroke-width: 1.6px * (check.s - 2px) / 12px;
+                    fill: transparent;
+                }
+                cta := TouchArea {
+                    clicked => { if !root.read-only { root.toggle(); } }
+                    double-clicked => { }
+                }
+            }
+            if chip.time != "" && !chip.cont-left: GText {
+                text: chip.time;
+                color: fg;
+                font-size: root.text-size;
+                opacity: 0.8;
+                glow: root.glow;
+            }
+            title-box := Rectangle {
+                height: root.height;
+                min-width: 0;
+                horizontal-stretch: 1;
+                preferred-width: title-row.preferred-width;
+                opacity: chip.done ? (bar ? 0.7 : 0.6) : 1;
+                title-row := HorizontalLayout {
+                    if chip.milestone: GText {
+                        text: "◆ ";
+                        color: bar ? fg : chip.bar;
+                        font-size: root.text-size;
+                        glow: root.glow;
+                    }
+                    title := GText {
+                        text: chip.title;
+                        color: fg;
+                        font-size: root.text-size;
+                        overflow: elide;
+                        glow: root.glow;
+                    }
+                }
+                if chip.done: Rectangle {
+                    x: 0;
+                    y: round((parent.height / 2 + 0.8px * k) / 1phx) * 1phx;
+                    width: min(parent.width, title-row.preferred-width);
+                    height: max(1px, round(0.9px * k / 1phx) * 1phx);
+                    background: fg;
+                }
+            }
+            if chip.repeat: Icon {
+                glyph: Glyph.repeat;
+                size: 10px;
+                color: fg.transparentize(0.3);
+            }
+        }
+    }
+}
