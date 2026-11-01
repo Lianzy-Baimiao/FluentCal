@@ -93,6 +93,17 @@ impl App {
         }
     }
 
+    /// Delete on a focused chip (0.2: removeTask(t, date, 'this')).
+    pub fn desk_chip_remove(&mut self, task_id: &str, date: &str) {
+        if self.desk.window.get_read_only() {
+            return;
+        }
+        let Some(t) = self.doc.tasks.get(task_id).cloned() else { return };
+        self.desk_remove_task(&t, Some((date, tasks::DeleteMode::This)));
+        // The focused chip is gone: the keys go to the calendar again (Ctrl+Z).
+        self.desk.window.invoke_focus_root();
+    }
+
     pub fn desk_chip_menu(&mut self, chip: &ChipData, x: f32, y: f32) {
         self.show_menu(Target::Task(chip.task_id.to_string(), chip.date.to_string()), At::Point(x, y));
     }

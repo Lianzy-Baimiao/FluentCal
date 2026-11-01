@@ -4,7 +4,8 @@
 import { Theme } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
 import { GText } from "controls.slint";
-import { Tip } from "overlay.slint";
+import { Tip, Overlay } from "overlay.slint";
+
 
 export struct ChipData {
     key: string,
@@ -29,6 +30,15 @@ export struct ChipData {
     bar-hover: color,
     check-ring: color,
     tip: string,
+}
+
+// Keys on a focused chip that need Rust (Delete, the menu key): one global for every chip,
+// in the week rows and the "+N" list.
+export global ChipKeys {
+    callback remove(ChipData);
+    callback menu(ChipData, length, length, length, length);
+    // A chip took the focus (the arrow keys then move the selected day, as in 0.2).
+    callback focused();
 }
 
 // One task occurrence in a week row: a chip (single day) or a bar (multi-day).
@@ -68,6 +78,37 @@ export component TaskChip inherits Rectangle {
     clip: true;
     accessible-role: groupbox;
     accessible-label: chip.title + (chip.done ? "，已完成" : "");
+    // A tab stop (0.2: tabindex 0): Enter opens, Space toggles, Delete deletes, the menu key /
+    // Shift+F10 opens the menu; other keys go on to the calendar.
+    kfs := FocusScope {
+        focus-on-click: false;
+        changed has-focus => {
+            if self.has-focus {
+                ChipKeys.focused();
+            }
+        }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.open();
+                return accept;
+            }
+            if e.text == " " {
+                if !root.read-only {
+                    root.toggle();
+                }
+                return accept;
+            }
+            if e.text == Key.Delete && !root.read-only {
+                ChipKeys.remove(root.chip);
+                return accept;
+            }
+            if e.text == Key.Menu || (e.modifiers.shift && e.text == Key.F10) {
+                ChipKeys.menu(root.chip, root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                return accept;
+            }
+            reject
+        }
+    }
     ta := TouchArea {
         changed has-hover => {
             if self.has-hover {
@@ -83,6 +124,8 @@ export component TaskChip inherits Rectangle {
                 root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
             } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
                 Tip.leave(root.tip-token);
+                Overlay.keyboard = false;
+                kfs.focus();
                 root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
             } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
                 root.release(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
@@ -164,5 +207,14 @@ export component TaskChip inherits Rectangle {
                 color: fg.transparentize(0.3);
             }
         }
+    }
+    if kfs.has-focus && Overlay.keyboard: Rectangle {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: root.height - 2px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: Theme.c.focus-outer;
     }
 }

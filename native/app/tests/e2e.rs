@@ -395,6 +395,39 @@ fn context_menu_on_a_chip() {
     assert!(!t.w.get_any_popup());
 }
 
+/// A chip is a tab stop (0.2's chipKey): Space toggles, Delete deletes, Enter opens the editor,
+/// the menu key opens its menu; the arrow keys still move the selected day.
+#[test]
+fn chip_keys() {
+    let today = fluentcal_core::date::today();
+    let t = start("chipkeys", Some(doc_with(&[json!({ "title": "复诊", "start": today })], json!({}))));
+    // A press on the title focuses it (a drag that doesn't move).
+    let press = |t: &T| {
+        let chip = t.find_prefix("复诊");
+        t.click_at(t.at(&chip, chip.size().width - 10.0, chip.size().height / 2.0));
+    };
+    press(&t);
+    t.key(" ");
+    assert_eq!(t.task("复诊")["done"], json!(true));
+    t.key(" ");
+    assert_eq!(t.task("复诊")["done"], json!(false), "the chip keeps the focus when its data changes");
+    t.key(&slint::SharedString::from(Key::Menu));
+    assert!(t.w.get_any_popup() && t.has("标记为完成"), "the chip's menu");
+    t.key(&slint::SharedString::from(Key::Escape));
+    press(&t);
+    t.key(&slint::SharedString::from(Key::Delete));
+    assert!(t.tasks().is_empty());
+    t.ctrl("z");
+    press(&t);
+    t.key("
+");
+    assert!(with(|a| a.editor.is_some()).unwrap(), "Enter opens the editor");
+    // The arrows move the selected day from a focused chip.
+    let sel = with(|a| a.desk.ui.selected.clone()).unwrap();
+    t.key(&slint::SharedString::from(Key::RightArrow));
+    assert_eq!(with(|a| a.desk.ui.selected.clone()).unwrap(), fluentcal_core::date::add_days(&sel, 1));
+}
+
 /// "+N": the day's tasks in a flyout; adding one there.
 #[test]
 fn day_list_lists_and_adds() {
