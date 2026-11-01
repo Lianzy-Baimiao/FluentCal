@@ -180,5 +180,6 @@ impl App {
         self.tokens = tokens(dark, &accent, palette);
         self.style = desk_style(&self.doc.settings.desk, &self.tokens);
         self.desk_apply_theme();
+        crate::windows::retheme(self);
     }
 }
