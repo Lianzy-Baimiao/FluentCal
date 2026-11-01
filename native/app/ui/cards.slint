@@ -253,7 +253,9 @@ export component SettingsRow inherits Rectangle {
 
 export enum Severity { info, success, warning, error }
 
-// 0.2's FInfoBar. The action (one button) is `action-text`; `closable` shows the × button.
+// 0.2's FInfoBar: icon, then title, message and actions as a wrapping row (flex-wrap: column
+// gap 12px, row gap 4px, actions pushed right), and the × button when `closable`. The action
+// is `action-text` (one button) and/or buttons given as children (the desk's welcome bar).
 export component InfoBar inherits Rectangle {
     in property <Severity> severity: Severity.info;
     in property <string> title;
@@ -268,69 +270,112 @@ export component InfoBar inherits Rectangle {
     border-color: Theme.c.card-stroke;
     background: severity == Severity.success ? Theme.c.success-bg : severity == Severity.warning ? Theme.c.caution-bg
         : severity == Severity.error ? Theme.c.critical-bg : Theme.c.info-bg;
-    min-height: 48px;
     accessible-role: groupbox;
     accessible-label: title;
     accessible-description: text;
-    HorizontalLayout {
-        padding-left: 16px;
-        padding-right: 1px;
-        spacing: 16px;
-        Rectangle {
-            width: 16px;
-            Icon {
-                glyph: Glyph.status-circle;
-                size: 16px;
-                color: root.severity == Severity.success ? Theme.c.success : root.severity == Severity.warning ? Theme.c.caution
-                    : root.severity == Severity.error ? Theme.c.critical : Theme.c.accent-fill;
-            }
-            Icon {
-                glyph: root.severity == Severity.success ? Glyph.status-check : root.severity == Severity.warning ? Glyph.status-exclamation
-                    : root.severity == Severity.error ? Glyph.status-x : Glyph.status-info;
-                size: 16px;
-                color: Theme.c.text-inverse;
-            }
+    // The flex body: from after the icon to the × button (gap 16) or the border.
+    property <length> left: 1px + 15px + 16px + 16px;
+    property <length> right: root.closable ? root.width - 1px - 4px - 38px - 16px : root.width - 1px;
+    property <length> avail: max(0, right - left);
+    property <length> tw: root.title != "" ? title-m.preferred-width : 0;
+    property <length> mw: msg-m.preferred-width;
+    property <length> aw: acts-row.preferred-width;
+    property <bool> has-act: aw > 0;
+    property <bool> has-title: root.title != "";
+    // Greedy line breaking: the message joins the title's line if it fits, else starts the
+    // next one (shrinking to the line, so it wraps); the actions follow if they fit.
+    property <bool> msg-new-line: has-title && tw + 12px + mw > avail;
+    property <length> msg-x: has-title && !msg-new-line ? tw + 12px : 0;
+    property <length> msg-w: min(mw, avail - msg-x);
+    property <bool> msg-wraps: mw > avail - msg-x;
+    property <bool> act-new-line: has-act && (msg-wraps || msg-x + msg-w + 12px + aw > avail);
+    property <int> msg-line: msg-new-line ? 1 : 0;
+    property <int> act-line: msg-line + (act-new-line ? 1 : 0);
+    property <length> msg-h: msg.preferred-height;
+    property <length> title-h: has-title ? 20px : 0;
+    property <length> act-h: has-act ? acts-row.preferred-height : 0;
+    property <length> line0-h: max(title-h, msg-line == 0 ? msg-h : 0, has-act && act-line == 0 ? act-h : 0);
+    property <length> line1-h: max(msg-line == 1 ? msg-h : 0, has-act && act-line == 1 ? act-h : 0);
+    property <length> line2-h: has-act && act-line == 2 ? act-h : 0;
+    property <length> line0-y: 0;
+    property <length> line1-y: line0-h + 4px;
+    property <length> line2-y: line1-y + line1-h + 4px;
+    property <length> content-h: act-line == 2 ? line2-y + line2-h : act-line == 1 || msg-line == 1 ? line1-y + line1-h : line0-h;
+    // 13px padding above and below the content inside the border; at least 48px.
+    property <length> body-y: 1px + 13px;
+    height: max(48px, content-h + 2 * 13px + 2px);
+    // CSS line-height 20px for the message's lines: the factor over the font's own height.
+    line-m := Text { visible: false; text: "Ag"; }
+    title-m := Text { visible: false; text: root.title; font-weight: 600; }
+    msg-m := Text { visible: false; text: root.text; }
+    Rectangle {
+        x: 1px + 15px;
+        y: (root.height - 16px) / 2;
+        width: 16px;
+        height: 16px;
+        Icon {
+            glyph: Glyph.status-circle;
+            size: 16px;
+            color: root.severity == Severity.success ? Theme.c.success : root.severity == Severity.warning ? Theme.c.caution
+                : root.severity == Severity.error ? Theme.c.critical : Theme.c.accent-fill;
         }
-        body := HorizontalLayout {
-            horizontal-stretch: 1;
-            padding-top: 13px;
-            padding-bottom: 13px;
-            spacing: 12px;
-            cross-axis-alignment: center;
-            if root.title != "": Text {
-                text: root.title;
-                font-weight: 600;
-                vertical-alignment: center;
-                color: Theme.c.text-primary;
-            }
-            Text {
-                horizontal-stretch: 1;
-                text: root.text;
-                wrap: word-wrap;
-                vertical-alignment: center;
-                color: Theme.c.text-primary;
-            }
+        Icon {
+            glyph: root.severity == Severity.success ? Glyph.status-check : root.severity == Severity.warning ? Glyph.status-exclamation
+                : root.severity == Severity.error ? Glyph.status-x : Glyph.status-info;
+            size: 16px;
+            color: Theme.c.text-inverse;
+        }
+    }
+    if root.title != "": Text {
+        x: root.left;
+        y: root.body-y + (root.line0-h - 20px) / 2;
+        width: root.tw;
+        height: 20px;
+        text: root.title;
+        font-weight: 600;
+        vertical-alignment: center;
+        color: Theme.c.text-primary;
+    }
+    msg := Text {
+        property <length> line-y: root.msg-line == 0 ? root.line0-y : root.line1-y;
+        property <length> line-h: root.msg-line == 0 ? root.line0-h : root.line1-h;
+        x: root.left + root.msg-x;
+        y: root.body-y + line-y + (line-h - root.msg-h) / 2;
+        width: root.msg-w;
+        text: root.text;
+        wrap: word-wrap;
+        line-height-factor: 20px / line-m.preferred-height;
+        vertical-alignment: center;
+        color: Theme.c.text-primary;
+    }
+    // The buttons are measured by the inner layout (the outer one's size is set from it).
+    Rectangle {
+        property <length> line-y: root.act-line == 0 ? root.line0-y : root.act-line == 1 ? root.line1-y : root.line2-y;
+        property <length> line-h: root.act-line == 0 ? root.line0-h : root.act-line == 1 ? root.line1-h : root.line2-h;
+        x: root.right - root.aw;
+        y: root.body-y + line-y + (line-h - root.act-h) / 2;
+        width: root.aw;
+        height: root.act-h;
+        acts-row := HorizontalLayout {
             if root.action-text != "": Button {
                 text: root.action-text;
                 variant: root.action-accent ? ButtonVariant.accent : ButtonVariant.standard;
                 clicked => { root.action(); }
             }
+            @children
         }
-        if root.closable: VerticalLayout {
-            padding-top: 4px;
-            padding-right: 3px;
-            alignment: start;
-            Rectangle {
-                width: 38px;
-                height: 38px;
-                border-radius: Theme.radius-control;
-                background: xta.pressed ? Theme.c.subtle-fill-pressed : xta.has-hover ? Theme.c.subtle-fill-hover : transparent;
-                accessible-role: button;
-                accessible-label: "关闭";
-                Icon { glyph: Glyph.close; size: 12px; color: xta.pressed ? Theme.c.text-secondary : Theme.c.text-primary; }
-                xta := TouchArea { clicked => { root.closed(); } }
-            }
-        }
+    }
+    if root.closable: Rectangle {
+        x: root.width - 1px - 4px - 38px;
+        y: 1px + 4px;
+        width: 38px;
+        height: 38px;
+        border-radius: Theme.radius-control;
+        background: xta.pressed ? Theme.c.subtle-fill-pressed : xta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+        accessible-role: button;
+        accessible-label: "关闭";
+        Icon { glyph: Glyph.close; size: 12px; color: xta.pressed ? Theme.c.text-secondary : Theme.c.text-primary; }
+        xta := TouchArea { clicked => { root.closed(); } }
     }
 }
 
