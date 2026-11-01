@@ -428,6 +428,36 @@ fn chip_keys() {
     assert_eq!(with(|a| a.desk.ui.selected.clone()).unwrap(), fluentcal_core::date::add_days(&sel, 1));
 }
 
+/// The day grid by keyboard alone (0.2's roving tabindex): Tab reaches the selected day, the
+/// arrows move it with the focus, Enter adds a task there and the focus comes back after.
+#[test]
+fn grid_by_keyboard() {
+    let t = start("gridkeys", Some(doc_with(&[], json!({}))));
+    let focused = || slint::ComponentHandle::global::<fluentcal_app::CellFocus>(&t.w).get_on();
+    let tab: slint::SharedString = Key::Tab.into();
+    for _ in 0..40 {
+        if focused() {
+            break;
+        }
+        t.key(&tab);
+    }
+    assert!(focused(), "Tab reaches the selected day");
+    let sel = with(|a| a.desk.ui.selected.clone()).unwrap();
+    t.key(&slint::SharedString::from(Key::RightArrow));
+    t.key(&slint::SharedString::from(Key::DownArrow));
+    let now = with(|a| a.desk.ui.selected.clone()).unwrap();
+    assert_eq!(now, fluentcal_core::date::add_days(&sel, 8));
+    t.key("\n");
+    t.type_text("键盘添加");
+    t.key("\n");
+    assert_eq!(t.task("键盘添加")["start"], json!(now));
+    t.key(&slint::SharedString::from(Key::Escape));
+    // The box closed; the arrows still move the day.
+    t.key(&slint::SharedString::from(Key::LeftArrow));
+    assert_eq!(with(|a| a.desk.ui.selected.clone()).unwrap(), fluentcal_core::date::add_days(&now, -1));
+    assert!(focused());
+}
+
 /// "+N": the day's tasks in a flyout; adding one there.
 #[test]
 fn day_list_lists_and_adds() {

@@ -37,7 +37,7 @@ impl App {
             if self.desk.drag.is_some() {
                 self.desk_drag_end();
             } else {
-                self.desk.ui.grid_focus = false;
+                self.desk_set_grid_focus(false);
             }
         } else if gantt {
             return false;
@@ -50,6 +50,16 @@ impl App {
             return false;
         }
         true
+    }
+
+    /// The day grid has the keyboard (arrow keys move the selected day); off: back to the window.
+    pub fn desk_set_grid_focus(&mut self, on: bool) {
+        self.desk.ui.grid_focus = on;
+        if on {
+            slint::ComponentHandle::global::<crate::CellFocus>(&self.desk.window).set_on(true);
+        } else {
+            self.desk.window.invoke_focus_root();
+        }
     }
 
     /// Arrow keys, Enter, Home, PageUp/Down and the menu key on the selected day.

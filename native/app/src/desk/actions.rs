@@ -112,6 +112,17 @@ impl App {
         self.desk.ui.quick_add = None;
         self.desk.window.set_quick_add_date("".into());
         self.desk.window.invoke_focus_root();
+        // back to the day it was on (0.2: the cell keeps the focus)
+        if self.desk.ui.grid_focus {
+            self.desk_set_grid_focus(true);
+            self.desk_refocus_cell();
+        }
+    }
+
+    /// The selected day's cell takes the focus again (after the quick-add box closes).
+    pub fn desk_refocus_cell(&mut self) {
+        let g = slint::ComponentHandle::global::<crate::CellFocus>(&self.desk.window);
+        g.set_nudge(g.get_nudge() + 1);
     }
 
     /// The box got the focus: the calendar (which normally doesn't activate) takes the keyboard.

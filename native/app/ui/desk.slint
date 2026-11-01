@@ -15,6 +15,15 @@ import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData }
 export { ChipData }
 
+// The day grid has the keyboard (0.2: a focused .cell): the selected day's cell keeps the
+// focus while the arrow keys move the selection (roving tab stop).
+export global CellFocus {
+    in-out property <bool> on;
+    // Rust bumps it: the selected day's cell takes the focus again.
+    in-out property <int> nudge;
+    callback focused();
+}
+
 export struct CellData {
     date: string,
     label: string,
@@ -64,6 +73,33 @@ component DayCell inherits Rectangle {
     callback menu(length, length);
     out property <bool> head-hover: ta.has-hover && ta.mouse-y < head-h;
     property <float> fs: Theme.desk.fs;
+    changed selected => {
+        if selected && CellFocus.on {
+            cfs.focus();
+        }
+    }
+    init => {
+        if selected && CellFocus.on {
+            cfs.focus();
+        }
+    }
+    property <int> nudge: CellFocus.nudge;
+    changed nudge => {
+        if selected && CellFocus.on {
+            cfs.focus();
+        }
+    }
+    // Tab reaches only the selected day (0.2: tabindex 0 / -1); other keys go to the calendar.
+    cfs := FocusScope {
+        focus-on-click: false;
+        focus-on-tab-navigation: root.selected;
+        changed has-focus => {
+            if self.has-focus {
+                CellFocus.on = true;
+                CellFocus.focused();
+            }
+        }
+    }
     border-radius: 4px;
     background: cell.dim ? Theme.desk.cell-bg.transparentize(0.45) : Theme.desk.cell-bg;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
@@ -96,7 +132,11 @@ component DayCell inherits Rectangle {
         }
     }
     ta := TouchArea {
-        clicked => { root.select(); }
+        clicked => {
+            root.select();
+            Overlay.keyboard = false;
+            cfs.focus();
+        }
         double-clicked => { root.quick-add(); }
         pointer-event(e) => {
             if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
@@ -143,6 +183,20 @@ component DayCell inherits Rectangle {
                 : cell.lunar-kind == "festival" || cell.lunar-kind == "term" ? Theme.desk.term-text
                 : cell.lunar-kind == "month" ? Theme.c.text-primary
                 : Theme.c.text-secondary;
+        }
+    }
+    if cfs.has-focus && Overlay.keyboard: Rectangle {
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: Theme.c.focus-outer;
+        Rectangle {
+            x: 2px;
+            y: 2px;
+            width: parent.width - 4px;
+            height: parent.height - 4px;
+            border-radius: 2px;
+            border-width: 1px;
+            border-color: Theme.c.focus-inner;
         }
     }
     if cell.badge != "": Rectangle {
@@ -761,7 +815,10 @@ export component DeskWindow inherits Window {
     callback toast-close();
     // Keys not taken by a text box: (text, ctrl, shift, alt) → handled.
     callback key(string, bool, bool, bool) -> bool;
-    public function focus-root() { keys.focus(); }
+    public function focus-root() {
+        CellFocus.on = false;
+        keys.focus();
+    }
 
     // The context menus and "更多" (one Fluent menu; Rust fills it before opening).
     in property <[MenuEntry]> menu-items;

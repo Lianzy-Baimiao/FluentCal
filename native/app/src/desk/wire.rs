@@ -56,7 +56,8 @@ pub fn wire(w: &DeskWindow) {
     let keys = slint::ComponentHandle::global::<crate::ChipKeys>(w);
     keys.on_remove(|c| run(move |a| a.desk_chip_remove(&c.task_id, &c.date)));
     keys.on_menu(|c, x, y, bw, bh| run(move |a| a.show_menu(super::menus::Target::Task(c.task_id.to_string(), c.date.to_string()), super::popups::At::Below(x, y, bw, bh))));
-    keys.on_focused(|| run(|a| a.desk.ui.grid_focus = true));
+    keys.on_focused(|| run(|a| a.desk_set_grid_focus(true)));
+    slint::ComponentHandle::global::<crate::CellFocus>(w).on_focused(|| run(|a| a.desk.ui.grid_focus = true));
     w.on_popups_changed(|on| {
         let close: std::rc::Rc<dyn Fn()> = std::rc::Rc::new(|| run(|a| a.desk_close_popups()));
         crate::platform::outside::watch("desk", on.then(|| (Box::new(crate::platform::desk::desk_hwnd) as Box<dyn Fn() -> _>, close)));
