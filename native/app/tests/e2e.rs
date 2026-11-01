@@ -458,6 +458,29 @@ fn grid_by_keyboard() {
     assert!(focused());
 }
 
+/// 0.2's animations: the jump flash holds its 2px ring for 60% of 1.5 s and then shrinks away;
+/// the toast keeps its text while it fades out.
+#[test]
+fn flash_and_toast_animations() {
+    let t = start("anims", Some(doc_with(&[], json!({}))));
+    let today = t.today();
+    with(|a| a.desk_flash(&today)).unwrap();
+    wait(500);
+    let w1 = with(|a| a.desk.window.get_flash_date().to_string()).unwrap();
+    assert_eq!(w1, today, "still flashing at 0.5 s");
+    wait(1200);
+    assert_eq!(with(|a| a.desk.window.get_flash_date().to_string()).unwrap(), "", "over after 1.6 s");
+    // The toast: text set, then cleared; the visible text stays until it has faded.
+    with(|a| a.notify("测试提示", false)).unwrap();
+    settle();
+    assert!(t.has("测试提示"));
+    with(|a| a.desk_close_toast()).unwrap();
+    wait(30);
+    assert!(t.has("测试提示"), "the text stays while the toast fades");
+    wait(400);
+    assert!(!t.has("测试提示"), "gone after the fade");
+}
+
 /// "+N": the day's tasks in a flyout; adding one there.
 #[test]
 fn day_list_lists_and_adds() {

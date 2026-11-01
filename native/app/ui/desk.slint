@@ -118,10 +118,18 @@ component DayCell inherits Rectangle {
         border-width: 1px;
         border-color: Theme.desk.today.transparentize(0.45);
     }
-    if drop || flash: Rectangle {
+    if drop: Rectangle {
         border-radius: 4px;
         border-width: 2px;
         border-color: Theme.c.accent-fill;
+    }
+    if flash && !drop: Rectangle {
+        property <float> k: 1;
+        init => { k = 0; }
+        animate k { delay: Theme.reduce-motion ? 0ms : 900ms; duration: Theme.reduce-motion ? 0ms : 600ms; easing: cubic-bezier(0, 0, 0, 1); }
+        border-radius: 4px;
+        border-width: 2px * k;
+        border-color: Theme.c.accent-fill.transparentize(1 - k);
     }
     property <int> tip-token: -1;
     changed head-hover => {
@@ -1096,10 +1104,32 @@ export component DeskWindow inherits Window {
                 close => { root.search-close(); }
                 wants-keyboard => { root.wants-keyboard(); }
             }
-            // Toast (the .toast of 0.2): bottom centre of the card.
-            if root.toast-text != "": Rectangle {
+            // Toast (the .toast of 0.2): bottom centre of the card; fades in and out while moving
+            // 8px (it keeps the last text while it leaves).
+            toast := Rectangle {
+                property <bool> shown: root.toast-text != "";
+                property <string> text-now: root.toast-text;
+                property <bool> undo-now: root.toast-undo;
+                property <string> last;
+                property <bool> last-undo;
+                property <float> k: shown ? 1 : 0;
+                animate k { duration: Theme.dur-normal; easing: cubic-bezier(0, 0, 0, 1); }
+                changed text-now => {
+                    if shown {
+                        last = text-now;
+                        last-undo = undo-now;
+                    }
+                }
+                changed undo-now => {
+                    if shown {
+                        last = text-now;
+                        last-undo = undo-now;
+                    }
+                }
+                visible: k > 0.001;
+                opacity: k;
                 x: (parent.width - self.width) / 2;
-                y: parent.height - 14px - self.height;
+                y: parent.height - 14px - self.height + (1 - k) * 8px;
                 width: tl.preferred-width;
                 height: tl.preferred-height;
                 BoxShadow { width: parent.width; height: parent.height; shadow: Theme.shadow-flyout; }
@@ -1117,11 +1147,11 @@ export component DeskWindow inherits Window {
                     spacing: 8px;
                     cross-axis-alignment: center;
                     Text {
-                        text: root.toast-text;
+                        text: toast.last;
                         font-size: 13px;
                         color: Theme.c.text-primary;
                     }
-                    if root.toast-undo: Button {
+                    if toast.last-undo: Button {
                         size: ButtonSize.small;
                         variant: ButtonVariant.accent;
                         text: "撤销";
