@@ -465,6 +465,76 @@ fn welcome_and_adjust_bars() {
     assert!(with(|a| a.doc.settings.desk.locked).unwrap());
 }
 
+/// A plain HTTP/1.1 GET on loopback (no proxy): (status, body).
+fn http_get(url: &str, token: Option<&str>) -> (u16, String) {
+    use std::io::{Read, Write};
+    let rest = url.strip_prefix("http://").unwrap();
+    let (host, path) = rest.split_once('/').map_or((rest, "/".to_owned()), |(h, p)| (h, format!("/{p}")));
+    let path = path.split('#').next().unwrap().to_owned();
+    let mut s = std::net::TcpStream::connect(host).unwrap();
+    s.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+    let auth = token.map_or(String::new(), |t| format!("Authorization: Bearer {t}\r\n"));
+    write!(s, "GET {path} HTTP/1.1\r\nHost: {host}\r\n{auth}Connection: close\r\n\r\n").unwrap();
+    let mut buf = Vec::new();
+    let _ = s.read_to_end(&mut buf);
+    let text = String::from_utf8_lossy(&buf).into_owned();
+    let status = text.split(' ').nth(1).and_then(|c| c.parse().ok()).unwrap_or(0);
+    (status, text.split_once("\r\n\r\n").map_or(String::new(), |(_, b)| b.to_owned()))
+}
+
+/// 0.2's "right-click a day › 在浏览器中查看": the loopback server starts, the link carries the
+/// access code, the page and the read-only data are served; a wrong code is refused.
+#[test]
+fn view_in_browser_from_the_day_menu() {
+    let today = fluentcal_core::date::today();
+    // A free port: the installed program may be serving on the default one.
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let t = start("browser", Some(doc_with(&[json!({ "title": "浏览器里的任务", "start": today })], json!({ "web": { "port": port } }))));
+    let _ = fluentcal_app::webcmd::captured_urls();
+    let (_, m, d) = fluentcal_core::date::parts(&today);
+    let cell = t.find_prefix(&format!("{m}月{d}日 "));
+    t.right_click_at(t.at(&cell, cell.size().width / 2.0, cell.size().height - 6.0));
+    t.click("在浏览器中查看");
+    let urls = fluentcal_app::webcmd::captured_urls();
+    assert_eq!(urls.len(), 1, "{urls:?} toast {:?}", t.w.get_toast_text());
+    let url = &urls[0];
+    assert!(url.starts_with("http://127.0.0.1:") && url.contains("?w=web#k="), "{url}");
+    let token = url.split("#k=").nth(1).unwrap();
+    let (code, page) = http_get(url, None);
+    assert_eq!(code, 200);
+    assert!(page.contains("<div id=\"app\""), "the web page");
+    let api = format!("{}api/doc", &url[..url.find("?").unwrap()]);
+    let (code, body) = http_get(&api, Some(token));
+    assert_eq!(code, 200);
+    assert!(body.contains("浏览器里的任务"));
+    assert_eq!(http_get(&api, Some("wrong")).0, 401);
+}
+
+/// 0.2's "first run: welcome bar, clear sample data (a renamed one stays), undo".
+#[test]
+fn clear_sample_data_keeps_a_renamed_task() {
+    let t = start("samples", None);
+    assert!(t.w.get_welcome());
+    let (n_tasks, n_groups) = with(|a| (a.doc.tasks.len(), a.doc.groups.len())).unwrap();
+    let mine = t.tasks().into_iter().find(|x| x["groupId"].is_string()).unwrap();
+    with(|a| {
+        let task = a.doc.tasks[mine["id"].as_str().unwrap()].clone();
+        let e = fluentcal_core::tasks::save_task(&a.doc, fluentcal_core::model::Task { title: "我的任务".into(), ..task }, 0);
+        a.apply(e, true);
+    })
+    .unwrap();
+    assert!(t.task("我的任务").get("sample").is_none_or(Value::is_null), "a renamed sample is the user's");
+    t.click("清除示例数据");
+    let left = t.tasks();
+    assert_eq!(left.len(), 1, "{left:?}");
+    assert!(left[0]["groupId"].is_null() && left[0]["deps"].as_array().is_none_or(Vec::is_empty));
+    assert!(with(|a| a.doc.groups.is_empty() && a.doc.settings.general.onboarded).unwrap());
+    assert!(!t.w.get_welcome());
+    t.click("撤销");
+    assert_eq!(with(|a| (a.doc.tasks.len(), a.doc.groups.len())).unwrap(), (n_tasks, n_groups));
+    assert!(!t.w.get_welcome(), "onboarded stays");
+}
+
 #[test]
 #[ignore]
 fn dump_labels() {

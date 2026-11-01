@@ -138,6 +138,17 @@ impl App {
     }
 }
 
+thread_local! {
+    /// Tests: links are recorded here instead of opening a browser.
+    static CAPTURED: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Tests: from now on links opened on this thread are recorded, not opened; returns them so far.
+#[doc(hidden)]
+pub fn captured_urls() -> Vec<String> {
+    CAPTURED.with(|c| c.borrow_mut().get_or_insert_with(Vec::new).clone())
+}
+
 /// Opens a link in the default browser (which may come to the front: the calendar doesn't
 /// activate, so it hands the right on).
 pub fn open_url(url: &str) {
@@ -145,6 +156,9 @@ pub fn open_url(url: &str) {
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
     if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return;
+    }
+    if CAPTURED.with(|c| c.borrow_mut().as_mut().map(|v| v.push(url.to_owned())).is_some()) {
         return;
     }
     crate::platform::desk::allow_foreground();
