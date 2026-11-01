@@ -506,6 +506,8 @@ component TitleBar inherits Rectangle {
     in property <bool> sync-failed;
     in property <string> sync-tip;
     in property <string> today-tip;
+    // The sync icon's turn, one path per frame (src/spin.rs); empty: no spinning.
+    in property <[string]> spin-frames;
     callback pick-month(length, length, length, length);
     callback page(int);
     callback go-today();
@@ -629,15 +631,33 @@ component TitleBar inherits Rectangle {
                 tip-bottom: true;
                 clicked => { root.search(); }
             }
-            if root.sync-enabled && wide: Button {
+            if root.sync-enabled && wide: sync-box := Rectangle {
+                property <bool> spin: root.sync-busy && root.spin-frames.length > 0;
+                width: 32px;
+                height: 32px;
+                sync-btn := Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
-                icon: root.sync-failed ? Glyph.warning : Glyph.sync;
+                icon: sync-box.spin ? "" : root.sync-failed ? Glyph.warning : Glyph.sync;
                 color-override: root.sync-failed ? Theme.c.caution : transparent;
                 accessible-label: root.sync-tip;
                 tip: root.sync-tip;
                 tip-bottom: true;
                 clicked => { root.sync-now(); }
+                }
+                // 0.2: the icon turns once a second while syncing
+                if sync-box.spin: Path {
+                    property <int> frame: mod(floor(animation-tick() / 1ms), 1000) * root.spin-frames.length / 1000;
+                    x: 8px;
+                    y: 8px;
+                    width: 16px;
+                    height: 16px;
+                    viewbox-width: 16;
+                    viewbox-height: 16;
+                    commands: root.spin-frames[frame];
+                    fill: Theme.c.text-primary;
+                    accessible-role: none;
+                }
             }
             Button {
                 variant: ButtonVariant.subtle;
@@ -788,6 +808,7 @@ export component DeskWindow inherits Window {
     in property <bool> sync-busy;
     in property <bool> sync-failed;
     in property <string> sync-tip;
+    in property <[string]> spin-frames;
     in property <string> quick-add-date;
     in-out property <string> quick-add-text;
     // Dragging a chip onto another day: the ghost label follows the pointer.
@@ -957,6 +978,7 @@ export component DeskWindow inherits Window {
                     sync-busy: root.sync-busy;
                     sync-failed: root.sync-failed;
                     sync-tip: root.sync-tip;
+                    spin-frames: root.spin-frames;
                     today-tip: root.today-tip;
                     page(d) => { root.page(d); }
                     go-today => { root.go-today(); }

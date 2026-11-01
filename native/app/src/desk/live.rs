@@ -79,6 +79,10 @@ impl App {
         let s = &self.sync;
         w.set_sync_enabled(s.enabled);
         w.set_sync_busy(s.syncing);
+        if s.syncing && slint::Model::row_count(&w.get_spin_frames()) == 0 {
+            let frames: Vec<slint::SharedString> = crate::spin::frames('\u{E895}').iter().map(|f| f.as_str().into()).collect();
+            w.set_spin_frames(slint::ModelRc::new(slint::VecModel::from(frames)));
+        }
         w.set_sync_failed(s.error.is_some());
         let line = fluentcal_core::sync_text::status_line(s, fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes());
         w.set_sync_tip(format!("{line}（点击立即同步）").into());

@@ -1247,6 +1247,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tauri-winrt-notification",
+ "ttf-parser",
  "windows",
  "windows-version",
 ]

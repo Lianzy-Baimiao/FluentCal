@@ -108,6 +108,17 @@ impl Desk {
                 w.set_search_empty(empty.into());
                 w.set_search_open(true);
             }
+            // The sync button: "static" (the glyph) or "spin" (frame `frame` of the turn).
+            "sync" => {
+                w.set_sync_enabled(true);
+                if s("state") == "spin" {
+                    let i = spec.get("frame").and_then(serde_json::Value::as_u64).unwrap_or(0) as usize;
+                    let f = crate::spin::frames('\u{E895}');
+                    let one: Vec<slint::SharedString> = f.get(i).map(|x| x.as_str().into()).into_iter().collect();
+                    w.set_spin_frames(slint::ModelRc::new(slint::VecModel::from(one)));
+                    w.set_sync_busy(true);
+                }
+            }
             "confirm" => {
                 w.set_confirm_title(s("title").into());
                 w.set_confirm_text(s("text").into());

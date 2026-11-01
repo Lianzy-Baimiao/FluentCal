@@ -12,6 +12,7 @@ pub mod platform;
 pub mod reminders;
 pub mod shadow;
 pub mod shell;
+pub mod spin;
 pub mod startup;
 pub mod theme;
 pub mod webcmd;
