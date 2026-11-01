@@ -1,0 +1,201 @@
+// 设置 › 外观 (0.2's AppearancePage.vue).
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Toggle, Slider } from "forms.slint";
+import { Select, Fluent } from "inputs.slint";
+import { ColorSwatches } from "menu.slint";
+import { SettingsGroup, SettingsCard, SettingsExpander, SettingsExpanderItems, SettingsRow, InfoBar, Severity } from "cards.slint";
+import { SetState } from "settings_state.slint";
+import { ThemeCards } from "settings_themes.slint";
+
+// FColorSwatches with "none" for automatic and the custom "+" (0.2's autoColor).
+component AutoSwatches inherits ColorSwatches {
+    allow-none: true;
+    custom: true;
+    custom-value: Fluent.custom-value(self.value, self.colors);
+    custom-color: Fluent.hex-color(self.custom-value);
+    custom-fg: Fluent.text-on(self.custom-value);
+}
+
+// A slider row of the 布局与文字 expander.
+component SliderRow inherits SettingsRow {
+    in property <string> path;
+    in property <float> value;
+    in property <float> min;
+    in property <float> max;
+    in property <float> step: 1;
+    in property <string> suffix;
+    Slider {
+        value: root.value;
+        minimum: root.min;
+        maximum: root.max;
+        step: root.step;
+        track-width: 180px;
+        show-value: true;
+        suffix: root.suffix;
+        moved(v) => { SetState.set-num(root.path, v); }
+        committed(v) => { SetState.set-num(root.path, v); }
+    }
+}
+
+// The accent colour row: the swatch grid (max 420px) doesn't fit beside the title, so it
+// wraps below it, right-aligned (0.2's flex-wrap).
+component AccentRow inherits Rectangle {
+    VerticalLayout {
+        padding-left: 56px;
+        padding-right: 48px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        Text { text: "选择强调色"; color: Theme.c.text-primary; min-height: 20px; vertical-alignment: center; }
+        HorizontalLayout {
+            alignment: end;
+            ColorSwatches {
+                width: 420px;
+                colors: SetState.accent-swatches;
+                value: SetState.appearance.accent-hex;
+                custom: true;
+                size: 28px;
+                custom-value: Fluent.custom-value(self.value, self.colors);
+                custom-color: Fluent.hex-color(self.custom-value);
+                custom-fg: Fluent.text-on(self.custom-value);
+                picked(v) => { SetState.set-str("theme.accent", v == "" ? "system" : v); }
+            }
+        }
+    }
+}
+
+export component AppearancePage inherits VerticalLayout {
+    property <bool> accent-open: !SetState.appearance.follow-accent;
+    changed accent-open => { open-accent = accent-open; }
+    property <bool> open-accent: !SetState.appearance.follow-accent;
+    property <bool> open-layout;
+    property <bool> open-detail;
+    SettingsGroup {
+        title: "颜色模式";
+        ThemeCards { kind: "mode"; }
+    }
+    SettingsGroup {
+        first: false;
+        title: "强调色";
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.color;
+                title: "跟随 Windows 强调色";
+                description: "今日高亮、按钮、选中状态使用的颜色";
+                expanded: root.open-accent;
+                toggled(v) => { root.open-accent = v; }
+                Toggle { checked: SetState.appearance.follow-accent; toggled(v) => { SetState.set-bool("follow-accent", v); } }
+            }
+                SettingsExpanderItems {
+                expanded: root.open-accent;
+                AccentRow { }
+            }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "预设方案";
+        ThemeCards { kind: "preset"; }
+    }
+    SettingsGroup {
+        first: false;
+        title: "桌面日历";
+        SettingsCard {
+            icon: Glyph.palette;
+            title: "背景颜色";
+            description: "留空则跟随浅色/深色主题";
+            AutoSwatches { colors: SetState.bg-swatches; value: SetState.appearance.bg-color; size: 24px; picked(v) => { SetState.set-str("desk.bgColor", v == "" ? "auto" : v); } }
+        }
+        SettingsCard {
+            icon: Glyph.contrast;
+            title: "背景不透明度";
+            description: "0% 为完全透明，只显示日期格";
+            Slider {
+                value: SetState.appearance.bg-opacity; minimum: 0; maximum: 100; step: 1; track-width: 200px; show-value: true; suffix: "%";
+                moved(v) => { SetState.set-num("desk.bgOpacity", v); }
+                committed(v) => { SetState.set-num("desk.bgOpacity", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.calendar-day;
+            title: "日期格不透明度";
+            Slider {
+                value: SetState.appearance.cell-opacity; minimum: 0; maximum: 100; step: 1; track-width: 200px; show-value: true; suffix: "%";
+                moved(v) => { SetState.set-num("desk.cellOpacity", v); }
+                committed(v) => { SetState.set-num("desk.cellOpacity", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.window;
+            title: "亚克力毛玻璃";
+            description: "模糊日历后面的桌面壁纸（Windows 11 效果）";
+            Toggle { checked: SetState.appearance.acrylic; toggled(v) => { SetState.set-bool("desk.acrylic", v); } }
+        }
+        if SetState.appearance.acrylic && SetState.appearance.no-transparency: InfoBar {
+            severity: Severity.warning;
+            text: "系统已关闭“透明效果”（设置 › 个性化 › 颜色），亚克力将不会生效。";
+        }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.font;
+                title: "布局与文字";
+                description: "圆角、阴影、字号与间距";
+                has-content: false;
+                expanded: root.open-layout;
+                toggled(v) => { root.open-layout = v; }
+            }
+                SettingsExpanderItems {
+                expanded: root.open-layout;
+                SliderRow { title: "圆角"; path: "desk.radius"; value: SetState.appearance.radius; min: 0; max: 16; suffix: "px"; }
+                SettingsRow {
+                    divider: true;
+                    title: "窗口阴影";
+                    Toggle { checked: SetState.appearance.shadow; toggled(v) => { SetState.set-bool("desk.shadow", v); } }
+                }
+                SettingsRow {
+                    divider: true;
+                    title: "文字阴影";
+                    description: "背景较透明时为文字加阴影，保证在壁纸上清晰可读";
+                    Select {
+                        width: 120px;
+                        value: SetState.appearance.text-shadow;
+                        options: [{ value: "auto", label: "自动" }, { value: "on", label: "开启" }, { value: "off", label: "关闭" }];
+                        selected(v) => { SetState.set-str("desk.textShadow", v); }
+                    }
+                }
+                SliderRow { divider: true; title: "字号"; path: "desk.fontScale"; value: SetState.appearance.font-scale; min: 80; max: 140; step: 5; suffix: "%"; }
+                SliderRow { divider: true; title: "日期格间隙"; path: "desk.cellGap"; value: SetState.appearance.cell-gap; min: 0; max: 10; suffix: "px"; }
+                SliderRow { divider: true; title: "任务行距"; path: "desk.lineSpacing"; value: SetState.appearance.line-spacing; min: 0; max: 8; suffix: "px"; }
+            }
+        }
+        VerticalLayout {
+                SettingsExpander {
+                icon: Glyph.color;
+                title: "细节颜色";
+                description: "今日、休息日、节假日和节气的颜色；留空为自动";
+                has-content: false;
+                expanded: root.open-detail;
+                toggled(v) => { root.open-detail = v; }
+            }
+                SettingsExpanderItems {
+                expanded: root.open-detail;
+                SettingsRow { title: "今日高亮"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-color; size: 22px; picked(v) => { SetState.set-str("desk.todayColor", v == "" ? "accent" : v); } } }
+                SettingsRow { divider: true; title: "休息日背景"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.rest-color; size: 22px; picked(v) => { SetState.set-str("desk.restBgColor", v == "" ? "auto" : v); } } }
+                SettingsRow { divider: true; title: "节假日文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.holiday-color; size: 22px; picked(v) => { SetState.set-str("desk.holidayTextColor", v == "" ? "auto" : v); } } }
+                SettingsRow { divider: true; title: "节日与节气文字"; AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.term-color; size: 22px; picked(v) => { SetState.set-str("desk.termTextColor", v == "" ? "auto" : v); } } }
+            }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "动画";
+        SettingsCard {
+            icon: Glyph.eye;
+            title: "减少动画";
+            description: "系统开启“动画效果”关闭时也会自动减少";
+            Toggle { checked: SetState.appearance.reduce-motion; toggled(v) => { SetState.set-bool("theme.reduceMotion", v); } }
+        }
+    }
+}

@@ -44,6 +44,7 @@ pub struct App {
     pub web: crate::webcmd::WebState,
     pub reminder_win: Option<crate::ReminderWindow>,
     pub editor: Option<crate::windows::editor::EditorWin>,
+    pub settings_win: Option<crate::windows::settings::SettingsWin>,
 }
 
 thread_local! {
@@ -152,6 +153,7 @@ impl App {
         self.editor_refresh();
         crate::shell::tray_refresh(self);
         self.schedule_reminders();
+        self.settings_refresh();
     }
 
     pub fn patch_settings(&mut self, patch: serde_json::Value) {
@@ -167,6 +169,7 @@ impl App {
     pub fn settings_changed(&mut self, old: &Settings) {
         crate::shell::apply_settings(self, old);
         self.editor_refresh();
+        self.settings_refresh();
     }
 
     /// Theme mode, accent, appearance or the system theme changed.

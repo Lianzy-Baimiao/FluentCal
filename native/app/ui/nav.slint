@@ -70,6 +70,10 @@ export component NavView {
     // "" = the selected item's label; " " = no heading.
     in property <string> page-title;
     callback navigate(string);
+    // Scrolls the page back to the top (a new page starts at the top).
+    public function scroll-top() {
+        flick.content-y = 0;
+    }
     property <bool> compact: root.width < 680px;
     property <length> pane-w: compact ? 48px : 280px;
     property <length> title-h: title != "" && !compact ? 40px : 0;
@@ -131,7 +135,7 @@ export component NavView {
             animate opacity { duration: Theme.dur-fast; }
         }
     }
-    Flickable {
+    flick := Flickable {
         x: root.pane-w;
         width: root.width - root.pane-w;
         height: root.height;

@@ -34,6 +34,8 @@ slint = { version = "1.18.1", default-features = false, features = [
     "unstable-fontique-011",
 ] }
 png = "0.18.1"
+# Settings › 网页查看: the QR code of the link (0.2 used uqr, the same algorithm).
+qrcodegen = "1.8"
 tauri-winrt-notification = "0.8.1"
 windows = { version = "0.62.2", features = [
     "ApplicationModel",
@@ -51,6 +53,7 @@ windows = { version = "0.62.2", features = [
     "Win32_System_DataExchange",
     "Win32_System_Diagnostics_Debug",
     "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
     "Win32_System_Registry",
     "Win32_System_Threading",
     "Win32_UI_HiDpi",

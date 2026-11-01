@@ -1,0 +1,237 @@
+// 设置 › 日历 and 设置 › 甘特图 (0.2's CalendarPage.vue, GanttPage.vue).
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Toggle } from "forms.slint";
+import { Select, NumberBox, TextBox, Fluent } from "inputs.slint";
+import { ColorSwatches } from "menu.slint";
+import { SettingsGroup, SettingsCard } from "cards.slint";
+import { SetState } from "settings_state.slint";
+
+// One of the 休息日 chips (0.2's .settings .chips button).
+component DayChip inherits Rectangle {
+    in property <string> label;
+    in property <bool> on;
+    callback clicked();
+    min-width: 36px;
+    preferred-width: max(36px, t.preferred-width + 18px);
+    height: 30px;
+    border-radius: 15px;
+    border-width: 1px;
+    border-color: on ? Theme.c.accent-fill : Theme.c.control-stroke;
+    background: on ? Theme.c.accent-fill : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-checked: on;
+    accessible-action-default => { root.clicked(); }
+    t := Text {
+        text: root.label;
+        color: root.on ? Theme.c.text-on-accent : Theme.c.text-primary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea { clicked => { root.clicked(); } }
+}
+
+export component CalendarPage inherits VerticalLayout {
+    SettingsGroup {
+        title: "视图";
+        SettingsCard {
+            icon: Glyph.calendar;
+            title: "默认视图";
+            Select {
+                width: 150px;
+                value: SetState.calendar.view;
+                options: [{ value: "month", label: "月视图" }, { value: "weeks", label: "多周视图" }, { value: "gantt", label: "甘特图" }];
+                selected(v) => { SetState.set-str("calendar.view", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.calendar-week;
+            title: "每周的第一天";
+            Select {
+                width: 150px;
+                value: SetState.calendar.week-start;
+                options: [{ value: "1", label: "星期一" }, { value: "0", label: "星期日" }];
+                selected(v) => { SetState.set-num("calendar.weekStart", v.to-float()); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.calendar-day;
+            title: "月视图行数";
+            description: "自动：只显示本月所在的 4～6 周；固定：总是 6 周";
+            Select {
+                width: 150px;
+                value: SetState.calendar.month-rows;
+                options: [{ value: "auto", label: "自动" }, { value: "six", label: "固定 6 行" }];
+                selected(v) => { SetState.set-str("calendar.monthRows", v); }
+            }
+        }
+        SettingsCard {
+            icon: Glyph.list;
+            title: "多周视图";
+            description: "显示的周数，以及其中已经过去的周数；日历每周自动向后滚动";
+            Text { text: "显示"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+            NumberBox { width: 96px; value: SetState.calendar.weeks-rows; minimum: 2; maximum: 10; suffix: "周"; changed-value(v) => { SetState.set-num("calendar.weeksRows", v); } }
+            Text { text: "已过"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+            NumberBox { width: 96px; value: SetState.calendar.weeks-past; minimum: 0; maximum: max(0, SetState.calendar.weeks-rows - 1); suffix: "周"; changed-value(v) => { SetState.set-num("calendar.weeksPast", v); } }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "显示";
+        SettingsCard {
+            icon: Glyph.moon;
+            title: "农历";
+            description: "在日期旁显示农历日；节日、节气始终显示";
+            Toggle { checked: SetState.calendar.show-lunar; toggled(v) => { SetState.set-bool("calendar.showLunar", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.flag;
+            title: "法定节假日";
+            description: "放假显示“休”，调休上班显示“班”";
+            Toggle { checked: SetState.calendar.show-holidays; toggled(v) => { SetState.set-bool("calendar.showHolidays", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.tag;
+            title: "周数";
+            description: "在每行左侧显示 ISO 周数";
+            Toggle { checked: SetState.calendar.show-week-numbers; toggled(v) => { SetState.set-bool("calendar.showWeekNumbers", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.info;
+            title: "宜忌";
+            description: "鼠标停在日期上时显示农历宜忌";
+            Toggle { checked: SetState.calendar.show-almanac; toggled(v) => { SetState.set-bool("calendar.showAlmanac", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.flag;
+            title: "节假日倒计时";
+            description: "在日历底部显示距离下一个法定假日的天数；任务可在右键菜单或编辑窗口中设为倒数日";
+            Toggle { checked: SetState.calendar.holiday-countdown; toggled(v) => { SetState.set-bool("calendar.holidayCountdown", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.home;
+            title: "休息日";
+            description: "没有法定节假日时，这几天按休息日显示";
+            HorizontalLayout {
+                spacing: 4px;
+                accessible-role: groupbox;
+                accessible-label: "休息日";
+                // Monday first; rest-days is indexed 0 = Sunday
+                for d[i] in [1, 2, 3, 4, 5, 6, 0]: DayChip {
+                    label: ["日", "一", "二", "三", "四", "五", "六"][d];
+                    on: SetState.calendar.rest-days[d];
+                    clicked => { SetState.set-rest-day(d, !self.on); }
+                }
+            }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "任务";
+        SettingsCard {
+            icon: Glyph.completed;
+            title: "显示已完成的任务";
+            Toggle { checked: SetState.calendar.show-completed; toggled(v) => { SetState.set-bool("tasks.showCompleted", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.list;
+            title: "已完成的任务排在最后";
+            Toggle { checked: SetState.calendar.completed-last; toggled(v) => { SetState.set-bool("tasks.completedLast", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.forward;
+            title: "未完成自动顺延";
+            description: "过期 30 天内未完成的单日任务，每天自动移到今天（可在任务上单独设置）";
+            Toggle { checked: SetState.calendar.auto-postpone; toggled(v) => { SetState.set-bool("tasks.autoPostpone", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.color;
+            title: "新任务默认颜色";
+            ColorSwatches { colors: SetState.task-swatches; value: SetState.calendar.default-color; allow-none: true; size: 22px; picked(v) => { SetState.set-str("tasks.defaultColor", v); } }
+        }
+    }
+}
+
+// A group's card: name box (saved on Enter / leaving it), colour, delete.
+component GroupCard inherits SettingsCard {
+    in property <string> gid;
+    in property <string> gname;
+    in property <string> gcolor;
+    property <string> draft: gname;
+    title: gname;
+    TextBox {
+        width: 160px;
+        text <=> root.draft;
+        placeholder: root.gname;
+        accepted(v) => { SetState.set-group-name(root.gid, v); }
+        focus-changed(f) => {
+            if !f {
+                SetState.set-group-name(root.gid, root.draft);
+            }
+        }
+    }
+    ColorSwatches { colors: SetState.task-swatches; value: root.gcolor; size: 18px; picked(v) => { SetState.set-group-color(root.gid, v); } }
+    Button { variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.delete; tip: "删除分组 " + root.gname; clicked => { SetState.action-arg("delete-group", root.gid); } }
+}
+
+export component GanttPage inherits VerticalLayout {
+    property <string> new-name;
+    SettingsGroup {
+        title: "显示";
+        SettingsCard {
+            icon: Glyph.zoom-in;
+            title: "默认时间刻度";
+            description: "在甘特图中按住 Ctrl 滚动鼠标滚轮也可以缩放";
+            Select {
+                width: 120px;
+                value: SetState.gantt.scale;
+                options: [{ value: "day", label: "日" }, { value: "week", label: "周" }, { value: "month", label: "月" }];
+                selected(v) => { SetState.set-str("gantt.scale", v); }
+            }
+        }
+        SettingsCard { icon: Glyph.list; title: "显示任务表"; Toggle { checked: SetState.gantt.show-table; toggled(v) => { SetState.set-bool("gantt.showTable", v); } } }
+        SettingsCard {
+            icon: Glyph.link;
+            title: "显示依赖连线";
+            description: "红色虚线表示后续任务开始得比前置任务结束更早";
+            Toggle { checked: SetState.gantt.show-deps; toggled(v) => { SetState.set-bool("gantt.showDeps", v); } }
+        }
+        SettingsCard { icon: Glyph.completed; title: "隐藏已完成的任务"; Toggle { checked: SetState.gantt.hide-done; toggled(v) => { SetState.set-bool("gantt.hideDone", v); } } }
+        SettingsCard {
+            icon: Glyph.filter;
+            title: "隐藏未分组的单日任务";
+            description: "日常待办不出现在甘特图里；里程碑和有依赖的任务不受影响";
+            Toggle { checked: SetState.gantt.hide-single-day; toggled(v) => { SetState.set-bool("gantt.hideSingleDay", v); } }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: "分组";
+        for g in SetState.groups: GroupCard { gid: g.id; gname: g.name; gcolor: g.color; description: g.desc; }
+        SettingsCard {
+            icon: Glyph.add;
+            title: "新建分组";
+            TextBox {
+                width: 200px;
+                text <=> root.new-name;
+                placeholder: "分组名称";
+                accepted(v) => {
+                    SetState.add-group(v);
+                    root.new-name = "";
+                }
+            }
+            Button {
+                text: "添加";
+                variant: ButtonVariant.accent;
+                enabled: Fluent.trim(root.new-name) != "";
+                clicked => {
+                    SetState.add-group(root.new-name);
+                    root.new-name = "";
+                }
+            }
+        }
+    }
+}

@@ -32,6 +32,10 @@ fn fatal(text: &str) {
 
 pub fn main() {
     let id = msgwin::instance_id();
+    // The old copy saves its data and syncs (up to ~5 s) before it lets go.
+    if std::env::args().any(|a| a == "--restart") {
+        msgwin::wait_for_exit(&id, 10_000);
+    }
     if !msgwin::claim(&id) {
         return; // the running instance opens its settings
     }
@@ -84,6 +88,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         post(move |app| {
             app.sync = s;
             app.desk_refresh_status();
+            app.settings_refresh();
         });
     });
     let cloud = Cloud::start(store.clone(), Some(on_status), local.join("cloud-state.json"));
@@ -142,6 +147,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         web: Default::default(),
         reminder_win: None,
         editor: None,
+        settings_win: None,
     })
 }
 

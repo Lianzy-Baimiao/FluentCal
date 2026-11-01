@@ -21,6 +21,7 @@ pub mod reminders;
 pub mod search;
 pub mod seed;
 pub mod settings;
+pub mod settings_page;
 pub mod store;
 pub mod sync;
 pub mod sync_text;

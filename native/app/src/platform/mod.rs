@@ -2,6 +2,7 @@
 //! (single instance, hotkeys), autostart, notifications, system theme.
 
 pub mod autostart;
+pub mod clipboard;
 pub mod desk;
 pub mod dialog;
 pub mod msgwin;
