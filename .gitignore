@@ -18,3 +18,6 @@ native/.parity/
 
 # agent worktrees
 .claude/worktrees/
+
+# installers handed to the user (built by scripts/build-native.sh)
+release/

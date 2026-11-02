@@ -56,6 +56,11 @@ const SCENES = [
   { name: 'desk-tip-chip', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } }, steps: [['hover', '.chip[aria-label="评审会"]'], ['wait', 700]] },
   { name: 'desk-tip-head', url: '?w=desk&theme=dark', size: month, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['hover', '.cell[data-date="2026-10-21"] .head'], ['wait', 700]] },
   { name: 'gantt-tip', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } }, steps: [['hover', '.bar[data-task="api"]'], ['wait', 700]] },
+  // Microsoft Store screenshots (scripts/store-shots.sh, at 2×): the README's scenes. Only when named.
+  { name: 'store-month-light', store: true, url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } } },
+  { name: 'store-month-dark', store: true, url: '?w=desk&theme=dark&accent=%238764B8', accent: '#8764B8', size: month, dark: true, settings: { theme: { mode: 'dark', accent: '#8764B8' }, desk: glass } },
+  { name: 'store-gantt', store: true, url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } } },
+  { ...settingsScene('store-settings-appearance', 'appearance', { dark: true }), store: true, size: { width: 980, height: 548 } },
   { name: 'gallery-light', window: 'gallery', url: '?w=gallery&theme=light', size: gallery },
   { name: 'gallery-dark', window: 'gallery', url: '?w=gallery&theme=dark', size: gallery, dark: true },
   { name: 'gallery-menu', window: 'gallery', url: '?w=gallery&theme=light', size: gallery, steps: [['click', 'button:has-text("菜单")']] },
@@ -159,7 +164,7 @@ async function runSteps(page, steps = []) {
 const server = await preview({ preview: { port: PORT, strictPort: true }, logLevel: 'error' });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
-  for (const s of SCENES.filter((s) => !only.length || only.includes(s.name))) {
+  for (const s of SCENES.filter((s) => (only.length ? only.includes(s.name) : !s.store))) {
     const isGallery = s.window === 'gallery';
     const isSettings = s.window === 'settings';
     const ctx = await browser.newContext({ viewport: s.size, deviceScaleFactor: SCALE, timezoneId: 'Asia/Shanghai', locale: 'zh-CN', colorScheme: s.dark ? 'dark' : 'light' });
