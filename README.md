@@ -2,7 +2,9 @@
 
 钉在 Windows 桌面上的日历 + 甘特图，Windows 11 Fluent 风格，支持浅色/深色和自定义颜色。
 
-![FluentCal 月视图：农历、节气、法定节假日“休/班”、多日任务横条和倒数日](docs/screenshots/month-light.png)
+0.3 起是 Rust 原生程序（界面用 [Slint](https://slint.dev)），不再需要 WebView2。发布版空闲时专用内存 9.4 MB，0.2 的 WebView2 版约 104 MB。
+
+![FluentCal 月视图：农历、节气、法定节假日“休/班”、多日任务横条和倒数日](docs/store/month-light.png)
 
 - 需求与设计：[需求文档.md](需求文档.md)
 - 开发进度：[TODO.md](TODO.md)
@@ -23,15 +25,15 @@
 
 深色主题、紫色强调色、“透明玻璃”预设（透出壁纸）：
 
-![深色、透明玻璃风格的月视图](docs/screenshots/month-dark.png)
+![深色、透明玻璃风格的月视图](docs/store/month-dark.png)
 
 甘特图：依赖箭头、进度、分组汇总、里程碑，和日历是同一份数据：
 
-![甘特图](docs/screenshots/gantt.png)
+![甘特图](docs/store/gantt.png)
 
 外观设置：浅色/深色/跟随系统、强调色、预设方案，以及背景、透明度、圆角、字号等：
 
-![外观设置](docs/screenshots/settings-appearance.png)
+![外观设置](docs/store/settings-appearance.png)
 
 同步设置：WebDAV、GitHub/Gitee 私有仓库，或者 OneDrive、Google Drive 等同步盘里的文件夹：
 
@@ -41,16 +43,16 @@
 
 <img src="docs/screenshots/web-phone-list.png" width="300" alt="手机浏览器中的列表视图：按天列出近期任务"> <img src="docs/screenshots/web-phone-month.png" width="300" alt="手机浏览器中的月视图">
 
-截图用示例数据在浏览器预览中生成（`npm run readme-shots`），背景是代替桌面壁纸的渐变；实际使用时日历后面是你的桌面。
+月视图、甘特图和外观设置的截图由原生版离屏渲染（`scripts/store-shots.sh`，也用作 Microsoft Store 的截图）；同步设置和手机网页的截图在浏览器预览中生成（`npm run readme-shots`）。都用示例数据和固定日期，背景是代替桌面壁纸的渐变；实际使用时日历后面是你的桌面。
 
 ## 下载安装
 
-到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。
+到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。Releases 上目前最新的是 0.2.0（WebView2 版）；0.3 原生版还没有发布，可以按下面“开发”一节自己构建。
 
 - 系统：Windows 11（在 24H2 上开发和测试）。Windows 10 未测试。
 - 安装包没有代码签名，Windows SmartScreen 可能提示“已保护你的电脑”：点“更多信息” →“仍要运行”。
-- 依赖 WebView2，Windows 11 自带；缺少时安装程序会自动下载。
-- 卸载不会删除数据（`%APPDATA%\com.fluentcal.desktop`）。
+- 0.3 起不需要 WebView2。0.2 及更早的版本依赖 WebView2（Windows 11 自带，缺少时安装程序会自动下载）。
+- 0.3 的安装包装在与 0.2 相同的位置，原地升级，继续使用原来的数据。卸载不会删除数据（`%APPDATA%\com.fluentcal.desktop`）。
 
 ## 常用操作
 
@@ -74,86 +76,85 @@
 
 ## 开发
 
-需要 Node.js 20+ 和 Rust（stable）。
+0.3 起的程序在 `native/`：Rust + [Slint](https://slint.dev)（软件渲染）。cargo 工作区分两个包：`core` 是与界面无关的逻辑，`app` 是窗口、界面和 Windows 平台层。仓库根目录的 Vue 前端仍在用：它是“在浏览器中查看”和局域网网页的页面（`vite build` 后嵌进 exe），也是与 0.2 逐像素对比的参照。发布版实测（2026-11-02）：空闲内存（专用工作集）9.4 MB（0.2 约 104 MB），17 个线程，空闲 CPU 测不出来，日历 0.15 秒出现；程序 21.8 MB。
+
+需要 Node.js 20+ 和 Rust（stable），打安装包还要 NSIS。
 
 ```bash
 npm install
+npm run build                        # 网页查看的页面（dist/，构建时嵌进 exe）
+cd native
+cargo run -p fluentcal-native        # 开发运行：测试数据在 %APPDATA%\com.fluentcal.native.dev，与已安装的版本互不影响
+cargo test --workspace               # 全部测试：日历逻辑、存储、云同步、网页服务、主题，以及端到端
+cd ..
+scripts/build-native.sh              # 发布版 exe + GitHub 安装包（NSIS），安装包放在 exe 旁边
+scripts/build-msix.sh                # Microsoft Store 包（MSIX）
+npm run parity && scripts/parity-native.sh   # 与 0.2 逐像素对比（同一示例数据、同一时刻，125% 缩放）
+scripts/store-shots.sh               # 重新生成 docs/store 下的截图
+```
+
+端到端测试（`native/app/tests`）运行真实程序，用 Slint 的无头测试后端模拟点击、拖动和按键，不显示窗口。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee）；`native/core/tests/cloud_webdav.rs` 和 `cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`native/core/tests/web.rs` 在本机端口上测试网页查看服务：页面与访问码、同一连接上的连续轮询（304）、监听地址、只回应局域网设备。
+
+`native/vendor/i-slint-renderer-software` 是打了一处补丁的 Slint 软件渲染器（字形 hinting 和覆盖率校正，使文字粗细与 0.2 一致），说明见其中的 README。
+
+### 工具链
+
+Windows 上 Rust 默认用 MSVC 工具链，需要 Visual Studio Build Tools（勾选“使用 C++ 的桌面开发”）。
+
+本项目实际是在没有 MSVC 的电脑上，用 GNU 工具链（`x86_64-pc-windows-gnu`）开发和测试的，MSVC 构建没有验证过。用 GNU 工具链时，把 `src-tauri/.cargo/config.toml.example` 复制为 `native/.cargo/config.toml`（0.2 用 `src-tauri/.cargo/config.toml`），按里面的说明填写路径：
+
+1. 需要 [llvm-mingw](https://github.com/mstorsjo/llvm-mingw)，用它的 `llvm-dlltool` 生成导入库，`windres` 编译图标资源。构建原生版前把它的 `bin` 加入 PATH（找不到 `windres` 时 exe 没有图标，构建会提示）；`npm run tauri` 会自动加入 `~/tools/llvm-mingw/bin`。
+2. 链接器用 rustc 自带的 rust-lld（做一个名为 `ld.exe` 的硬链接），因为 GNU ld 会把 LLVM 导入库链接错。
+3. 项目路径含中文时，把构建目录（`target-dir`）设到纯英文路径下，因为 GNU 工具打不开中文路径下的文件。原生版和 0.2 各用一个构建目录。
+
+### 0.2（Tauri + WebView2）
+
+0.2 的 Tauri 版保留在仓库中，作为原生版对照的参照：`src-tauri/` 是它的 Rust 后端，`src/` 是它的 Vue 界面（也是网页查看的页面）。
+
+```bash
 npm run tauri dev      # 开发运行（桌面日历 + 热更新）
 npm run tauri build    # 生成 NSIS 安装包，输出到 <target 目录>\release\bundle\nsis\
 npm test               # 前端单元测试（vitest）
 npm run typecheck      # 类型检查
-npm run e2e            # 端到端测试（无界面 Edge，18 项交互）
+npm run e2e            # 端到端测试（无界面 Edge）
 npm run a11y           # 无障碍审计（axe-core）
-npm run readme-shots   # 重新生成 docs/screenshots 下的 README 截图（示例数据、固定日期）
+npm run readme-shots   # 重新生成 docs/screenshots 下的截图（示例数据、固定日期）
 ```
 
-浏览器预览（不需要 Tauri，数据存在 localStorage）：`npm run dev` 后打开
-
-- `http://localhost:1420/?w=desk&theme=dark` 桌面日历
-- `http://localhost:1420/?w=settings&page=appearance` 设置
-- `http://localhost:1420/?w=gallery` Fluent 组件库
-
-Rust 测试：`cd src-tauri && cargo test`。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee）；`tests/cloud_webdav.rs` 和 `tests/cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`tests/web.rs` 在本机端口上测试网页查看服务：访问码、返回的数据、304、同一连接上的连续轮询、路径穿越、响应头、监听地址。
-
-### 工具链
-
-Windows 上 Rust 默认用 MSVC 工具链，需要 Visual Studio Build Tools（勾选“使用 C++ 的桌面开发”），这是 Tauri 的标准配置。
-
-本项目实际是在没有 MSVC 的电脑上，用 GNU 工具链（`x86_64-pc-windows-gnu`）开发和测试的，MSVC 构建没有验证过。用 GNU 工具链时，把 `src-tauri/.cargo/config.toml.example` 复制为 `config.toml`，按里面的说明填写路径：
-
-1. 需要 [llvm-mingw](https://github.com/mstorsjo/llvm-mingw)，用它的 `llvm-dlltool` 生成导入库，`windres` 编译图标资源。解压到 `~/tools/llvm-mingw` 时，`npm run tauri` 会自动把它加入 PATH。
-2. 链接器用 rustc 自带的 rust-lld（做一个名为 `ld.exe` 的硬链接），因为 GNU ld 会把 LLVM 导入库链接错。
-3. 项目路径含中文时，把构建目录（`target-dir`）设到纯英文路径下，因为 GNU 工具打不开中文路径下的文件。
-
-### 原生版（native/，开发中）
-
-0.3 起改为 Rust 原生界面（[Slint](https://slint.dev)，软件渲染），不再需要 WebView2。发布版实测（2026-11-02）：空闲内存（专用工作集）
-9.4 MB（0.2 约 104 MB），17 个线程，空闲 CPU 测不出来，日历 0.15 秒出现；程序 21.8 MB。
-0.2 的 Tauri 版保留在仓库中，原生版功能齐全前仍以它为准。原生版同样用 GNU 工具链，把 `src-tauri/.cargo/config.toml`
-复制到 `native/.cargo/config.toml`（改一个构建目录）。
-
-```bash
-cd native
-cargo run -p fluentcal-native        # 开发运行：测试数据在 %APPDATA%\com.fluentcal.native.dev，与已安装的版本互不影响
-cargo test -p fluentcal-core         # 日历逻辑、存储、云同步、网页服务、主题（与 0.2 的测试对应）
-cargo test -p fluentcal-native       # 端到端：真实程序 + Slint 无头测试后端，模拟点击、拖动、按键
-cd ..
-npm run parity && scripts/parity-native.sh   # 与 0.2 逐像素对比（同一示例数据、同一时刻，125% 缩放）
-scripts/build-native.sh              # 发布版 + GitHub 安装包（NSIS）
-scripts/build-msix.sh                # Microsoft Store 包（MSIX）
-```
-
-`native/vendor/i-slint-renderer-software` 是打了一处补丁的 Slint 软件渲染器（字形 hinting 和覆盖率校正，使文字粗细与
-WebView2 一致），说明见其中的 README。
+浏览器预览（不需要 Tauri，数据存在 localStorage）：`npm run dev` 后打开 `http://localhost:1420/?w=desk&theme=dark`（桌面日历）、`?w=settings&page=appearance`（设置）或 `?w=gallery`（Fluent 组件库）。Rust 测试：`cd src-tauri && cargo test`。
 
 ## 目录
 
 ```
-src-tauri/src
-  desktop.rs         钉在桌面（所有者 = Progman + 强制置底）、鼠标穿透、亚克力、系统主题
-  screens.rs         多显示器：选择屏幕、屏幕变化后拉回
-  store.rs           JSON 存储：原子写入、防抖、每日备份、损坏自动恢复
-  merge.rs, sync.rs  多台电脑共用数据文件夹时按条目合并、监视外部修改
-  datadir.rs         自定义数据文件夹
-  cloud/             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee），secrets.rs 凭据管理器
-  reminder.rs        提醒调度；reminder_popup.rs 右下角提醒卡片
-  web.rs             网页查看：局域网 HTTP 服务（访问码、只读数据、静态文件）；webcmd.rs 开关、端口、本机地址
-  tray.rs            托盘菜单
-  lib.rs             窗口、快捷键、开机启动、命令
-src
-  fluent/      Windows 11 Fluent 组件库与主题
-  lib/         日期、农历节假日、重复规则、日历布局、甘特几何、导出、合并等（核心逻辑有单元测试）
-  stores/      数据与设置（多窗口同步、撤销/重做）
-  windows/     desk（桌面日历 + 甘特图）、settings、editor、reminder、gallery、web（网页查看，数据经 webApi.ts 从 FluentCal 获取）
+native/core/src      与界面无关的逻辑（测试在 native/core/tests）
+  date.rs, lunar.rs, holidays.rs     日期、农历节气、法定节假日
+  recur.rs, tasks.rs, countdown.rs   重复规则、任务、倒数日；search.rs 搜索
+  layout.rs, gantt.rs                日历布局、甘特图几何；export.rs 导出 JSON/CSV/ICS
+  store.rs                           JSON 存储：原子写入、防抖、每日备份、损坏自动恢复
+  merge.rs, sync.rs                  多台电脑共用数据文件夹时按条目合并、监视外部修改；datadir.rs 自定义数据文件夹
+  cloud/                             云同步：engine.rs 一轮同步、service.rs 调度，webdav.rs、git.rs（GitHub/Gitee），secrets.rs 凭据管理器
+  web.rs                             网页查看：局域网 HTTP 服务（访问码、只读数据、静态文件）
+  theme/, settings.rs, editor/       主题颜色、设置、编辑窗口的字段与合并
+native/app
+  ui/                  Slint 界面：Fluent 控件、日历、甘特图、设置、编辑、提醒
+  src/desk/            日历窗口的交互、菜单、甘特图
+  src/windows/         设置、编辑、提醒窗口
+  src/platform/        Windows 平台层：钉在桌面（所有者 = Progman）、托盘、通知、开机启动、单实例、多显示器、窗口外点击
+  src/shell/           托盘菜单、全局快捷键和单实例消息的处理
+  installer/, package/ GitHub 安装包（NSIS）和 Microsoft Store 包（MSIX）的清单
+  tests/               端到端测试
+native/vendor          打了补丁的 Slint 软件渲染器
+src-tauri/src, src     0.2 的 Tauri 后端和 Vue 界面（Vue 界面也是网页查看的页面）
 ```
 
 ## 致谢
 
 - 法定节假日数据：[NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)
-- 农历、节气、宜忌：[tyme4ts](https://github.com/6tail/tyme4ts)（MIT）
-- 框架：[Tauri](https://tauri.app)（MIT / Apache-2.0）、[Vue](https://vuejs.org)（MIT）
-- 二维码：[uqr](https://github.com/unjs/uqr)（MIT）
-- 原生界面：[Slint](https://slint.dev)（免版税许可证，需在“关于”中注明）、[resvg](https://github.com/linebender/resvg)（甘特图导出 PNG，Apache-2.0 / MIT）
+- 农历、节气、宜忌：[tyme4rs](https://github.com/6tail/tyme4rs)（原生版，MIT）、[tyme4ts](https://github.com/6tail/tyme4ts)（Vue 前端，MIT）
+- 界面：[Slint](https://slint.dev)（免版税许可证，需在“关于”中注明）
+- 甘特图导出 PNG：[resvg](https://github.com/linebender/resvg)（Apache-2.0 / MIT）
+- 二维码：[qrcodegen](https://www.nayuki.io/page/qr-code-generator-library)（原生版，MIT）、[uqr](https://github.com/unjs/uqr)（Vue 前端，MIT）
+- 0.2 的框架：[Tauri](https://tauri.app)（MIT / Apache-2.0）、[Vue](https://vuejs.org)（MIT）
 - 图标：Windows 自带的 Segoe Fluent Icons 字体（不随程序分发）
 
 ## 常见问题
