@@ -500,6 +500,34 @@ fn gantt_today_glides() {
     assert_eq!(with(|a| a.gantt_date_at(0.3)).unwrap(), today, "ends with today at 30%");
 }
 
+/// Menus are as wide as their longest entry, as in 0.2 (measured in 0.2's page, logical px):
+/// "更多" 228, a chip's menu 266 (its 11 colours wrap after 9), the Gantt options 230.
+#[test]
+fn menu_widths_match_0_2() {
+    let today = fluentcal_core::date::today();
+    let t = start("menuw", Some(doc_with(&[json!({ "title": "评审会", "start": today, "time": "14:00" })], json!({}))));
+    use i_slint_backend_testing::AccessibleRole as R;
+    let panel_w = |t: &T, first: &str| -> f32 {
+        let row = ElementHandle::find_by_accessible_label(&t.w, first).find(|e| e.accessible_role() == Some(R::ListItem)).unwrap_or_else(|| panic!("no row {first:?}"));
+        // the row (with its 4px margins) is the panel's width less the 1px border each side
+        row.size().width + 2.0
+    };
+    t.click("更多");
+    let w = panel_w(&t, "新建任务…");
+    assert!((w - 228.0).abs() <= 6.0, "更多: {w}");
+    t.key(&slint::SharedString::from(Key::Escape));
+    let chip = t.find("评审会");
+    t.right_click_at(t.at(&chip, 40.0, chip.size().height / 2.0));
+    let w = panel_w(&t, "标记为完成");
+    assert!((w - 266.0).abs() <= 6.0, "chip menu: {w}");
+    t.key(&slint::SharedString::from(Key::Escape));
+    with(|a| a.desk_set_view("gantt")).unwrap();
+    settle();
+    t.click("显示选项");
+    let w = panel_w(&t, "显示任务表");
+    assert!((w - 230.0).abs() <= 6.0, "Gantt options: {w}");
+}
+
 /// "+N": the day's tasks in a flyout; adding one there.
 #[test]
 fn day_list_lists_and_adds() {

@@ -581,6 +581,10 @@ export component Select {
                 property <bool> is-sel: i == root.sel;
                 property <bool> is-hi: i == root.hi;
                 min-height: i == root.options.length - 1 ? 32px : 34px;
+                // The option's natural width (0.2: the list is at least as wide as the button and
+                // grows to fit its longest option): padding 12px, the icon and gap, 4px margins.
+                lw := Text { visible: false; text: o.label; accessible-role: none; }
+                preferred-width: 8px + 24px + (o.icon != "" ? 16px + 12px : 0) + lw.preferred-width;
                 accessible-role: list-item;
                 accessible-label: o.label;
                 accessible-item-selected: is-sel;

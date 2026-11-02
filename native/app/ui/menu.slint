@@ -406,9 +406,20 @@ export component Menu {
                         property <length> prev-m: i == 0 ? 0 : root.items[i - 1].kind == "separator" ? 3px : 2px;
                         property <length> top: max(m, prev-m);
                         property <length> bottom: i == root.items.length - 1 ? m : 0;
-                        property <length> body: sep ? 1px : sws ? (it.label != "" ? 22px : 0) + 20px + 14px : 32px;
+                        // 0.2's .sws: max-width 232px, so 9 swatches a line, then they wrap
+                        property <int> sw-n: it.swatches.length;
+                        property <int> sw-rows: ceil(sw-n / 9);
+                        property <length> body: sep ? 1px : sws ? (it.label != "" ? 22px : 0) + sw-rows * 20px + (sw-rows - 1) * 6px + 14px : 32px;
                         height: top + body + bottom;
-                        preferred-width: sws ? 8px + 24px + it.swatches.length * 26px - 6px : 0;
+                        // A text row's natural width, as MenuRow lays it out (12px padding and gaps,
+                        // the check and icon columns, 24px before the shortcut, the 8px + 12px
+                        // chevron, 4px margins): the MenuRow itself is under `if`, out of reach here.
+                        lm := Text { visible: false; text: it.label; accessible-role: none; }
+                        sm := Text { visible: false; text: it.shortcut; font-size: 12px; accessible-role: none; }
+                        property <int> cols: (root.has-check ? 1 : 0) + (root.has-icon ? 1 : 0) + 1 + (it.shortcut != "" ? 1 : 0) + (it.children.length > 0 ? 1 : 0);
+                        property <length> text-w: 24px + (root.has-check ? 16px : 0) + (root.has-icon ? 16px : 0) + lm.preferred-width
+                            + (it.shortcut != "" ? 24px + sm.preferred-width : 0) + (it.children.length > 0 ? 20px : 0) + (cols - 1) * 12px + 8px;
+                        preferred-width: sep ? 0 : sws ? 8px + 24px + min(232px, sw-n * 26px - 6px) : text-w;
                         if sep: Rectangle { y: parent.top; height: 1px; background: Theme.c.divider; }
                         if sws: Rectangle {
                             x: 4px;
@@ -436,8 +447,8 @@ export component Menu {
                                 vertical-alignment: center;
                             }
                             for s[k] in it.swatches: SwatchDot {
-                                x: 12px + k * 26px;
-                                y: it.label != "" ? 28px : 6px;
+                                x: 12px + mod(k, 9) * 26px;
+                                y: (it.label != "" ? 28px : 6px) + floor(k / 9) * 26px;
                                 s: s;
                                 kb: i == root.hi && k == root.swatch-hi;
                                 picked => { root.pick-swatch(i, s.key); }
