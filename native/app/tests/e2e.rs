@@ -475,7 +475,9 @@ fn flash_and_toast_animations() {
     settle();
     assert!(t.has("测试提示"));
     with(|a| a.desk_close_toast()).unwrap();
-    wait(30);
+    // Look before sleeping: the fade lasts 187 ms, and a 30 ms sleep here sometimes took longer
+    // than that while the other tests were running.
+    wait(0);
     assert!(t.has("测试提示"), "the text stays while the toast fades");
     wait(400);
     assert!(!t.has("测试提示"), "gone after the fade");

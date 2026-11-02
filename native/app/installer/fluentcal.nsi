@@ -53,6 +53,8 @@ Section "FluentCal"
   !insertmacro CloseRunning
   SetOutPath "$INSTDIR"
   File "/oname=fluentcal.exe" "${EXE}"
+  ; 0.2's WebView2 loader: this version has no WebView2, and RMDir would leave it behind.
+  Delete "$INSTDIR\WebView2Loader.dll"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   CreateShortcut "$SMPROGRAMS\${NAME}.lnk" "$INSTDIR\fluentcal.exe"
   WriteRegStr HKCU "${UNINST}" "DisplayName" "${NAME}"
@@ -72,6 +74,7 @@ Section "Uninstall"
   !insertmacro CloseRunning
   Delete "$INSTDIR\fluentcal.exe"
   Delete "$INSTDIR\uninstall.exe"
+  Delete "$INSTDIR\WebView2Loader.dll"
   RMDir "$INSTDIR"
   Delete "$SMPROGRAMS\${NAME}.lnk"
   DeleteRegKey HKCU "${UNINST}"

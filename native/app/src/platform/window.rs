@@ -52,6 +52,17 @@ pub fn hwnd(w: &slint::Window) -> Option<HWND> {
 /// Runs `f` with the window's HWND as soon as the window exists (Slint creates it lazily,
 /// once the event loop runs after show()).
 pub fn when_created(w: slint::Weak<impl slint::ComponentHandle + 'static>, f: impl FnOnce(HWND) + 'static) {
+    poll(w, |_| true, move |_, h| f(h));
+}
+
+/// Runs `f` once the window is on screen: Slint creates it hidden and shows it after the
+/// first frame, and winit only brings a visible window to the front.
+pub fn when_shown<C: slint::ComponentHandle + 'static>(w: slint::Weak<C>, f: impl FnOnce(&C, HWND) + 'static) {
+    poll(w, |c| c.window().with_winit_window(|win| win.is_visible() == Some(true)) == Some(true), f);
+}
+
+/// Checks every 5 ms (for at most 2 s) until the window exists and `ready` says so.
+fn poll<C: slint::ComponentHandle + 'static>(w: slint::Weak<C>, ready: impl Fn(&C) -> bool + 'static, f: impl FnOnce(&C, HWND) + 'static) {
     let f = Cell::new(Some(f));
     let timer = slint::Timer::default();
     let tries = Cell::new(0);
@@ -59,10 +70,10 @@ pub fn when_created(w: slint::Weak<impl slint::ComponentHandle + 'static>, f: im
     let t2 = t.clone();
     t.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(5), move || {
         tries.set(tries.get() + 1);
-        let got = w.upgrade().and_then(|c| hwnd(c.window()));
-        if let Some(h) = got {
+        let got = w.upgrade().and_then(|c| hwnd(c.window()).filter(|_| ready(&c)).map(|h| (c, h)));
+        if let Some((c, h)) = got {
             if let Some(f) = f.take() {
-                f(h);
+                f(&c, h);
             }
             t2.stop();
         } else if tries.get() > 400 {

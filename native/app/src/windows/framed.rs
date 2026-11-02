@@ -7,8 +7,10 @@ use crate::platform::{desk, screens, window};
 use crate::theme::{apply, Look};
 use crate::Theme;
 use fluentcal_core::layout::Mon;
+use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, Global};
-use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE};
 
 /// Size in logical px; the window's minimum size comes from its layout.
 pub struct Spec {
@@ -72,6 +74,7 @@ where
     if let Err(e) = w.show() {
         eprintln!("[window] show: {e}");
     }
+    window::when_shown(w.as_weak(), |w, h| to_front(w, h));
     Some(w)
 }
 
@@ -79,11 +82,22 @@ where
 pub fn raise(w: &impl ComponentHandle) {
     let _ = w.show();
     if let Some(h) = window::hwnd(w.window()) {
-        unsafe {
-            if IsIconic(h).as_bool() {
-                let _ = ShowWindow(h, SW_RESTORE);
-            }
-            let _ = SetForegroundWindow(h);
+        to_front(w, h);
+    }
+}
+
+/// Restores and activates the window. Windows refuses SetForegroundWindow when the click came
+/// from the calendar (a window that never activates) or another program is in front: the
+/// window then opens behind it. winit's focus_window gets past that the way 0.2 did (Tauri's
+/// set_focus): it taps Alt, which lifts the foreground lock, and tries again.
+fn to_front(w: &impl ComponentHandle, h: HWND) {
+    unsafe {
+        if IsIconic(h).as_bool() {
+            let _ = ShowWindow(h, SW_RESTORE);
+        }
+        let _ = SetForegroundWindow(h);
+        if GetForegroundWindow() != h {
+            w.window().with_winit_window(|win| win.focus_window());
         }
     }
 }
