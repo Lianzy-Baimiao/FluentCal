@@ -89,10 +89,32 @@ desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countd
 
 ### 审核说明（Additional testing info）
 
-> FluentCal needs no account, sign-in or credentials. On first start it shows sample tasks and a welcome bar. The calendar is placed on the desktop layer (below other windows): press Win+D or Ctrl+Alt+D to see it, or use the tray icon. Right-click a day or a task for its menu; the "..." button opens views, themes and Settings. Cloud sync (WebDAV/GitHub/Gitee) and the LAN web view are optional and off by default; they are not needed to review the app. Public holiday data is downloaded from fastly.jsdelivr.net (falls back to raw.githubusercontent.com).
+> FluentCal needs no account, sign-in, credentials or purchase. The interface is in Simplified Chinese. On first start it shows sample tasks and a welcome bar.
+>
+> Where the window is: by default the calendar sits on the desktop layer, below other windows. Press Win+D (show desktop) to see it, or press Ctrl+Alt+D or left-click the tray icon to bring it forward. Starting the app again from Start opens its Settings window. The tray menu has 显示日历 (show calendar), 设置… (Settings) and 退出 (quit).
+>
+> What to try: the header switches between 月 (month), 多周 (multi-week) and 甘特 (Gantt chart). Double-click a day to add a task, right-click a day or a task for its menu, and drag tasks to reschedule. The 更多 (…) button in the header has search, the theme, the window level (desktop layer / always on top / normal window), 外观… (appearance) and 设置… (Settings).
+>
+> Start with Windows is on by default, through the package's startup task; it takes effect after the first launch. It can be turned off in Settings › 常规 › 开机自动启动 or in Task Manager's Startup tab.
+>
+> Network: China's public holiday data is downloaded from fastly.jsdelivr.net (falling back to raw.githubusercontent.com); Settings › 常规 › 自动更新法定节假日 turns this off. Cloud sync (WebDAV/GitHub/Gitee) and the LAN web view are optional and off by default; they are not needed to review the app.
 
 ### 年龄分级（IARC）
 
 应用类型：其他所有应用类型（日历、效率工具）。没有用户间的内容交流或共享、位置共享、应用内购买、浏览器或搜索功能、有年龄限制的内容；预期结果 3+。
 
 ## 提交记录
+
+### 0.3.0.0 首次提交（2026-11-02 18:00 送审，正在认证）
+
+- 产品 **FluentCal 桌面日历 / 9NTT06453DG5**（包族 `ice.FluentCal_rz8m2sa64m4em`），Submission 1 **1152921505702293830**。用户要求“改完打包给我安装包，然后上传微软商店”后提交。
+- 包：`FluentCal_0.3.0.0_x64.msix`（9.6 MB，SHA-256 `4c31e0c01f2f4f0c7fd2052506b6af3ca0ee80c55524e70b30674b456312be81`），后台显示 Validated；仅桌面设备，未勾选“由 Microsoft 决定未来设备系列”。包内 `fluentcal.exe` 与同次构建的安装包 `FluentCal_0.3.0_x64-setup.exe`（SHA-256 `45eaf2cd…3c282`）里的相同，含菜单宽度修复（521a48a）。
+- 定价和可用性：免费（CNY 0），240 个市场，公开可见。
+- 属性：效率类；隐私政策、网站、支持地址见本文开头。
+- 年龄分级：IARC 10.3，9 个问题都答“否”，结果 IARC 3+、ESRB 所有人、PEGI 3+、USK 所有人、Microsoft 3+；分级 ID `afe5d54a-952c-86c6-8310-3fb8c4443fff`。IARC 使用条款的确认框留给用户本人勾选，保存后重新打开分级页核对过。
+- Store 一览：只有中文（中国），与包的 `Resource Language="zh-CN"` 和纯中文界面一致，没有加英文页。描述、7 项功能、简短描述、7 个关键词、开发者“白描ice”与上文逐字一致；4 张桌面截图依次为 month-light、month-dark、gantt、settings-appearance，按 SHA-256 与 `docs/store/` 对上。重新打开页面核对过。
+- 提交选项：发布暂缓为“除非我选择‘立即发布’，否则不发布此提交”；runFullTrust 用途说明 453 字符，重新打开后一致。
+- 其他测试信息：上文“审核说明”1329 字符，重新打开后一致；凭据表为空。
+- 送审后状态：“正在认证”，页面提示“单击‘立即发布’时，产品将开始发布”。认证通过后要有人在产品概述页点“立即发布”才会上架。商店链接 https://apps.microsoft.com/detail/9NTT06453DG5 上架后才可用。
+- runFullTrust 是受限能力，Validated 不代表已获批准，以认证结果为准。
+- 操作脚本、截图在忽略的 `dist/store-0.3.0/`；临时 Edge（CDP 127.0.0.1:9441）和它的配置目录已在送审后清理。
