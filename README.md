@@ -47,7 +47,7 @@
 
 ## 下载安装
 
-到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。Releases 上目前最新的是 0.2.0（WebView2 版）；0.3 原生版还没有发布，可以按下面“开发”一节自己构建。
+到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。最新版是 0.3.0（Rust 原生，不再需要 WebView2）；0.2.0（WebView2 版）仍可从 Releases 下载。
 
 - 系统：Windows 11（在 24H2 上开发和测试）。Windows 10 未测试。
 - 安装包没有代码签名，Windows SmartScreen 可能提示“已保护你的电脑”：点“更多信息” →“仍要运行”。
