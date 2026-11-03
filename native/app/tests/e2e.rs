@@ -617,6 +617,38 @@ fn welcome_and_adjust_bars() {
     assert!(with(|a| a.doc.settings.desk.locked).unwrap());
 }
 
+#[test]
+fn quick_add_after_finishing_position_adjustment() {
+    let t = start("quickadd-after-adjust", Some(doc_with(&[], json!({}))));
+    // A desktop window can be inactive after adjusting it. Slint then withholds
+    // has-focus; the input must request native activation without waiting for it.
+    let keyboard_requests = std::rc::Rc::new(std::cell::Cell::new(0));
+    let requested = keyboard_requests.clone();
+    t.w.on_quick_add_focus(move || requested.set(requested.get() + 1));
+    with(|a| a.desk_toggle_lock()).unwrap();
+    settle();
+    t.click("完成");
+    assert!(with(|a| a.doc.settings.desk.locked).unwrap());
+    t.ev(WindowEvent::WindowActiveChanged(false));
+    settle();
+
+    let today = t.today();
+    let (_, m, d) = fluentcal_core::date::parts(&today);
+    let cell = t.find_prefix(&format!("{m}月{d}日 "));
+    t.double_click_at(t.at(&cell, 40.0, 50.0));
+    t.find("快速添加任务");
+    assert!(keyboard_requests.get() > 0, "quick add must request the keyboard while the desktop window is inactive");
+    t.ev(WindowEvent::WindowActiveChanged(true));
+    settle();
+    t.type_text("调整位置后添加");
+    assert_eq!(t.w.get_quick_add_text(), "调整位置后添加");
+    t.key("\n");
+    assert_eq!(t.task("调整位置后添加")["start"], json!(today));
+    t.type_text("继续添加");
+    t.key("\n");
+    assert_eq!(t.task("继续添加")["start"], json!(today));
+}
+
 /// A plain HTTP/1.1 GET on loopback (no proxy): (status, body).
 fn http_get(url: &str, token: Option<&str>) -> (u16, String) {
     use std::io::{Read, Write};

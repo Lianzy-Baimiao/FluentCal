@@ -47,7 +47,7 @@
 
 ## 下载安装
 
-到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。最新版是 0.3.0（Rust 原生，不再需要 WebView2）；0.2.0（WebView2 版）仍可从 Releases 下载。
+到 [Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases) 下载 `FluentCal_x.y.z_x64-setup.exe`，双击安装。安装到当前用户目录，不需要管理员权限。最新版是 0.3.2，修复调整位置后双击日期无法输入的问题（Rust 原生，不再需要 WebView2）；0.2.0（WebView2 版）仍可从 Releases 下载。
 
 - 系统：Windows 11（在 24H2 上开发和测试）。Windows 10 未测试。
 - 安装包没有代码签名，Windows SmartScreen 可能提示“已保护你的电脑”：点“更多信息” →“仍要运行”。
@@ -94,6 +94,8 @@ scripts/store-shots.sh               # 重新生成 docs/store 下的截图
 ```
 
 端到端测试（`native/app/tests`）运行真实程序，用 Slint 的无头测试后端模拟点击、拖动和按键，不显示窗口。云同步的测试用内存中的模拟服务器（WebDAV、GitHub、Gitee）；`native/core/tests/cloud_webdav.rs` 和 `cloud_git.rs` 里各有一项 `#[ignore]` 测试，可按注释对真实的 WebDAV 服务器和 GitHub 私有仓库运行。`native/core/tests/web.rs` 在本机端口上测试网页查看服务：页面与访问码、同一连接上的连续轮询（304）、监听地址、只回应局域网设备。
+
+Windows 焦点回归测试需要真实窗口，在 `native/` 下单独运行 `cargo test -p fluentcal-native --test native_focus -- --ignored`。它使用临时数据，验证调整位置、完成调整后，未激活的日历仍能在双击日期时取得键盘焦点、输入并保存任务；默认测试集会跳过它。
 
 `native/vendor/i-slint-renderer-software` 是打了一处补丁的 Slint 软件渲染器（字形 hinting 和覆盖率校正，使文字粗细与 0.2 一致），说明见其中的 README。
 

@@ -381,7 +381,12 @@ component WeekRow inherits Rectangle {
                 vertical-alignment: center;
                 single-line: true;
                 accessible-label: "快速添加任务";
-                init => { self.focus(); }
+                init => {
+                    // An inactive desktop window cannot give the input has-focus yet.
+                    // Request native activation before waiting for focus changes.
+                    root.quick-add-focus();
+                    self.focus();
+                }
                 accepted => {
                     if self.text != "" { root.quick-add-submit(self.text); }
                 }
