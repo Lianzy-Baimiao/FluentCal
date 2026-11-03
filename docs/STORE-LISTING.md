@@ -129,15 +129,16 @@ desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countd
 - 独立安装包：`release/FluentCal_0.3.0_x64-setup.exe`，SHA-256 `f0edb4a81a3d4a41b355370e3eb5828d7251cfb864fdcdd68fb59d44b99ba035`。
 - 本地商店包内 `fluentcal.exe` 的 SHA-256 为 `9d866fa95eee830151b4fcd61ea8f06203dee1af3da2b3d9c5f6bf09e0eccd29`。校验了 ZIP 完整性，并用修复后的脚本重新构建 `0.3.1.0`，其全部包内文件与 `release/` 中的待发包一致。
 - 认证页面截图：`release/store-proof/certification-2026-11-02.jpg`（本地忽略目录）。
+- 2026-11-03 在产品概述页确认 Submission 1 已完成发布，后台显示产品当前可在 Microsoft Store 获取。
 
 #### 避免重复上传和非法版本
 
 - 微软商店保留四段版本号的最后一段，必须为 `0`；替换内容应增加前三段之一，例如 `0.3.0.0 → 0.3.1.0`。`0.3.0.1` 会被商店拒绝，即使 SDK 打包成功。
 - `scripts/build-msix.sh` 现在在读取 SDK 和修改打包目录前校验版本格式、第四段和每段的 `0..65535` 范围。回归命令 `bash scripts/test-msix-version.sh` 的 7 个非法版本用例均通过；合法版本实际打包成功。
 - 页面出现目标文件后，不要因尚未验证完成而再次选取同一文件。必须按目标文件名和版本观察结果，不能把旧包的 Validated 或旧的 Save 按钮状态当作新包完成。删除时同样等待 Deleting 完成再继续。
-- 后续以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 的认证结果为准；本节记录的是送审成功，并非已上架。
+- 后续以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 的认证结果为准；送审成功不代表已上架。
 
-### 0.3.2.0 输入修复更新（2026-11-03，待上传）
+### 0.3.2.0 输入修复更新（2026-11-03 20:09 送审，正在认证）
 
 - 应用版本与 Windows 文件版本更新为 **0.3.2**，商店包为 **0.3.2.0**，高于此前已使用的 `0.3.1.0`。
 - 修复调整日历位置并完成调整后，未激活的日历窗口双击日期出现输入框却无法输入的问题。输入框创建时主动请求键盘激活，支持输入、回车保存和连续添加。
@@ -145,5 +146,9 @@ desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countd
 - 已构建并通过 MakeAppx 校验：`release/FluentCal_0.3.2.0_x64.msix`，SHA-256 `2d8cdaff20d9b22ac080932b77a1fc0917c1058c918664ed44bb9c5d95256bf2`。
 - 独立安装包：`release/FluentCal_0.3.2_x64-setup.exe`，SHA-256 `3177749e5ae7a5a68339ecd79f2a0740bc2672277237de2f162ce5c78e743c44`。两种包使用同次构建的 `fluentcal.exe`，SHA-256 `cfc113f3c06a3ea1b3f3cae8c10d212358ec273e3843aefb0d379d8dc6d70e68`；已读取 MSIX 中的 EXE 校验一致，并确认 EXE 文件版本、产品版本均为 `0.3.2`。
 - 验证：网页构建与类型检查、完整原生测试、商店非法版本检查通过；输入修复已通过真实 Windows 焦点回归。
-- 提交说明建议：`修复调整日历位置后双击日期无法输入的问题，现在可以正常输入、回车保存并连续添加任务。`
-- 本轮操作 Partner Center 时，界面自动化因无法可靠识别 Edge 当前网址而停止。**本次尚未上传或送审**，当前线上及认证状态没有重新确认。后续从产品概述页继续，沿用“通过认证后立即发布”的用户选择。
+- 通过 Codex 内置浏览器创建 **Submission 2 / 1152921505702305394**，上传 `FluentCal_0.3.2.0_x64.msix`，等待后台验证后保存。总览确认新包为 **Validated**；Partner Center 自动移除覆盖相同设备范围的旧包 `0.3.1.0`，提交中仅保留新包。
+- 中文 Store 一览的“此版本的新增功能”已填写并保存：`修复调整日历位置后双击日期无法输入的问题，现在可以正常输入、回车保存并连续添加任务。`
+- 沿用原有描述、4 张桌面截图、免费定价、年龄分级和仅桌面设备范围；已核对 `runFullTrust` 用途说明保留，发布选项为通过认证后立即发布。
+- 已点击“提交进行认证”。后台确认 **正在认证更新 / 预处理正在进行**，并明确显示 **产品在通过认证后立即开始发布**。本次更新已送审，尚未确认新版本上架；上一版仍可在商店获取。
+- 认证与自动发布状态截图：`release/store-proof/certification-0.3.2-2026-11-03.jpg`（本地忽略目录，2026-11-03 20:09，UTC+8）。后续状态以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 为准。
+- GitHub **v0.3.2** 已发布，修复提交为 `9427505`；安装包见 [Release](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.2)。
