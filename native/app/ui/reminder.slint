@@ -29,14 +29,14 @@ component Card inherits Rectangle {
             spacing: 6px;
             cross-axis-alignment: center;
             Icon { glyph: Glyph.alarm; size: 14px; color: Theme.c.accent-text; }
-            Text { horizontal-stretch: 1; text: "FluentCal 提醒"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+            Text { horizontal-stretch: 1; text: @tr("FluentCal 提醒"); font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
             Rectangle {
                 width: 24px;
                 height: 24px;
                 border-radius: 4px;
                 background: xt.has-hover ? Theme.c.subtle-fill-hover : transparent;
                 accessible-role: button;
-                accessible-label: "关闭提醒";
+                accessible-label: @tr("关闭提醒");
                 Icon { glyph: Glyph.close; size: 10px; color: Theme.c.text-secondary; }
                 xt := TouchArea { clicked => { root.dismiss(); } }
             }
@@ -49,13 +49,13 @@ component Card inherits Rectangle {
         HorizontalLayout {
             spacing: 6px;
             alignment: start;
-            Button { variant: ButtonVariant.accent; size: ButtonSize.small; icon: Glyph.check-mark; text: "完成"; clicked => { root.done(); } }
-            Button { size: ButtonSize.small; text: "10 分钟后提醒"; clicked => { root.snooze(10); } }
+            Button { variant: ButtonVariant.accent; size: ButtonSize.small; icon: Glyph.check-mark; text: @tr("完成"); clicked => { root.done(); } }
+            Button { size: ButtonSize.small; text: @tr("10 分钟后提醒"); clicked => { root.snooze(10); } }
             lt := Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.small;
                 icon: Glyph.chevron-down;
-                accessible-label: "选择稍后提醒的时间";
+                accessible-label: @tr("选择稍后提醒的时间");
                 clicked => { root.later(lt.absolute-position.x, lt.absolute-position.y, lt.width, lt.height); }
             }
         }
@@ -73,13 +73,13 @@ export component ReminderWindow inherits Window {
     callback popups-changed(bool);
     changed any-popup => { root.popups-changed(self.any-popup); }
     public function close-menu() { later-menu.close(); }
-    title: "FluentCal 提醒";
+    title: @tr("FluentCal 提醒");
     no-frame: true;
     background: transparent;
     default-font-family: Theme.font-ui;
     default-font-size: 14px;
     accessible-role: groupbox;
-    accessible-label: "任务提醒";
+    accessible-label: @tr("任务提醒");
     OverlayRoot {
     win-width: root.width;
     win-height: root.height;
@@ -109,10 +109,10 @@ export component ReminderWindow inherits Window {
     later-menu := Menu {
         placement: Placement.bottom-end;
         items: [
-            { key: "5", kind: "item", label: "5 分钟后" },
-            { key: "30", kind: "item", label: "30 分钟后" },
-            { key: "60", kind: "item", label: "1 小时后" },
-            { key: "180", kind: "item", label: "3 小时后" },
+            { key: "5", kind: "item", label: @tr("5 分钟后") },
+            { key: "30", kind: "item", label: @tr("30 分钟后") },
+            { key: "60", kind: "item", label: @tr("1 小时后") },
+            { key: "180", kind: "item", label: @tr("3 小时后") },
         ];
         activated(k) => { root.snooze(root.later-key, round(k.to-float())); }
     }

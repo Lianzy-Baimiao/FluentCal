@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 const server = await preview({ preview: { port: 1431, strictPort: true }, logLevel: 'error' });
 const base = 'http://localhost:1431';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
-const ctx = await browser.newContext({ viewport: { width: 900, height: 620 } });
+const ctx = await browser.newContext({ locale: 'zh-CN', viewport: { width: 900, height: 620 } });
 const desk = await ctx.newPage();
 const errors = [];
 desk.on('pageerror', (e) => errors.push(e.message));
@@ -36,9 +36,13 @@ await check('first run seeds sample data', async () => {
 });
 
 // An empty day in the visible month, so new chips are not hidden behind "+N".
-const visible = await desk.evaluate(() => [...document.querySelectorAll('.cell:not(.dim)')].map((c) => c.dataset.date));
-const busy = new Set(Object.values((await stored(desk)).tasks).flatMap((t) => [t.start, t.end]));
-const target = visible.find((d) => !busy.has(d) && d !== plus(-1) && d !== iso(today)) ?? plus(1);
+// Use the rendered occurrence counts: start/end alone miss the middle of multi-day
+// tasks and recurring tasks, which can push the new chips into the overflow flyout.
+const emptyDays = await desk.evaluate(() => [...document.querySelectorAll('.cell:not(.dim)')]
+  .filter(c => c.querySelector('.sr-only')?.textContent.endsWith('无任务'))
+  .map(c => c.dataset.date));
+const target = emptyDays.find(d => d !== plus(-1) && d !== iso(today));
+assert(target, 'expected an empty day in the visible month');
 void plus;
 await check('double-click quick add creates tasks', async () => {
   const cell = await desk.locator(`.cell[data-date="${target}"]`).boundingBox();
@@ -152,7 +156,7 @@ await check('Gantt: zooming keeps the visible dates', async () => {
   await desk.waitForTimeout(300);
   const after = await desk.locator('.g-label').textContent();
   assert(after === before || Math.abs(parseInt(after.slice(5)) - parseInt(before.slice(5))) <= 1, `${before} -> ${after} (${await centre()})`);
-  await desk.getByRole('radio', { name: '日', exact: true }).click();
+  await desk.getByRole('radio', { name: '按日', exact: true }).click();
   await desk.waitForTimeout(300);
 });
 
@@ -247,7 +251,7 @@ await check('web view: access code, phone list, read-only, live update, wrong co
   const task = (id, title, start, extra = {}) => ({ id, title, start, end: start, progress: 0, done: false, order: 1, createdAt: 0, updatedAt: 0, ...extra });
   const served = { version: 1, tasks: { w1: task('w1', '网页里的任务', plus(0), { time: '09:30', notes: '带上材料' }), w2: task('w2', '每周例会', plus(1), { repeat: { freq: 'weekly' } }) }, groups: {}, dayMarks: {}, holidays: {}, settings: { calendar: { weekStart: 1 }, theme: { mode: 'light', accent: 'system' } } };
   let rev = 1;
-  const wctx = await browser.newContext({ viewport: { width: 390, height: 760 } });
+  const wctx = await browser.newContext({ locale: 'zh-CN', viewport: { width: 390, height: 760 } });
   await wctx.route('**/api/doc', (route) => {
     const auth = route.request().headers()['authorization'];
     if (auth !== `Bearer ${TOKEN}`) return route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"访问码无效"}' });
@@ -294,7 +298,7 @@ await check('settings: web view page with QR code', async () => {
 });
 
 await check('first run: welcome bar, clear sample data (a renamed one stays), undo', async () => {
-  const fctx = await browser.newContext({ viewport: { width: 900, height: 620 } });
+  const fctx = await browser.newContext({ locale: 'zh-CN', viewport: { width: 900, height: 620 } });
   const f = await fctx.newPage();
   f.on('pageerror', (e) => errors.push(e.message));
   await f.goto(`${base}/?w=desk&theme=light`);

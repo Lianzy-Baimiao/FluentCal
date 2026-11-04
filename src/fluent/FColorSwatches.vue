@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref } from 'vue';
 import FButton from './FButton.vue';
 import FFlyout from './FFlyout.vue';
@@ -19,7 +20,7 @@ const props = withDefaults(
   { size: 24 },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
-const name = useFieldName(() => props.label, () => '颜色');
+const name = useFieldName(() => props.label, () => tr("颜色"));
 
 const addBtn = ref<HTMLElement>();
 const pickerOpen = ref(false);
@@ -69,7 +70,7 @@ function key(e: KeyboardEvent) {
       :class="{ sel: !modelValue }"
       role="radio"
       :aria-checked="!modelValue"
-      title="无"
+      :title="tr('无')"
       @click="pick('')"
     />
     <button
@@ -98,17 +99,17 @@ function key(e: KeyboardEvent) {
       <FIcon name="checkMark" :size="Math.round(size * 0.5)" />
     </button>
     </div>
-    <button v-if="custom" ref="addBtn" type="button" class="sw add" title="自定义颜色" @click="openPicker">
+    <button v-if="custom" ref="addBtn" type="button" class="sw add" :title="tr('自定义颜色')" @click="openPicker">
       <FIcon name="add" :size="Math.round(size * 0.5)" />
     </button>
-    <FFlyout v-model:open="pickerOpen" :anchor="addBtn" placement="bottom-start" :width="232" label="自定义颜色">
+    <FFlyout v-model:open="pickerOpen" :anchor="addBtn" placement="bottom-start" :width="232" :label="tr('自定义颜色')">
       <div class="picker">
-        <input v-model="draft" type="color" class="native" aria-label="选择颜色" />
-        <FTextBox v-model="draft" :width="120" label="颜色值" @enter="applyCustom" />
+        <input v-model="draft" type="color" class="native" :aria-label="tr('选择颜色')" />
+        <FTextBox v-model="draft" :width="120" :label="tr('颜色值')" @enter="applyCustom" />
       </div>
       <div class="actions">
-        <FButton variant="accent" :disabled="!draftValid" @click="applyCustom">确定</FButton>
-        <FButton @click="pickerOpen = false">取消</FButton>
+        <FButton variant="accent" :disabled="!draftValid" @click="applyCustom">{{ tr("确定") }}</FButton>
+        <FButton @click="pickerOpen = false">{{ tr("取消") }}</FButton>
       </div>
     </FFlyout>
   </div>

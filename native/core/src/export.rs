@@ -1,5 +1,7 @@
 //! Export to CSV and iCalendar, and backup import (0.2's src/lib/export.ts).
 
+use crate::i18n::{tr, trf};
+
 use crate::date::{add_days, days_in_month, diff_days, from_day_num, parts, weekday};
 use crate::model::{Freq, Group, Task};
 use crate::recur::{describe_rule, occurrences, task_end};
@@ -16,7 +18,7 @@ fn csv_cell(v: &str) -> String {
 }
 
 pub fn to_csv(tasks: &[Task], groups: &BTreeMap<String, Group>) -> String {
-    let head = ["标题", "开始日期", "结束日期", "时间", "分组", "进度", "状态", "重复", "备注"];
+    let head = [tr("标题"), tr("开始日期"), tr("结束日期"), tr("时间"), tr("分组"), tr("进度"), tr("状态"), tr("重复"), tr("备注")];
     let mut sorted: Vec<&Task> = tasks.iter().collect();
     sorted.sort_by(|a, b| a.start.cmp(&b.start).then(a.order.total_cmp(&b.order)));
     let mut lines = vec![head.iter().map(|h| csv_cell(h)).collect::<Vec<_>>().join(",")];
@@ -30,7 +32,7 @@ pub fn to_csv(tasks: &[Task], groups: &BTreeMap<String, Group>) -> String {
             t.time.clone().unwrap_or_default(),
             group,
             format!("{}%", progress as i64),
-            if t.done { "已完成" } else { "未完成" }.into(),
+            if t.done { tr("已完成") } else { tr("未完成") }.into(),
             t.repeat.as_ref().map_or(String::new(), |r| describe_rule(Some(r), &t.start)),
             t.notes.clone().unwrap_or_default(),
         ];
@@ -237,12 +239,12 @@ pub fn plan_merge(current: &Value, incoming: &Value) -> MergePlan {
 
 /// Validates a backup file; returns the document or an error message.
 pub fn parse_backup(text: &str) -> Result<Value, String> {
-    let v: Value = serde_json::from_str(text.trim_start_matches('\u{FEFF}')).map_err(|_| "文件不是有效的 JSON".to_owned())?;
-    let Some(tasks) = obj(&v, "tasks") else { return Err("文件中没有任务数据，可能不是 FluentCal 备份".into()) };
+    let v: Value = serde_json::from_str(text.trim_start_matches('\u{FEFF}')).map_err(|_| tr("文件不是有效的 JSON").to_owned())?;
+    let Some(tasks) = obj(&v, "tasks") else { return Err(tr("文件中没有任务数据，可能不是 FluentCal 备份").into()) };
     for (id, t) in tasks {
         let ok = ["title", "start", "end"].iter().all(|k| t.get(*k).is_some_and(Value::is_string));
         if !ok {
-            return Err(format!("任务 {id} 的格式不正确"));
+            return Err(trf("任务 {0} 的格式不正确", &[format!("{}", id)]));
         }
     }
     let or_empty = |k: &str| v.get(k).filter(|x| x.is_object()).cloned().unwrap_or_else(|| json!({}));

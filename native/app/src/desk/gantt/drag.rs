@@ -1,6 +1,8 @@
 //! Gantt dragging (0.2's gantt/drag.ts): bars (move, resize, progress), drag-creating on an
 //! add row, dependency links, the table splitter; and the view's keys. Chart-local px.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use super::{model::RH, BarDrag};
 use crate::app::App;
 use crate::{GBar, GLink, GanttData};
@@ -11,7 +13,7 @@ use fluentcal_core::tasks;
 use slint::{ComponentHandle, Model};
 
 fn span(a: &str, b: &str) -> String {
-    format!("{} – {}（{} 天）", a[5..].replace('-', "/"), b[5..].replace('-', "/"), diff_days(a, b) + 1)
+    trf("{0} – {1}（{2} 天）", &[format!("{}", a[5..].replace('-', "/")), format!("{}", b[5..].replace('-', "/")), format!("{}", diff_days(a, b) + 1)])
 }
 
 impl App {
@@ -96,7 +98,7 @@ impl App {
         let (bs, be, bp) = (s.bar.start.clone(), s.bar.end.clone(), f64::from(s.bar.g.progress));
         let (start, end, progress, text) = if s.mode == "progress" {
             let p = ((bp + dx / s.bar.w.max(1.0) * 100.0) / 5.0).round().clamp(0.0, 20.0) * 5.0;
-            (bs, be, p, format!("进度 {p}%"))
+            (bs, be, p, trf("进度 {0}%", &[format!("{}", p)]))
         } else {
             let dd = (dx / dw).round() as i32;
             let len = diff_days(&bs, &be);
@@ -159,9 +161,9 @@ impl App {
         gd.set_rubber(l);
         gd.set_rubber_show(true);
         let text = match &to {
-            Some(t) if *t != from && ok => format!("设为“{}”的前置任务", self.doc.tasks.get(t).map_or("", |t| t.title.as_str())),
-            Some(t) if *t != from => "不能连接（会形成循环或已连接）".into(),
-            _ => "拖到另一个任务上".into(),
+            Some(t) if *t != from && ok => trf("设为“{0}”的前置任务", &[format!("{}", self.doc.tasks.get(t).map_or("", |t| t.title.as_str()))]),
+            Some(t) if *t != from => tr("不能连接（会形成循环或已连接）").into(),
+            _ => tr("拖到另一个任务上").into(),
         };
         self.tip(x, y, &text);
     }

@@ -1,6 +1,8 @@
 //! WebDAV (SYN-01): 坚果云, Nextcloud, Synology, Alist… GET/PUT one file with ETag
 //! conditions; missing folders are created with MKCOL.
 
+use crate::i18n::{tr, trf};
+
 use super::http::{enc, Http, Resp};
 use super::{Fetched, Remote, Rev, SyncError};
 use base64::Engine as _;
@@ -18,13 +20,13 @@ impl WebDav {
     pub fn new(http: Http, server: &str, user: &str, password: &str, folder: &str) -> Result<WebDav, SyncError> {
         let server = server.trim();
         if !(server.starts_with("https://") || server.starts_with("http://")) {
-            return Err(SyncError::config("服务器地址要以 https:// 开头"));
+            return Err(SyncError::config(tr("服务器地址要以 https:// 开头")));
         }
         let mut url = server.trim_end_matches('/').to_owned();
         let mut folders = Vec::new();
         for seg in folder.split(['/', '\\']).map(str::trim).filter(|s| !s.is_empty()) {
             if seg == "." || seg == ".." {
-                return Err(SyncError::config("文件夹名不能是 . 或 .."));
+                return Err(SyncError::config(tr("文件夹名不能是 . 或 ..")));
             }
             url = format!("{url}/{}", enc(seg));
             folders.push(format!("{url}/"));
@@ -46,7 +48,7 @@ impl WebDav {
                 // Created, or exists already (405 / 301 on most servers).
                 200..=299 | 301 | 405 => {}
                 401 => return Err(auth_error()),
-                s => return Err(SyncError::server(format!("无法在服务器上创建文件夹（{s}）"))),
+                s => return Err(SyncError::server(trf("无法在服务器上创建文件夹（{0}）", &[format!("{}", s)]))),
             }
         }
         Ok(())
@@ -54,7 +56,7 @@ impl WebDav {
 }
 
 fn auth_error() -> SyncError {
-    SyncError::auth("用户名或密码不对（坚果云要用“第三方应用密码”，不是登录密码）")
+    SyncError::auth(tr("用户名或密码不对（坚果云要用“第三方应用密码”，不是登录密码）"))
 }
 
 fn etag(r: &Resp) -> Option<String> {
@@ -77,8 +79,8 @@ impl Remote for WebDav {
             304 => Ok(Fetched::NotModified),
             404 | 409 | 410 => Ok(Fetched::Missing),
             401 => Err(auth_error()),
-            403 => Err(SyncError::auth("服务器拒绝访问（403），请检查账号权限和地址")),
-            405 | 501 => Err(SyncError::config("这个地址不是 WebDAV 地址（坚果云为 https://dav.jianguoyun.com/dav/）")),
+            403 => Err(SyncError::auth(tr("服务器拒绝访问（403），请检查账号权限和地址"))),
+            405 | 501 => Err(SyncError::config(tr("这个地址不是 WebDAV 地址（坚果云为 https://dav.jianguoyun.com/dav/）"))),
             s => Err(SyncError::status(s)),
         }
     }
@@ -110,11 +112,11 @@ impl Remote for WebDav {
                     made_folders = true;
                 }
                 401 => return Err(auth_error()),
-                403 => return Err(SyncError::auth("服务器拒绝写入（403），请检查账号权限")),
-                507 => return Err(SyncError::server("网盘空间已满")),
+                403 => return Err(SyncError::auth(tr("服务器拒绝写入（403），请检查账号权限"))),
+                507 => return Err(SyncError::server(tr("网盘空间已满"))),
                 s => return Err(SyncError::status(s)),
             }
         }
-        Err(SyncError::server("无法上传到服务器"))
+        Err(SyncError::server(tr("无法上传到服务器")))
     }
 }

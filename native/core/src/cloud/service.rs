@@ -2,6 +2,8 @@
 //! minutes, after waking from sleep, on demand, and a short last push on exit. Reports status
 //! to the windows as `sync://status`.
 
+use crate::i18n::{tr, trf};
+
 use super::engine::{self, Mode, SyncState};
 use super::git::{Flavor, Git};
 use super::{cloud_view, http::Http, secrets, view_sig, webdav::WebDav, ErrKind, Remote, SyncError};
@@ -85,10 +87,10 @@ impl Config {
 
 pub fn make_remote(cfg: &Config, timeout: Duration) -> Result<Box<dyn Remote>, SyncError> {
     let http = Http::new(&cfg.proxy, timeout)?;
-    let missing = |what: &str| SyncError::auth(format!("还没有填写{what}"));
-    Ok(match cfg.provider.as_ref().ok_or_else(|| SyncError::config("还没有选择同步方式"))? {
+    let missing = |what: &str| SyncError::auth(trf("还没有填写{0}", &[format!("{}", what)]));
+    Ok(match cfg.provider.as_ref().ok_or_else(|| SyncError::config(tr("还没有选择同步方式")))? {
         Provider::WebDav { url, user, folder } => {
-            let pw = secrets::get("webdav").ok_or_else(|| missing("密码"))?;
+            let pw = secrets::get("webdav").ok_or_else(|| missing(tr("密码")))?;
             Box::new(WebDav::new(http, url, user, &pw, folder)?)
         }
         Provider::Git { site, repo, branch, path } => {
@@ -252,7 +254,7 @@ impl Cloud {
         {
             let mut rt = self.rt.lock().unwrap();
             if !manual && (rt.halted || !rt.cfg.active() || rt.cfg != *cfg) {
-                return Err(SyncError::config("同步已关闭"));
+                return Err(SyncError::config(tr("同步已关闭")));
             }
             rt.status.syncing = true;
             self.emit(&rt.status);
@@ -382,7 +384,7 @@ impl Cloud {
     pub fn sync_now(&self) -> Result<engine::Outcome, SyncError> {
         let cfg = self.rt.lock().unwrap().cfg.clone();
         if !cfg.active() {
-            return Err(SyncError::config("同步没有开启"));
+            return Err(SyncError::config(tr("同步没有开启")));
         }
         self.run_with(&cfg, Mode::Normal, true)
     }
@@ -399,7 +401,7 @@ impl Cloud {
     pub fn enable(&self, replace: bool) -> Result<engine::Outcome, SyncError> {
         let mut cfg = self.rt.lock().unwrap().cfg.clone();
         if cfg.provider.is_none() {
-            return Err(SyncError::config("还没有选择同步方式"));
+            return Err(SyncError::config(tr("还没有选择同步方式")));
         }
         cfg.enabled = true;
         if !replace {

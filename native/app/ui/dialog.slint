@@ -16,7 +16,7 @@ export component Cell inherits Rectangle {
 export component DialogFooter inherits Rectangle {
     in property <string> primary-text;
     in property <string> secondary-text;
-    in property <string> close-text: "取消";
+    in property <string> close-text: @tr("取消");
     in property <bool> danger;
     in property <bool> primary-enabled: true;
     callback primary();

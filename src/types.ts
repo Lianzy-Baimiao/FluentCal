@@ -89,7 +89,7 @@ export type GanttScale = 'day' | 'week' | 'month';
 
 export interface Settings {
   /** onboarded: the first-run welcome bar was dismissed (or the samples cleared). */
-  general: { autostart: boolean; seeded: boolean; onboarded: boolean };
+  general: { language: 'system' | 'zh-CN' | 'zh-TW' | 'en-US'; autostart: boolean; seeded: boolean; onboarded: boolean };
   theme: {
     mode: ThemeMode;
     /** 'system' or #RRGGBB */

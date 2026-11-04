@@ -5,7 +5,7 @@ use super::menus::Entry;
 use crate::theme::color;
 use crate::{ChipData, MenuEntry, MenuLeaf, SearchHitData, Swatch};
 use fluentcal_core::date::{format_friendly, format_range};
-use fluentcal_core::lunar::day_info;
+use fluentcal_core::lunar::display_info as day_info;
 use fluentcal_core::recur::occurrences;
 use fluentcal_core::search::{search_tasks, SearchOptions};
 use fluentcal_core::tasks::Doc;
@@ -66,7 +66,7 @@ fn swatch(key: &str, title: &str, selected: bool, t: &Tokens) -> Swatch {
 
 /// The search panel's colour filter (0.2's TASK_COLORS as swatches).
 pub fn search_colors(t: &Tokens) -> ModelRc<Swatch> {
-    model(TASK_COLORS.iter().map(|c| swatch(c.key, c.label, false, t)).collect())
+    model(TASK_COLORS.iter().map(|c| swatch(c.key, fluentcal_core::i18n::tr(c.label), false, t)).collect())
 }
 
 /// Menu entries for the Fluent menu, and whether it needs the check / icon columns (0.2's

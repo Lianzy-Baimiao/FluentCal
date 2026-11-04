@@ -102,8 +102,8 @@ export component Checkbox {
 // The 开/关 text sits next to the switch (left like Windows Settings, or right).
 export component Toggle {
     in property <bool> checked;
-    in property <string> on-text: "开";
-    in property <string> off-text: "关";
+    in property <string> on-text: @tr("开");
+    in property <string> off-text: @tr("关");
     in property <bool> show-text: true;
     in property <bool> text-right;
     in property <bool> enabled: true;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref, watch } from 'vue';
 import FCalendarView from './FCalendarView.vue';
 import FFlyout from './FFlyout.vue';
@@ -21,7 +22,7 @@ const props = withDefaults(
     disabled?: boolean;
     label?: string;
   }>(),
-  { placeholder: '选择日期', firstDay: 1, width: 180 },
+  { placeholder: tr("选择日期"), firstDay: 1, width: 180 },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 const split = useSplitAttrs();
@@ -33,7 +34,7 @@ watch(() => props.modelValue, (v) => (text.value = v));
 
 const weekday = computed(() => {
   const d = toDate(props.modelValue);
-  return d ? `周${'日一二三四五六'[d.getDay()]}` : '';
+  return d ? tr("周{0}", tr(['日', '一', '二', '三', '四', '五', '六'][d.getDay()]!)) : '';
 });
 
 function commit() {
@@ -84,7 +85,7 @@ function pick(v: string) {
           type="button"
           class="cal-btn"
           :disabled="disabled"
-          aria-label="打开日历"
+          :aria-label="tr('打开日历')"
           :aria-expanded="open"
           @mousedown.prevent
           @click="open = !open"
@@ -93,7 +94,7 @@ function pick(v: string) {
         </button>
       </template>
     </FTextBox>
-    <FFlyout v-model:open="open" :anchor="root" placement="bottom-start" :padding="false" label="日历">
+    <FFlyout v-model:open="open" :anchor="root" placement="bottom-start" :padding="false" :label="tr('日历')">
       <FCalendarView
         :model-value="modelValue"
         :first-day="firstDay"

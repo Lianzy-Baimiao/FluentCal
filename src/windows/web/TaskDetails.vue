@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import { FDialog, taskColor } from '@/fluent';
 import { formatRange } from '@/lib/date';
@@ -23,32 +24,32 @@ const color = computed(() => taskColor(task.value?.color, isDark.value).bar);
 </script>
 
 <template>
-  <FDialog :open="details.open && !!task" :title="task?.title ?? ''" close-text="关闭" :width="420" @update:open="details.open = $event">
+  <FDialog :open="details.open && !!task" :title="task?.title ?? ''" :close-text="tr('关闭')" :width="420" @update:open="details.open = $event">
     <dl v-if="task" class="facts">
-      <dt>时间</dt>
-      <dd><span class="dot" :style="{ background: color }" aria-hidden="true" />{{ when }}{{ done ? '（已完成）' : '' }}</dd>
+      <dt>{{ tr("时间") }}</dt>
+      <dd><span class="dot" :style="{ background: color }" aria-hidden="true" />{{ when }}{{ done ? tr("（已完成）") : '' }}</dd>
       <template v-if="task.repeat">
-        <dt>重复</dt>
+        <dt>{{ tr("重复") }}</dt>
         <dd>{{ describeRule(task.repeat, task.start) }}</dd>
       </template>
       <template v-if="group">
-        <dt>分组</dt>
+        <dt>{{ tr("分组") }}</dt>
         <dd>{{ group }}</dd>
       </template>
       <template v-if="!task.repeat && !task.milestone && task.progress > 0">
-        <dt>进度</dt>
+        <dt>{{ tr("进度") }}</dt>
         <dd>{{ task.done ? 100 : task.progress }}%</dd>
       </template>
       <template v-if="deps">
-        <dt>前置任务</dt>
+        <dt>{{ tr("前置任务") }}</dt>
         <dd>{{ deps }}</dd>
       </template>
       <template v-if="task.notes">
-        <dt>备注</dt>
+        <dt>{{ tr("备注") }}</dt>
         <dd class="notes">{{ task.notes }}</dd>
       </template>
     </dl>
-    <p class="hint">网页中只能查看。要修改，请在电脑上打开 FluentCal。</p>
+    <p class="hint">{{ tr("网页中只能查看。要修改，请在电脑上打开 FluentCal。") }}</p>
   </FDialog>
 </template>
 

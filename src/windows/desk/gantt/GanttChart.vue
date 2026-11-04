@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { vTip } from '@/fluent';
 import { diffDays, formatRange, weekday } from '@/lib/date';
@@ -28,9 +29,9 @@ const tip = (b: Bar) => {
   const deps = (t.deps ?? []).map((id) => doc.tasks[id]?.title).filter(Boolean);
   return [
     t.title,
-    `${formatRange(b.start, b.end)} · ${diffDays(b.start, b.end) + 1} 天`,
-    t.milestone ? '里程碑' : b.rep ? '重复任务（双击编辑整个系列）' : `进度 ${b.progress}%`,
-    deps.length ? `前置：${deps.join('、')}` : '',
+    tr("{0} · {1} 天", formatRange(b.start, b.end), diffDays(b.start, b.end) + 1),
+    t.milestone ? tr("里程碑") : b.rep ? tr("重复任务（双击编辑整个系列）") : tr("进度 {0}%", b.progress),
+    deps.length ? tr("前置：{0}", deps.join('、')) : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -49,7 +50,7 @@ const menu = (b: Bar, e: MouseEvent) => {
     <template v-for="(r, i) in rows" :key="r.key">
       <div v-if="r.kind === 'group'" class="row-tint group" :style="{ top: `${i * RH}px` }" />
       <div v-else-if="r.kind === 'task' && selected === r.task.id" class="row-tint sel" :style="{ top: `${i * RH}px` }" />
-      <div v-else-if="r.kind === 'add'" class="add-zone" :style="{ top: `${i * RH}px` }" title="拖动以创建任务" @pointerdown="onAddRowDown(r.groupId, i, $event)" />
+      <div v-else-if="r.kind === 'add'" class="add-zone" :style="{ top: `${i * RH}px` }" :title="tr('拖动以创建任务')" @pointerdown="onAddRowDown(r.groupId, i, $event)" />
     </template>
     <div class="row-lines" />
     <div class="today" :style="{ left: `${todayX}px` }" />

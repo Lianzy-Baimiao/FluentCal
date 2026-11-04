@@ -1,5 +1,7 @@
 //! Program start and exit (0.2's lib.rs run()).
 
+use fluentcal_core::i18n::{tr, trf};
+
 use crate::app::{self, install, post, run, App};
 use crate::desk::{live::DeskLive, vm::DeskUi};
 use crate::platform::{autostart, desk as pd, msgwin, sysinfo, toast, tray, window};
@@ -40,7 +42,7 @@ pub fn main() {
         return; // the running instance opens its settings
     }
     if let Err(e) = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("software".into()).with_winit_window_attributes_hook(window::attributes).select() {
-        return fatal(&format!("无法初始化界面：{e}"));
+        return fatal(&trf("无法初始化界面：{0}", &[format!("{}", e)]));
     }
     crate::fonts::setup();
     let app = match build(local_dir(&id)) {
@@ -72,7 +74,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
     let (dir, local_settings, data_dir) = fluentcal_core::datadir::resolve(&local);
     let store = match Store::open_with(dir, local_settings) {
         Ok(s) => s,
-        Err(e) => return Err(format!("无法打开数据文件夹：{e}")),
+        Err(e) => return Err(trf("无法打开数据文件夹：{0}", &[format!("{}", e)])),
     };
     if let Some(patch) = cloud::drop_google_drive(&store.snapshot()["settings"]) {
         store.patch_settings(&patch);
@@ -117,8 +119,9 @@ pub fn build(local: PathBuf) -> Result<App, String> {
     window::next(window::Kind::Desk);
     let w = match DeskWindow::new() {
         Ok(w) => w,
-        Err(e) => return Err(format!("无法创建日历窗口：{e}")),
+        Err(e) => return Err(trf("无法创建日历窗口：{0}", &[format!("{}", e)])),
     };
+    crate::i18n::select(&doc.settings.general.language);
     crate::desk::wire::wire(&w);
     let sys = sysinfo::system_info();
     let tokens = fluentcal_core::theme::tokens(sys.dark, "#0078D4", None);
@@ -177,14 +180,14 @@ pub fn init(app: &mut App, headless: bool) {
 /// The warning bar at start (0.2's DeskApp): a custom data folder not reachable, or a data
 /// file that was damaged and replaced.
 fn startup_notice(app: &mut App) {
-    let mut text = app.data_dir.missing.as_ref().map(|m| format!("找不到数据文件夹 {m}（同步盘未启动？），本次使用本机默认文件夹。")).unwrap_or_default();
+    let mut text = app.data_dir.missing.as_ref().map(|m| trf("找不到数据文件夹 {0}（同步盘未启动？），本次使用本机默认文件夹。", &[format!("{}", m)])).unwrap_or_default();
     if let Some(r) = app.store.take_recovered() {
         text = if r == "last-saved.json" {
-            "数据文件已损坏，已恢复到最后一次保存的内容。".to_owned()
+            tr("数据文件已损坏，已恢复到最后一次保存的内容。").to_owned()
         } else if !r.is_empty() {
-            format!("数据文件已损坏，已从备份 {r} 恢复。")
+            trf("数据文件已损坏，已从备份 {0} 恢复。", &[format!("{}", r)])
         } else {
-            "数据文件已损坏且没有可用备份，已重新开始。".to_owned()
+            tr("数据文件已损坏且没有可用备份，已重新开始。").to_owned()
         };
     }
     app.desk_set_notice(&text);
@@ -200,7 +203,7 @@ fn start_platform(app: &mut App, id: &str) {
     toast::register(Some(&icon));
     msgwin::create(id, |e| post(move |app| events::on_msg(app, e)));
     if let Some(h) = msgwin::hwnd() {
-        let tip = if crate::platform::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
+        let tip = if crate::platform::isolated() { tr("FluentCal 桌面日历（开发版）") } else { tr("FluentCal 桌面日历") };
         tray::create(h, tip, |e| post(move |app| shell::tray::on_tray(app, e)));
     }
     events::register_hotkeys(app);

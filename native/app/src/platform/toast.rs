@@ -2,6 +2,8 @@
 //! program's is "com.fluentcal.desktop" (its Start menu shortcut carries it, as with 0.2);
 //! debug builds register their own under HKCU so their toasts show a proper name.
 
+use fluentcal_core::i18n::{tr};
+
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::System::Registry::*;
 
@@ -18,7 +20,7 @@ pub fn register(icon_png: Option<&std::path::Path>) {
         return; // the package's manifest names the app
     }
     let key = HSTRING::from(format!(r"Software\Classes\AppUserModelId\{}", app_id()));
-    let name = if super::isolated() { "FluentCal 桌面日历（开发版）" } else { "FluentCal 桌面日历" };
+    let name = if super::isolated() { tr("FluentCal 桌面日历（开发版）") } else { tr("FluentCal 桌面日历") };
     let set = |value: PCWSTR, text: &str| unsafe {
         let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
         let _ = RegSetKeyValueW(HKEY_CURRENT_USER, &key, value, REG_SZ.0, Some(wide.as_ptr() as *const _), (wide.len() * 2) as u32);

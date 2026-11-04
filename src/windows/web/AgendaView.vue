@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref } from 'vue';
 import { FButton, FIcon, taskColor } from '@/fluent';
 import { addDays, formatRange, weekday, WEEKDAY_SHORT } from '@/lib/date';
-import { dayInfo } from '@/lib/lunar';
+import { displayInfo as dayInfo } from '@/lib/lunar';
 import { agenda, dayHeading } from '@/lib/agenda';
 import type { Occurrence } from '@/lib/recur';
 import { doc, taskList } from '@/stores/doc';
@@ -16,8 +17,8 @@ const days = computed(() => agenda(taskList.value, now.value, addDays(now.value,
 
 function sub(date: string): string {
   const i = dayInfo(date);
-  const extra = i.legal ? `${i.legal.name}${i.legal.work ? '·班' : '·休'}` : i.festivals[0] ?? i.term ?? '';
-  return [`周${WEEKDAY_SHORT[weekday(date)]}`, i.lunarLabel, extra].filter(Boolean).join(' · ');
+  const extra = i.legal ? `${i.legal.name}${i.legal.work ? tr("·班") : tr("·休")}` : i.festivals[0] ?? i.term ?? '';
+  return [tr("周{0}", tr(WEEKDAY_SHORT[weekday(date)])), i.lunarLabel, extra].filter(Boolean).join(' · ');
 }
 
 const dot = (o: Occurrence) => taskColor(o.task.color, isDark.value).bar;
@@ -33,20 +34,20 @@ const open = (o: Occurrence) => openEditor({ mode: 'edit', taskId: o.task.id, da
         <span class="when">{{ dayHeading(d.date, now) }}</span>
         <span class="sub">{{ sub(d.date) }}</span>
       </h2>
-      <p v-if="!d.items.length" class="empty">没有任务</p>
+      <p v-if="!d.items.length" class="empty">{{ tr("没有任务") }}</p>
       <button v-for="o in d.items" :key="`${o.task.id}@${o.date}`" type="button" class="item" :class="{ done: o.done }" @click="open(o)">
-        <span class="time">{{ o.task.time ?? '全天' }}</span>
+        <span class="time">{{ o.task.time ?? tr("全天") }}</span>
         <span class="dot" :style="{ background: dot(o) }" aria-hidden="true" />
         <span class="text">
           <span class="title">{{ o.task.title }}</span>
           <span v-if="range(o) || group(o)" class="meta">{{ [range(o), group(o)].filter(Boolean).join(' · ') }}</span>
         </span>
-        <FIcon v-if="o.task.repeat" name="repeat" :size="12" class="rep" title="重复" />
+        <FIcon v-if="o.task.repeat" name="repeat" :size="12" class="rep" :title="tr('重复')" />
       </button>
     </section>
     <div class="more">
-      <FButton v-if="span < 180" @click="span += 30">显示更多日期</FButton>
-      <span v-else class="note">只显示 180 天内的任务</span>
+      <FButton v-if="span < 180" @click="span += 30">{{ tr("显示更多日期") }}</FButton>
+      <span v-else class="note">{{ tr("只显示 180 天内的任务") }}</span>
     </div>
   </div>
 </template>

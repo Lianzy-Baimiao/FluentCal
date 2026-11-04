@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import { FIcon, taskColor, vTip } from '@/fluent';
 import type { Chip } from '@/lib/layout';
@@ -24,9 +25,9 @@ const tip = computed(() => {
   const t = task.value;
   const lines = [t.title, formatRange(occ.value.start, occ.value.end) + (t.time ? ` ${t.time}` : '')];
   const g = t.groupId && doc.groups[t.groupId];
-  if (g) lines.push(`分组：${g.name}`);
-  if (t.repeat) lines.push(`重复：${describeRule(t.repeat, t.start)}`);
-  if (!t.repeat && t.progress > 0 && !t.done) lines.push(`进度：${t.progress}%`);
+  if (g) lines.push(tr("分组：{0}", g.name));
+  if (t.repeat) lines.push(tr("重复：{0}", describeRule(t.repeat, t.start)));
+  if (!t.repeat && t.progress > 0 && !t.done) lines.push(tr("进度：{0}%", t.progress));
   if (t.notes) lines.push(t.notes.length > 120 ? `${t.notes.slice(0, 120)}…` : t.notes);
   return { text: lines.join('\n'), placement: 'top' as const };
 });
@@ -54,8 +55,8 @@ const style = computed(() =>
     :style="style"
     tabindex="0"
     role="group"
-    aria-roledescription="任务"
-    :aria-label="`${task.title}${occ.done ? '，已完成' : ''}`"
+    :aria-roledescription="tr('任务')"
+    :aria-label="`${task.title}${occ.done ? tr('，已完成') : ''}`"
     v-tip="tip"
     @click="storeState.readOnly && emit('open')"
     @dblclick.stop="emit('open')"
@@ -69,7 +70,7 @@ const style = computed(() =>
       role="checkbox"
       :aria-checked="occ.done"
       tabindex="-1"
-      :aria-label="occ.done ? '标记为未完成' : '标记为完成'"
+      :aria-label="occ.done ? tr('标记为未完成') : tr('标记为完成')"
       @click.stop="!storeState.readOnly && emit('toggle')"
       @dblclick.stop
       @pointerdown.stop

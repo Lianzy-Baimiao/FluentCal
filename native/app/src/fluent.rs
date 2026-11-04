@@ -107,8 +107,9 @@ fn digits(s: &str, max: usize) -> Option<(u32, &str)> {
 /// Typed dates: 2026-10-30, 2026/10/30, 2026.10.30, 2026年10月30日, 10/30, 10-30, 10月30日
 /// (this year), 20261030, 今天/明天/后天/昨天/前天. None when invalid.
 pub fn parse_date(text: &str, today: &str) -> Option<String> {
-    let t = text.trim();
-    let rel = [("今天", 0), ("今日", 0), ("明天", 1), ("后天", 2), ("昨天", -1), ("前天", -2)];
+    let normalized = text.trim().to_lowercase();
+    let t = normalized.as_str();
+    let rel = [("今天", 0), ("今日", 0), ("明天", 1), ("后天", 2), ("昨天", -1), ("前天", -2), ("後天", 2), ("today", 0), ("tomorrow", 1), ("yesterday", -1)];
     if let Some((_, n)) = rel.iter().find(|(k, _)| *k == t) {
         return Some(add_days(today, *n));
     }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref } from 'vue';
 import { useFieldName, useSplitAttrs } from './field';
 
@@ -19,7 +20,7 @@ const props = withDefaults(
   { min: 0, max: 100, step: 1, width: 200 },
 );
 const emit = defineEmits<{ 'update:modelValue': [number]; change: [number] }>();
-const name = useFieldName(() => props.label, () => '滑块');
+const name = useFieldName(() => props.label, () => tr("滑块"));
 const split = useSplitAttrs();
 
 const track = ref<HTMLElement>();

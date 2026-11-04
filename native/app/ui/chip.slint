@@ -77,7 +77,7 @@ export component TaskChip inherits Rectangle {
     opacity: dragging ? 0.35 : 1;
     clip: true;
     accessible-role: groupbox;
-    accessible-label: chip.title + (chip.done ? "，已完成" : "");
+    accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
     // A tab stop (0.2: tabindex 0): Enter opens, Space toggles, Delete deletes, the menu key /
     // Shift+F10 opens the menu; other keys go on to the calendar.
     kfs := FocusScope {

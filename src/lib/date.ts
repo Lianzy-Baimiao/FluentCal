@@ -1,3 +1,4 @@
+import { t as tr } from '@/i18n';
 import type { ISODate } from '@/types';
 
 // Dates are handled as day numbers (days since 1970-01-01, computed in UTC) so adding days
@@ -115,19 +116,19 @@ export const WEEKDAY_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
 
 export function formatMD(iso: ISODate): string {
   const [, m, d] = parts(iso);
-  return `${m}月${d}日`;
+  return tr("{0}月{1}日", m, d);
 }
 
 export function formatYMD(iso: ISODate): string {
   const [y, m, d] = parts(iso);
-  return `${y}年${m}月${d}日`;
+  return tr("{0}年{1}月{2}日", y, m, d);
 }
 
 /** "10月30日 周五" or with the year when it differs from the current one. */
 export function formatFriendly(iso: ISODate, now: ISODate = today()): string {
   const [y] = parts(iso);
   const base = y === parts(now)[0] ? formatMD(iso) : formatYMD(iso);
-  return `${base} 周${WEEKDAY_SHORT[weekday(iso)]}`;
+  return tr("{0} 周{1}", base, tr(WEEKDAY_SHORT[weekday(iso)]));
 }
 
 export function formatRange(start: ISODate, end: ISODate): string {
@@ -137,10 +138,10 @@ export function formatRange(start: ISODate, end: ISODate): string {
 
 export function relativeDay(iso: ISODate, now: ISODate = today()): string {
   const d = diffDays(now, iso);
-  if (d === 0) return '今天';
-  if (d === 1) return '明天';
-  if (d === 2) return '后天';
-  if (d === -1) return '昨天';
-  if (d === -2) return '前天';
-  return d > 0 ? `${d} 天后` : `${-d} 天前`;
+  if (d === 0) return tr("今天");
+  if (d === 1) return tr("明天");
+  if (d === 2) return tr("后天");
+  if (d === -1) return tr("昨天");
+  if (d === -2) return tr("前天");
+  return d > 0 ? tr("{0} 天后", d) : tr("{0} 天前", -d);
 }

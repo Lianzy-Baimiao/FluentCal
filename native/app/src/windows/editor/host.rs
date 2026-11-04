@@ -2,6 +2,8 @@
 //! snapshot (Offline): window callbacks become `Msg`s, `handle` applies one to the draft,
 //! `push` shows the draft, `show` does what an action's effect asks of the window.
 
+use fluentcal_core::i18n::{tr};
+
 use crate::desk::sync;
 use crate::theme::color;
 use crate::{DepTag, EditorData, EditorWindow, RadioOption, SelectOption, Swatch};
@@ -70,13 +72,13 @@ fn options(list: &[Option_]) -> Vec<SelectOption> {
 
 /// What doesn't change while the window is open: the repeat choices and the colour palette.
 pub fn setup(w: &EditorWindow) {
-    let freqs: Vec<SelectOption> = FREQS.iter().map(|(v, l)| SelectOption { value: (*v).into(), label: (*l).into(), ..Default::default() }).collect();
+    let freqs: Vec<SelectOption> = FREQS.iter().map(|(v, l)| SelectOption { value: (*v).into(), label: tr(l).into(), ..Default::default() }).collect();
     w.set_freqs(ModelRc::new(VecModel::from(freqs)));
     let colors: Vec<Swatch> = TASK_COLORS
         .iter()
         .map(|c| {
             let bar = Rgba::hex(c.bar);
-            Swatch { key: c.key.into(), color: color(bar), fg: color(best_text_on(bar)), title: c.label.into(), ..Default::default() }
+            Swatch { key: c.key.into(), color: color(bar), fg: color(best_text_on(bar)), title: fluentcal_core::i18n::tr(c.label).into(), ..Default::default() }
         })
         .collect();
     w.set_colors(ModelRc::new(VecModel::from(colors)));
@@ -137,7 +139,7 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
     let deps: Vec<DepTag> = v
         .deps
         .iter()
-        .map(|g| DepTag { id: g.id.clone().into(), title: g.title.clone().unwrap_or_else(|| "（已删除）".into()).into(), dot: color(task_color(g.color.as_deref(), t).bar) })
+        .map(|g| DepTag { id: g.id.clone().into(), title: g.title.clone().unwrap_or_else(|| tr("（已删除）").into()).into(), dot: color(task_color(g.color.as_deref(), t).bar) })
         .collect();
     sync::rows(&w.get_deps(), deps, |m| w.set_deps(m));
     sync::rows(&w.get_reminder_options(), options(&v.reminder_options), |m| w.set_reminder_options(m));

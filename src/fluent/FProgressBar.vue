@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { useFieldName } from './field';
 
 const props = defineProps<{ value?: number; label?: string }>();
-const name = useFieldName(() => props.label, () => '进度');
+const name = useFieldName(() => props.label, () => tr("进度"));
 </script>
 
 <template>

@@ -1,5 +1,7 @@
 //! The live desk window's state and how the app refreshes it.
 
+use fluentcal_core::i18n::{trf};
+
 use super::vm::DeskUi;
 use crate::app::App;
 use crate::theme::{apply, Look};
@@ -85,7 +87,7 @@ impl App {
         }
         w.set_sync_failed(s.error.is_some());
         let line = fluentcal_core::sync_text::status_line(s, fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes());
-        w.set_sync_tip(format!("{line}（点击立即同步）").into());
+        w.set_sync_tip(trf("{0}（点击立即同步）", &[format!("{}", line)]).into());
     }
 
     /// Lane capacity from the layout changed: lay the chips out again.

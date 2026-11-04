@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { ref } from 'vue';
 import FIcon from './FIcon.vue';
 import { useFieldName, useSplitAttrs } from './field';
@@ -98,7 +99,7 @@ defineExpose({
       type="button"
       class="clear"
       tabindex="-1"
-      aria-label="清除"
+      :aria-label="tr('清除')"
       @mousedown.prevent
       @click="clear"
     >

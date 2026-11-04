@@ -2,6 +2,8 @@
 //! edited, its fields (fields.rs), what the window shows (view.rs), and saving, deleting and
 //! the questions on the way (flow.rs). The window glue only maps these to controls.
 
+use crate::i18n::{tr};
+
 mod fields;
 mod flow;
 mod view;
@@ -96,6 +98,6 @@ impl Editor {
 
     /// The window title (0.2: 新建任务 / 编辑任务).
     pub fn window_title(&self) -> &'static str {
-        if self.is_new { "新建任务" } else { "编辑任务" }
+        if self.is_new { tr("新建任务") } else { tr("编辑任务") }
     }
 }

@@ -114,14 +114,14 @@ struct Preset { id: string, label: string, desc: string, bg: float, cell: float,
 export component ThemeCards {
     in property <string> kind;
     property <[{v: string, label: string}]> modes: [
-        { v: "light", label: "浅色" }, { v: "dark", label: "深色" }, { v: "system", label: "跟随系统" },
+        { v: "light", label: @tr("浅色") }, { v: "dark", label: @tr("深色") }, { v: "system", label: @tr("跟随系统") },
     ];
     property <[Preset]> presets: [
-        { id: "light", label: "浅色卡片", desc: "明亮、清晰", bg: 0.92, cell: 0.7, dark: false },
-        { id: "dark", label: "深色卡片", desc: "夜间不刺眼", bg: 0.9, cell: 0.6, dark: true },
-        { id: "acrylic", label: "亚克力", desc: "Win11 毛玻璃", bg: 0.45, cell: 0.4, dark: true },
-        { id: "glass", label: "透明玻璃", desc: "透出壁纸", bg: 0.18, cell: 0.38, dark: true },
-        { id: "minimal", label: "极简", desc: "只显示文字", bg: 0, cell: 0.1, dark: true },
+        { id: "light", label: @tr("浅色卡片"), desc: @tr("明亮、清晰"), bg: 0.92, cell: 0.7, dark: false },
+        { id: "dark", label: @tr("深色卡片"), desc: @tr("夜间不刺眼"), bg: 0.9, cell: 0.6, dark: true },
+        { id: "acrylic", label: @tr("亚克力"), desc: @tr("Win11 毛玻璃"), bg: 0.45, cell: 0.4, dark: true },
+        { id: "glass", label: @tr("透明玻璃"), desc: @tr("透出壁纸"), bg: 0.18, cell: 0.38, dark: true },
+        { id: "minimal", label: @tr("极简"), desc: @tr("只显示文字"), bg: 0, cell: 0.1, dark: true },
     ];
     property <int> n: kind == "mode" ? modes.length : presets.length;
     // grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap 12px
@@ -134,7 +134,7 @@ export component ThemeCards {
     preferred-height: 4px + rows * ch + (rows - 1) * 12px + 12px;
     min-height: self.preferred-height;
     accessible-role: radio-group;
-    accessible-label: kind == "mode" ? "颜色模式" : "预设方案";
+    accessible-label: kind == "mode" ? @tr("颜色模式") : @tr("预设方案");
     if root.kind == "mode": Rectangle {
         for m[i] in root.modes: Card {
             x: Math.mod(i, root.cols) * (root.cw + 12px);

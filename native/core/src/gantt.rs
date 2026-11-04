@@ -1,6 +1,8 @@
 //! Gantt chart geometry (0.2's src/lib/gantt.ts): rows, group summaries, the visible range,
 //! date ↔ pixel mapping, the two header tiers and dependency arrows.
 
+use crate::i18n::{tr, trf};
+
 use crate::date::{add_days, add_months, day_num, diff_days, end_of_month, iso_week, parts, start_of_month, start_of_week, weekday};
 use crate::model::{Group, Task};
 use crate::recur::task_end;
@@ -18,7 +20,7 @@ pub const ROW_HEIGHT: f64 = 32.0;
 pub const UNGROUPED: &str = "__ungrouped__";
 
 pub fn ungrouped_group() -> Group {
-    Group { id: UNGROUPED.into(), name: "未分组".into(), color: "gray".into(), order: 1e9, ..Default::default() }
+    Group { id: UNGROUPED.into(), name: tr("未分组").into(), color: "gray".into(), order: 1e9, ..Default::default() }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -160,13 +162,13 @@ pub fn header_tiers(range: (&str, &str), scale: &str, now: &str, week_start: u32
     let mut bottom = Vec::new();
     if scale == "month" {
         for y in parts(start).0..=parts(end).0 {
-            top.push(cell(format!("y{y}"), format!("{y}年"), &format!("{y:04}-01-01"), &format!("{y:04}-12-31"), false));
+            top.push(cell(format!("y{y}"), trf("{0}年", &[format!("{}", y)]), &format!("{y:04}-01-01"), &format!("{y:04}-12-31"), false));
         }
     } else {
         let mut m = start_of_month(start);
         while m.as_str() <= end {
             let (y, mm, _) = parts(&m);
-            top.push(cell(format!("m{m}"), format!("{y}年{mm}月"), &m, &end_of_month(&m), false));
+            top.push(cell(format!("m{m}"), trf("{0}年{1}月", &[format!("{}", y), format!("{}", mm)]), &m, &end_of_month(&m), false));
             m = add_months(&m, 1);
         }
     }
@@ -190,7 +192,7 @@ pub fn header_tiers(range: (&str, &str), scale: &str, now: &str, week_start: u32
             let mut m = start_of_month(start);
             while m.as_str() <= end {
                 let mm = parts(&m).1;
-                bottom.push(cell(format!("b{m}"), format!("{mm}月"), &m, &end_of_month(&m), start_of_month(now) == m));
+                bottom.push(cell(format!("b{m}"), trf("{0}月", &[format!("{}", mm)]), &m, &end_of_month(&m), start_of_month(now) == m));
                 m = add_months(&m, 1);
             }
         }
@@ -200,7 +202,7 @@ pub fn header_tiers(range: (&str, &str), scale: &str, now: &str, week_start: u32
 
 /// Label for the week header tooltip: "第 44 周".
 pub fn week_label(iso: &str) -> String {
-    format!("第 {} 周", iso_week(iso))
+    trf("第 {0} 周", &[format!("{}", iso_week(iso))])
 }
 
 /// The corners of a finish-to-start dependency arrow between two bars, first to last.

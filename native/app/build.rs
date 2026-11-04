@@ -2,10 +2,32 @@ fn main() {
     // Debug builds carry element names for the end-to-end tests' element search (tests/e2e.rs);
     // release builds don't need them.
     let debug = std::env::var("PROFILE").is_ok_and(|p| p == "debug");
-    let config = slint_build::CompilerConfiguration::new().with_debug_info(debug);
+    let config = slint_build::CompilerConfiguration::new().with_debug_info(debug)
+        .with_default_translation_context(slint_build::DefaultTranslationContext::None)
+        .with_bundled_translations(translations());
     slint_build::compile_with_config("ui/main.slint", config).expect("Slint build failed");
     resources();
     web_assets();
+}
+
+/// One catalog serves Slint, Rust and the bundled browser view. Generate gettext files in
+/// OUT_DIR so translators only edit the checked-in JSON catalogs.
+fn translations() -> std::path::PathBuf {
+    let root = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("translations");
+    for language in ["zh-CN", "en-US", "zh-TW"] {
+        let source = format!("../../locales/{}.json", if language == "zh-CN" { "en-US" } else { language });
+        println!("cargo:rerun-if-changed={source}");
+        let messages: std::collections::BTreeMap<String, String> = serde_json::from_str(&std::fs::read_to_string(source).unwrap()).unwrap();
+        let mut po = format!("msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n\"Language: {language}\\n\"\n\"Plural-Forms: nplurals=1; plural=0;\\n\"\n\n");
+        for (key, mut value) in messages {
+            if language == "zh-CN" { value = key.clone(); }
+            po += &format!("msgid {}\nmsgstr {}\n\n", serde_json::to_string(&key).unwrap(), serde_json::to_string(&value).unwrap());
+        }
+        let dir = root.join(language).join("LC_MESSAGES");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("fluentcal-native.po"), po).unwrap();
+    }
+    root
 }
 
 /// The web view's files (the browser build of the frontend in ../../dist, `npm run build`),

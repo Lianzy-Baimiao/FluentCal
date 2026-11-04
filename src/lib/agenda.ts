@@ -1,3 +1,4 @@
+import { t as tr } from '@/i18n';
 import type { ISODate, Task } from '@/types';
 import { addDays } from './date';
 import { occurrences, type Occurrence } from './recur';
@@ -35,8 +36,8 @@ export function agenda(tasks: Task[], start: ISODate, end: ISODate, today: ISODa
 
 /** "今天", "明天", or e.g. "10月31日". */
 export function dayHeading(date: ISODate, today: ISODate): string {
-  if (date === today) return '今天';
-  if (date === addDays(today, 1)) return '明天';
-  if (date === addDays(today, -1)) return '昨天';
-  return `${+date.slice(5, 7)}月${+date.slice(8, 10)}日`;
+  if (date === today) return tr("今天");
+  if (date === addDays(today, 1)) return tr("明天");
+  if (date === addDays(today, -1)) return tr("昨天");
+  return tr("{0}月{1}日", +date.slice(5, 7), +date.slice(8, 10));
 }

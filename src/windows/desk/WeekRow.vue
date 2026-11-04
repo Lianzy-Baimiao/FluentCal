@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 import { vTip } from '@/fluent';
 import type { ISODate } from '@/types';
@@ -72,7 +73,7 @@ async function qaSubmit() {
   await addTask({ title, start: date });
   await nextTick();
   const col = qaCol();
-  if (col >= 0 && props.layout.overflow[col] > 0) notify(`已添加“${title}”（点 +${props.layout.overflow[col]} 查看）`);
+  if (col >= 0 && props.layout.overflow[col] > 0) notify(tr("已添加“{0}”（点 +{1} 查看）", title, props.layout.overflow[col]));
 }
 
 function qaClose() {
@@ -108,7 +109,7 @@ function onCellDblClick(date: ISODate) {
             <span class="num">{{ c.label }}</span>
             <span v-if="c.lunar" class="lunar" :class="c.lunarKind">{{ c.lunar }}</span>
           </div>
-          <span v-if="c.badge" class="badge" :class="c.badge === '休' ? 'off' : 'work'">{{ c.badge }}</span>
+          <span v-if="c.badge" class="badge" :class="c.badge === tr('休') ? 'off' : 'work'">{{ c.badge }}</span>
           <span :id="`desc-${c.date}`" class="sr-only">{{ c.aria }}</span>
           <div v-for="ch in byCol[i]" :key="ch.key" class="slot" :style="chipStyle(ch)">
             <TaskChip
@@ -126,7 +127,7 @@ function onCellDblClick(date: ISODate) {
             class="more"
             type="button"
             :style="moreStyle(i)"
-            :aria-label="`还有 ${layout.overflow[i]} 项`"
+            :aria-label="tr('还有 {0} 项', layout.overflow[i])"
             @dblclick.stop
             @click.stop="emit('more', c.date, $event.currentTarget as HTMLElement)"
           >
@@ -137,9 +138,9 @@ function onCellDblClick(date: ISODate) {
             v-model="qaText"
             class="quick-add"
             :style="{ height: `${chipH + 6}px` }"
-            placeholder="添加任务，回车保存"
+            :placeholder="tr('添加任务，回车保存')"
             maxlength="200"
-            aria-label="快速添加任务"
+            :aria-label="tr('快速添加任务')"
             @click.stop
             @dblclick.stop
             @keydown.enter.prevent="qaSubmit"

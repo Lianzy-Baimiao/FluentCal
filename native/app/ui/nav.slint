@@ -91,7 +91,7 @@ export component NavView {
             : list.length > 10 && list[10].key == k ? 10 : list.length > 11 && list[11].key == k ? 11 : -1;
     }
     accessible-role: navigation;
-    accessible-label: title != "" ? title : "导航";
+    accessible-label: title != "" ? title : @tr("导航");
     pane := Rectangle {
         x: 0;
         width: root.pane-w;

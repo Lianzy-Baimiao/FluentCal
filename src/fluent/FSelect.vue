@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, ref } from 'vue';
 import FFlyout from './FFlyout.vue';
 import FIcon from './FIcon.vue';
@@ -18,7 +19,7 @@ const props = withDefaults(
     disabled?: boolean;
     label?: string;
   }>(),
-  { placeholder: '请选择' },
+  { placeholder: tr("请选择") },
 );
 const emit = defineEmits<{ 'update:modelValue': [V] }>();
 const name = useFieldName(() => props.label, () => props.placeholder);

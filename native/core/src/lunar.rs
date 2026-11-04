@@ -198,6 +198,29 @@ pub fn day_info(iso: &str) -> DayInfo {
     info
 }
 
+/// Localized presentation only. Canonical names in the cache remain untouched because
+/// recurrence and holiday matching depend on them.
+pub fn display_info(iso: &str) -> DayInfo {
+    use crate::i18n::{current, tr, trf, Language};
+    let mut info = day_info(iso);
+    if current() == Language::SimplifiedChinese { return info; }
+    info.festivals = info.festivals.iter().map(|s| tr(s).to_owned()).collect();
+    info.term = info.term.map(|s| tr(&s).to_owned());
+    if let Some(legal) = &mut info.legal { legal.name = tr(&legal.name).to_owned(); }
+    if current() == Language::English {
+        let month = trf(if info.lunar_month < 0 { "闰月{0}" } else { "农历月{0}" }, &[info.lunar_month.abs().to_string()]);
+        let day = trf("农历日{0}", &[info.lunar_day.to_string()]);
+        info.lunar_label = format!("{month} {day}");
+        info.ganzhi_year = trf("农历年份{0}", &[info.lunar_year.to_string()]);
+        info.text = match info.kind { Kind::Lunar => day, Kind::Month => month, _ => tr(&info.text).to_owned() };
+    } else {
+        info.text = tr(&info.text).replace('闰', "閏").replace('腊', "臘");
+        info.lunar_label = info.lunar_label.replace('闰', "閏").replace('腊', "臘");
+        info.ganzhi_year = tr(&info.ganzhi_year).to_owned();
+    }
+    info
+}
+
 /// 宜/忌 for the day (only shown on hover).
 pub fn almanac(iso: &str) -> (Vec<String>, Vec<String>) {
     let (y, m, d) = parts(iso);
@@ -229,12 +252,19 @@ pub fn lunar_to_solar(lunar_year: i32, lunar_month: i32, lunar_day: u32) -> Opti
 
 /// Chinese numerals for lunar months, used in rule descriptions.
 pub fn lunar_month_name(m: i32) -> String {
+    if crate::i18n::current() == crate::i18n::Language::English {
+        return crate::i18n::trf(if m < 0 { "闰月{0}" } else { "农历月{0}" }, &[m.abs().to_string()]);
+    }
     const NAMES: [&str; 12] = ["正", "二", "三", "四", "五", "六", "七", "八", "九", "十", "冬", "腊"];
     let i = (m.unsigned_abs() as usize).clamp(1, 12) - 1;
-    format!("{}{}月", if m < 0 { "闰" } else { "" }, NAMES[i])
+    let label = format!("{}{}月", if m < 0 { "闰" } else { "" }, NAMES[i]);
+    if crate::i18n::current() == crate::i18n::Language::TraditionalChinese { label.replace('闰', "閏").replace('腊', "臘") } else { label }
 }
 
 pub fn lunar_day_name(d: u32) -> String {
+    if crate::i18n::current() == crate::i18n::Language::English {
+        return crate::i18n::trf("农历日{0}", &[d.to_string()]);
+    }
     const TEN: [&str; 4] = ["初", "十", "廿", "三"];
     const DIGITS: [&str; 11] = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
     match d {

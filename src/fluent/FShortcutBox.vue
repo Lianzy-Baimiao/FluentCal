@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref } from 'vue';
 import FIcon from './FIcon.vue';
 import { uid, useFieldName, useSplitAttrs } from './field';
@@ -7,7 +8,7 @@ import { modsOf, shortcutFromEvent, shortcutLabels } from './shortcut';
 defineOptions({ inheritAttrs: false });
 const props = withDefaults(
   defineProps<{ modelValue: string; placeholder?: string; disabled?: boolean; label?: string }>(),
-  { placeholder: '未设置' },
+  { placeholder: tr("未设置") },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 
@@ -20,7 +21,7 @@ const split = useSplitAttrs();
 const ownId = uid('fsk');
 const keysId = uid('fsk');
 const hintId = uid('fsk');
-const ownText = () => name.text() ?? '快捷键';
+const ownText = () => name.text() ?? tr("快捷键");
 /** aria-labelledby: caller's ids, the settings card title, or our own hidden label. */
 function labelledBy(): string {
   const a = name.attrs();
@@ -98,9 +99,9 @@ function keyup(e: KeyboardEvent) {
           <kbd>{{ k }}</kbd>
         </template>
       </template>
-      <span v-else class="ph">{{ recording ? '按下快捷键…' : placeholder }}</span>
+      <span v-else class="ph">{{ recording ? tr("按下快捷键…") : placeholder }}</span>
     </span>
-    <span v-if="recording" :id="hintId" class="visually-hidden">按下新的快捷键，Esc 取消，Backspace 清除</span>
+    <span v-if="recording" :id="hintId" class="visually-hidden">{{ tr("按下新的快捷键，Esc 取消，Backspace 清除") }}</span>
     <FIcon :name="recording ? 'keyboard' : 'edit'" :size="14" class="edit" />
   </button>
 </template>

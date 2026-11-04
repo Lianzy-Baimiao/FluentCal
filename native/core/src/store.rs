@@ -3,6 +3,8 @@
 //! Mutations mark the store dirty, a background thread writes atomically (temp + rename)
 //! after a short debounce, and every change is broadcast so all windows stay in sync.
 
+use crate::i18n::{tr, trf};
+
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::{
@@ -576,9 +578,9 @@ pub fn backup_restore(&self, origin: &str, name: &str) -> Result<(), String> {
         return Err("invalid backup name".into());
     }
     let text = fs::read_to_string(self.backups_dir().join(name)).map_err(|e| e.to_string())?;
-    let doc: Value = serde_json::from_str(&text).map_err(|e| format!("备份文件无法解析：{e}"))?;
+    let doc: Value = serde_json::from_str(&text).map_err(|e| trf("备份文件无法解析：{0}", &[format!("{}", e)]))?;
     if !doc.is_object() {
-        return Err("备份文件格式不正确".into());
+        return Err(tr("备份文件格式不正确").into());
     }
     self.manual_backup("pre-restore").map_err(|e| e.to_string())?;
     let old = self.snapshot()["settings"].clone();

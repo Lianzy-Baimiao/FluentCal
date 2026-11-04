@@ -48,7 +48,7 @@ export struct EditorData {
 }
 
 export component EditorWindow inherits Window {
-    title: root.is-new ? "新建任务" : "编辑任务";
+    title: root.is-new ? @tr("新建任务") : @tr("编辑任务");
     // Mica behind the window (Windows 11); else the solid background (0.2's .no-mica).
     in property <bool> mica;
     background: root.mica ? transparent : Theme.c.solid-base;
@@ -56,7 +56,7 @@ export component EditorWindow inherits Window {
     default-font-size: 14px;
     preferred-width: 560px;
     preferred-height: 720px;
-    min-width: 460px;
+    min-width: 520px;
     min-height: 560px;
     in property <bool> is-new;
     // The task no longer exists (0.2's "这个任务已被删除。").
@@ -122,7 +122,7 @@ export component EditorWindow inherits Window {
         dialog.close();
         ask-result(a);
     }
-    property <[string]> day-names: ["日", "一", "二", "三", "四", "五", "六"];
+    property <[string]> day-names: [@tr("日"), @tr("一"), @tr("二"), @tr("三"), @tr("四"), @tr("五"), @tr("六")];
     property <[int]> day-order: [1, 2, 3, 4, 5, 6, 0];
     OverlayRoot {
         win-width: root.width;
@@ -149,7 +149,7 @@ export component EditorWindow inherits Window {
                 if root.missing: Rectangle {
                     vertical-stretch: 1;
                     Text {
-                        text: "这个任务已被删除。";
+                        text: @tr("这个任务已被删除。");
                         color: Theme.c.text-secondary;
                         horizontal-alignment: center;
                         vertical-alignment: center;
@@ -176,7 +176,7 @@ export component EditorWindow inherits Window {
                             spacing: 6px;
                             title-box := TextBox {
                                 text <=> root.title-text;
-                                placeholder: "任务名称";
+                                placeholder: @tr("任务名称");
                                 text-size: 20px;
                                 text-weight: 600;
                                 box-height: 32px;
@@ -187,7 +187,7 @@ export component EditorWindow inherits Window {
                                 padding-left: 2px;
                                 Text {
                                     height: 20px;
-                                    text: "请输入任务名称";
+                                    text: @tr("请输入任务名称");
                                     font-size: 12px;
                                     color: Theme.c.critical;
                                     vertical-alignment: center;
@@ -197,23 +197,10 @@ export component EditorWindow inherits Window {
                         }
                         Card {
                             Row {
-                                label: "日期";
-                                dr := Rectangle {
-                                // the hint stays on the dates' line when it fits (flex-wrap):
-                                // the pickers, "至" and the gaps are fixed widths
-                                property <length> room: body.width - 48px - 34px - 84px;
-                                property <length> dates-w: root.data.milestone ? 150px : 150px + 8px + 12px + 8px + 150px;
-                                property <bool> inline: self.dates-w + 8px + hint-w.preferred-width <= self.room;
-                                hint-w := Text {
-                                    visible: false;
-                                    width: 0;
-                                    height: 0;
-                                    text: root.data.span;
-                                    font-size: 12px;
-                                }
+                                label: @tr("日期");
                                 VerticalLayout {
                                     spacing: 8px;
-                                    dates := HorizontalLayout {
+                                    HorizontalLayout {
                                         spacing: 8px;
                                         alignment: start;
                                         cross-axis-alignment: center;
@@ -226,7 +213,7 @@ export component EditorWindow inherits Window {
                                         }
                                         if !root.data.milestone: Text {
                                             height: 33px;
-                                            text: "至";
+                                            text: @tr("至");
                                             font-size: 12px;
                                             color: Theme.c.text-secondary;
                                             vertical-alignment: center;
@@ -238,15 +225,8 @@ export component EditorWindow inherits Window {
                                             markers: true;
                                             changed-value(v) => { root.edit("end", v); }
                                         }
-                                        if dr.inline: Text {
-                                            height: 33px;
-                                            text: root.data.span;
-                                            font-size: 12px;
-                                            color: Theme.c.text-secondary;
-                                            vertical-alignment: center;
-                                        }
                                     }
-                                    if !dr.inline: Text {
+                                    Text {
                                         height: 20px;
                                         text: root.data.span;
                                         font-size: 12px;
@@ -254,12 +234,11 @@ export component EditorWindow inherits Window {
                                         vertical-alignment: center;
                                     }
                                 }
-                                }
                             }
                             Row {
-                                label: "时间";
+                                label: @tr("时间");
                                 Checkbox {
-                                    text: "全天";
+                                    text: @tr("全天");
                                     checked: root.data.all-day;
                                     toggled(v) => { root.edit("all-day", v ? "1" : "0"); }
                                 }
@@ -270,7 +249,7 @@ export component EditorWindow inherits Window {
                                 }
                             }
                             TopRow {
-                                label: "重复";
+                                label: @tr("重复");
                                 VerticalLayout {
                                     spacing: 8px;
                                     HorizontalLayout {
@@ -283,7 +262,7 @@ export component EditorWindow inherits Window {
                                             value: root.data.freq;
                                             selected(v) => { root.edit("freq", v); }
                                         }
-                                        if root.data.unit != "": Text { text: "每"; vertical-alignment: center; }
+                                        if root.data.unit != "": Text { text: @tr("每"); vertical-alignment: center; }
                                         if root.data.unit != "": NumberBox {
                                             width: 100px;
                                             value: root.data.interval;
@@ -297,7 +276,7 @@ export component EditorWindow inherits Window {
                                         spacing: 4px;
                                         alignment: start;
                                         accessible-role: groupbox;
-                                        accessible-label: "重复的星期";
+                                        accessible-label: @tr("重复的星期");
                                         for d in root.day-order: DayButton {
                                             label: root.day-names[d];
                                             on: root.data.days[d];
@@ -317,9 +296,9 @@ export component EditorWindow inherits Window {
                                         Select {
                                             width: 140px;
                                             options: [
-                                                { value: "never", label: "永不结束" },
-                                                { value: "count", label: "重复次数" },
-                                                { value: "until", label: "截止日期" },
+                                                { value: "never", label: @tr("永不结束") },
+                                                { value: "count", label: @tr("重复次数") },
+                                                { value: "until", label: @tr("截止日期") },
                                             ];
                                             value: root.data.end-mode;
                                             selected(v) => { root.edit("end-mode", v); }
@@ -329,7 +308,7 @@ export component EditorWindow inherits Window {
                                             value: root.data.count;
                                             minimum: 1;
                                             maximum: 999;
-                                            suffix: "次";
+                                            suffix: @tr("次");
                                             changed-value(v) => { root.edit("count", v); }
                                         }
                                         if root.data.end-mode == "until": DatePicker {
@@ -348,7 +327,7 @@ export component EditorWindow inherits Window {
                                 }
                             }
                             TopRow {
-                                label: "提醒";
+                                label: @tr("提醒");
                                 last: true;
                                 VerticalLayout {
                                     spacing: 6px;
@@ -366,7 +345,7 @@ export component EditorWindow inherits Window {
                                             variant: ButtonVariant.subtle;
                                             size: ButtonSize.icon;
                                             icon: Glyph.close;
-                                            tip: "删除提醒";
+                                            tip: @tr("删除提醒");
                                             clicked => { root.reminder-remove(i); }
                                         }
                                     }
@@ -377,7 +356,7 @@ export component EditorWindow inherits Window {
                                         Button {
                                             variant: ButtonVariant.subtle;
                                             icon: Glyph.add;
-                                            text: "添加提醒";
+                                            text: @tr("添加提醒");
                                             enabled: root.data.reminder-count < 5;
                                             clicked => { root.reminder-add(); }
                                         }
@@ -393,7 +372,7 @@ export component EditorWindow inherits Window {
                         }
                         Card {
                             Row {
-                                label: "分组";
+                                label: @tr("分组");
                                 wide: true;
                                 FlexboxLayout {
                                     spacing: 8px;
@@ -413,20 +392,20 @@ export component EditorWindow inherits Window {
                                     if root.new-group-open: TextBox {
                                         width: 150px;
                                         text <=> root.new-group-name;
-                                        placeholder: "分组名称";
+                                        placeholder: @tr("分组名称");
                                         accepted => { root.create-group(root.new-group-name); }
                                         escape => { root.new-group-open = false; }
                                     }
                                     if root.new-group-open: Button {
                                         size: ButtonSize.small;
                                         variant: ButtonVariant.accent;
-                                        text: "创建";
+                                        text: @tr("创建");
                                         clicked => { root.create-group(root.new-group-name); }
                                     }
                                 }
                             }
                             Row {
-                                label: "颜色";
+                                label: @tr("颜色");
                                 wide: true;
                                 ColorSwatches {
                                     colors: root.colors;
@@ -441,7 +420,7 @@ export component EditorWindow inherits Window {
                                 }
                             }
                             if root.data.show-progress: Row {
-                                label: "进度";
+                                label: @tr("进度");
                                 if !root.data.milestone: Slider {
                                     track-width: 180px;
                                     minimum: 0;
@@ -454,21 +433,21 @@ export component EditorWindow inherits Window {
                                     committed(v) => { root.edit("progress-done", v); }
                                 }
                                 Checkbox {
-                                    text: "已完成";
+                                    text: @tr("已完成");
                                     checked: root.data.done;
                                     toggled(v) => { root.edit("done", v ? "1" : "0"); }
                                 }
                             }
                             Row {
-                                label: "里程碑";
+                                label: @tr("里程碑");
                                 Checkbox {
-                                    text: "在甘特图中显示为菱形";
+                                    text: @tr("在甘特图中显示为菱形");
                                     checked: root.data.milestone;
                                     toggled(v) => { root.edit("milestone", v ? "1" : "0"); }
                                 }
                             }
                             TopRow {
-                                label: "前置任务";
+                                label: @tr("前置任务");
                                 FlexboxLayout {
                                     spacing: 6px;
                                     cross-axis-alignment: center;
@@ -481,26 +460,26 @@ export component EditorWindow inherits Window {
                                         width: 220px;
                                         options: root.dep-options;
                                         value: "";
-                                        placeholder: "添加前置任务…";
+                                        placeholder: @tr("添加前置任务…");
                                         enabled: root.dep-options.length > 0;
                                         selected(v) => { root.dep-add(v); }
                                     }
                                 }
                             }
                             Row {
-                                label: "倒数日";
+                                label: @tr("倒数日");
                                 last: !root.data.show-postpone;
                                 Checkbox {
-                                    text: "在日历底部显示“距离这一天还有 N 天”";
+                                    text: @tr("在日历底部显示“距离这一天还有 N 天”");
                                     checked: root.data.countdown;
                                     toggled(v) => { root.edit("countdown", v ? "1" : "0"); }
                                 }
                             }
                             if root.data.show-postpone: Row {
-                                label: "顺延";
+                                label: @tr("顺延");
                                 last: true;
                                 Checkbox {
-                                    text: "未完成时自动顺延到今天";
+                                    text: @tr("未完成时自动顺延到今天");
                                     checked: root.data.postpone;
                                     toggled(v) => { root.edit("postpone", v ? "1" : "0"); }
                                 }
@@ -513,7 +492,7 @@ export component EditorWindow inherits Window {
                                 text <=> root.notes-text;
                                 multiline: true;
                                 rows: 4;
-                                placeholder: "备注";
+                                placeholder: @tr("备注");
                                 edited(t) => { root.edit("notes", t); }
                             }
                         }
@@ -534,20 +513,20 @@ export component EditorWindow inherits Window {
                         if !root.is-new: Button {
                             variant: ButtonVariant.subtle;
                             icon: Glyph.delete;
-                            text: "删除";
+                            text: @tr("删除");
                             color-override: Theme.c.critical;
                             clicked => { root.remove(); }
                         }
                         Rectangle { horizontal-stretch: 1; }
                         Button {
                             width: 96px;
-                            text: "取消";
+                            text: @tr("取消");
                             clicked => { root.cancel(); }
                         }
                         Button {
                             width: 96px;
                             variant: ButtonVariant.accent;
-                            text: root.is-new ? "创建" : "保存";
+                            text: root.is-new ? @tr("创建") : @tr("保存");
                             enabled: Fluent.trim(root.title-text) != "";
                             clicked => { root.save(); }
                         }

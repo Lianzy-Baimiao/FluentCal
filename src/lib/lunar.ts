@@ -1,6 +1,7 @@
 import { LegalHoliday, LunarDay, SolarDay } from 'tyme4ts';
 import type { HolidayYear, ISODate } from '@/types';
 import { parts, weekday, ymd } from './date';
+import { language, t } from '@/i18n';
 
 /** What a day cell shows under the date number, plus tooltip details. */
 export interface DayInfo {
@@ -157,6 +158,24 @@ export function dayInfo(iso: ISODate): DayInfo {
   return info;
 }
 
+/** Display names only. The canonical cache is used unchanged by recurrence and holidays. */
+export function displayInfo(iso: ISODate): DayInfo {
+  const raw = dayInfo(iso);
+  if (language.value === 'zh-CN') return raw;
+  const month = t(raw.lunarMonth < 0 ? '闰月{0}' : '农历月{0}', Math.abs(raw.lunarMonth));
+  const day = t('农历日{0}', raw.lunarDay);
+  const english = language.value === 'en-US';
+  return {
+    ...raw,
+    text: english && raw.kind === 'lunar' ? day : english && raw.kind === 'month' ? month : t(raw.text).replaceAll('闰', '閏').replaceAll('腊', '臘'),
+    lunarLabel: english ? `${month} ${day}` : raw.lunarLabel.replaceAll('闰', '閏').replaceAll('腊', '臘'),
+    ganzhiYear: english ? t('农历年份{0}', raw.lunarYear) : raw.ganzhiYear,
+    festivals: raw.festivals.map(v => t(v)),
+    term: raw.term ? t(raw.term) : undefined,
+    legal: raw.legal ? { ...raw.legal, name: t(raw.legal.name) } : undefined,
+  };
+}
+
 /** 宜/忌 for the day (computed lazily; only shown on hover). */
 export function almanac(iso: ISODate): { recommends: string[]; avoids: string[] } {
   const [y, m, d] = parts(iso);
@@ -187,11 +206,13 @@ export function lunarToSolar(lunarYear: number, lunarMonth: number, lunarDay: nu
 
 /** Chinese numerals for lunar months, used in rule descriptions. */
 export function lunarMonthName(m: number): string {
+  if (language.value === 'en-US') return t(m < 0 ? '闰月{0}' : '农历月{0}', Math.abs(m));
   const names = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
   return `${m < 0 ? '闰' : ''}${names[Math.abs(m) - 1]}月`;
 }
 
 export function lunarDayName(d: number): string {
+  if (language.value === 'en-US') return t('农历日{0}', d);
   const ten = ['初', '十', '廿', '三'];
   const digits = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
   if (d === 10) return '初十';

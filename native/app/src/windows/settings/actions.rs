@@ -1,6 +1,8 @@
 //! What the settings pages' controls do (0.2's page handlers and the Tauri commands they
 //! called: sync_*, backup_*, data_dir_set, file_save/file_open, notify_test, web_*…).
 
+use fluentcal_core::i18n::{tr};
+
 use super::view::{qr_image, Info, WebView};
 use crate::app::{run, App};
 use crate::Severity;
@@ -170,7 +172,7 @@ impl App {
             Ok(()) => {
                 self.cloud.secrets_changed();
                 self.settings_load_secrets();
-                self.settings_say(Severity::Success, "已保存到 Windows 凭据管理器");
+                self.settings_say(Severity::Success, tr("已保存到 Windows 凭据管理器"));
             }
             Err(e) => self.settings_say(Severity::Error, &e),
         }

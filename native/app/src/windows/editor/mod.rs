@@ -2,7 +2,9 @@
 //! one, switching (after asking) when opened on another task while open. Its saves aren't
 //! undoable from the calendar: in 0.2 the editor was another window with its own history.
 
-mod host;
+use fluentcal_core::i18n::{tr};
+
+pub(crate) mod host;
 
 pub use host::Msg;
 
@@ -25,8 +27,8 @@ pub struct EditorWin {
 
 /// Lunar text and 休/班 for the date pickers (EditorApp lunarOf / markerOf).
 fn day_labels(iso: &str) -> (String, String) {
-    let i = fluentcal_core::lunar::day_info(iso);
-    let marker = i.legal.map(|l| if l.work { "班" } else { "休" }).unwrap_or_default();
+    let i = fluentcal_core::lunar::display_info(iso);
+    let marker = i.legal.map(|l| if l.work { tr("班") } else { tr("休") }).unwrap_or_default();
     (i.text, marker.into())
 }
 

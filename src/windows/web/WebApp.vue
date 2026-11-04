@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { t as tr, language, languagePreference, setWebLanguage } from '@/i18n';
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
-import { FButton, FInfoBar, FSegmented } from '@/fluent';
+import { FButton, FInfoBar, FSegmented, FSelect } from '@/fluent';
 import { call, on } from '@/api';
 import { doc, initStore, patchSettings, storeState } from '@/stores/doc';
 import { deskVars, startThemeSync } from '@/composables/theme';
@@ -37,12 +38,18 @@ const mq = matchMedia('(max-width: 640px)');
 const onMq = () => (narrow.value = mq.matches);
 const chosen = ref(localStorage.getItem(VIEW_KEY) ?? '');
 const view = computed(() => chosen.value || (narrow.value ? 'list' : doc.settings.calendar.view));
-const views = [
-  { value: 'list', label: '列表' },
-  { value: 'month', label: '月' },
-  { value: 'weeks', label: '多周' },
-  { value: 'gantt', label: '甘特' },
-];
+const views = computed(() => [
+  { value: 'list', label: tr("列表") },
+  { value: 'month', label: tr("月") },
+  { value: 'weeks', label: tr("多周") },
+  { value: 'gantt', label: tr("甘特") },
+]);
+const languages = computed(() => [
+  { value: 'system', label: tr('跟随系统') },
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'zh-TW', label: '繁體中文' },
+  { value: 'en-US', label: 'English' },
+]);
 const viewModel = computed({
   get: () => view.value,
   set: (v: string) => {
@@ -51,21 +58,21 @@ const viewModel = computed({
     if (v !== 'list') patchSettings({ calendar: { view: v as 'month' | 'weeks' | 'gantt' } });
   },
 });
-const title = computed(() => (view.value === 'list' ? '近期' : viewTitle()));
+const title = computed(() => (view.value === 'list' ? tr("近期") : viewTitle()));
 
 // Opened on this PC ("在浏览器中查看"): the server there runs only after that menu item.
 const onThisPc = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
-const reopen = '在日历上右键 ›“在浏览器中查看”重新打开';
+const reopen = computed(() => tr("在日历上右键 ›“在浏览器中查看”重新打开"));
 const notice = computed(() => {
   switch (status.value) {
     case 'offline':
       return onThisPc
-        ? { sev: 'warning' as const, text: `连不上 FluentCal（程序已退出或重新启动过）。显示的是上次的数据；${reopen}。` }
-        : { sev: 'warning' as const, text: `连不上${pc.value ? ` ${pc.value} 上的` : '电脑上的'} FluentCal（电脑关机、程序已退出或不在同一网络）。显示的是上次的数据，恢复后会自动更新。` };
+        ? { sev: 'warning' as const, text: tr("连不上 FluentCal（程序已退出或重新启动过）。显示的是上次的数据；{0}。", reopen.value) }
+        : { sev: 'warning' as const, text: tr("连不上{0} FluentCal（电脑关机、程序已退出或不在同一网络）。显示的是上次的数据，恢复后会自动更新。", pc.value ? tr(" {0} 上的", pc.value) : tr("电脑上的")) };
     case 'unauthorized':
-      return { sev: 'error' as const, text: `访问码无效或已更换。${onThisPc ? `请${reopen}。` : '请在电脑上打开 FluentCal › 设置 › 网页查看，重新扫码或复制链接。'}` };
+      return { sev: 'error' as const, text: tr("访问码无效或已更换。{0}", onThisPc ? tr("请{0}。", reopen.value) : tr("请在电脑上打开 FluentCal › 设置 › 网页查看，重新扫码或复制链接。")) };
     case 'noToken':
-      return { sev: 'error' as const, text: `缺少访问码。${onThisPc ? `请${reopen}。` : '请在电脑上打开 FluentCal › 设置 › 网页查看，扫码或复制完整的链接。'}` };
+      return { sev: 'error' as const, text: tr("缺少访问码。{0}", onThisPc ? tr("请{0}。", reopen.value) : tr("请在电脑上打开 FluentCal › 设置 › 网页查看，扫码或复制完整的链接。")) };
     default:
       return null;
   }
@@ -77,10 +84,10 @@ watchEffect(() => {
   const vars = { ...deskVars.value, '--desk-bg': 'transparent', '--desk-shadow': 'none', '--desk-pad': '0px', '--text-glow': 'none' };
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
 });
-watch(() => storeState.blocked, () => notify('网页中只能查看，请在电脑上修改'));
+watch(() => storeState.blocked, () => notify(tr("网页中只能查看，请在电脑上修改")));
 
 function onKey(e: KeyboardEvent) {
-  if ((e.target as HTMLElement).matches?.('input, textarea')) return;
+  if (e.defaultPrevented || (e.target as HTMLElement).closest?.('input, textarea, [role="combobox"], [role="listbox"]')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') ui.searchOpen = true;
   else if (e.key === 'Escape' && ui.searchOpen) ui.searchOpen = false;
   else if (view.value === 'month' || view.value === 'weeks') {
@@ -105,21 +112,29 @@ onBeforeUnmount(() => {
     <header class="bar">
       <h1 class="title">{{ title }}</h1>
       <template v-if="view === 'month' || view === 'weeks'">
-        <FButton variant="subtle" size="icon" icon="chevronLeft" :title="view === 'weeks' ? '上一周' : '上个月'" @click="page(-1)" />
-        <FButton variant="subtle" size="icon" icon="chevronRight" :title="view === 'weeks' ? '下一周' : '下个月'" @click="page(1)" />
-        <FButton variant="subtle" size="small" @click="goToday">今天</FButton>
+        <FButton variant="subtle" size="icon" icon="chevronLeft" :title="view === 'weeks' ? tr('上一周') : tr('上个月')" @click="page(-1)" />
+        <FButton variant="subtle" size="icon" icon="chevronRight" :title="view === 'weeks' ? tr('下一周') : tr('下个月')" @click="page(1)" />
+        <FButton variant="subtle" size="small" @click="goToday">{{ tr("今天") }}</FButton>
       </template>
       <span class="grow" />
-      <FSegmented v-model="viewModel" :options="views" size="small" label="视图" />
-      <FButton variant="subtle" size="icon" icon="search" title="搜索" @click="ui.searchOpen = !ui.searchOpen" />
+      <FSelect
+        class="language"
+        :label="tr('显示语言')"
+        :model-value="languagePreference"
+        :options="languages"
+        :width="152"
+        @update:model-value="setWebLanguage(String($event))"
+      />
+      <FSegmented v-model="viewModel" :options="views" size="small" :label="tr('视图')" />
+      <FButton variant="subtle" size="icon" icon="search" :title="tr('搜索')" @click="ui.searchOpen = !ui.searchOpen" />
     </header>
     <FInfoBar v-if="notice" class="notice" :severity="notice.sev">{{ notice.text }}</FInfoBar>
     <main class="body">
-      <p v-if="!storeState.ready" class="loading">{{ status === 'connecting' ? '正在连接电脑上的 FluentCal…' : '' }}</p>
+      <p v-if="!storeState.ready" class="loading">{{ status === 'connecting' ? tr("正在连接电脑上的 FluentCal…") : '' }}</p>
       <template v-else>
-        <AgendaView v-if="view === 'list'" />
-        <GanttView v-else-if="view === 'gantt'" />
-        <MonthView v-else :mode="view === 'weeks' ? 'weeks' : 'month'" />
+        <AgendaView v-if="view === 'list'" :key="language" />
+        <GanttView v-else-if="view === 'gantt'" :key="language" />
+        <MonthView v-else :key="language" :mode="view === 'weeks' ? 'weeks' : 'month'" />
         <CountdownBar v-if="view !== 'gantt'" />
       </template>
       <SearchPanel v-if="ui.searchOpen && storeState.ready" />
@@ -127,7 +142,7 @@ onBeforeUnmount(() => {
         <div v-if="ui.toast" class="toast" role="status">{{ ui.toast.text }}</div>
       </Transition>
     </main>
-    <footer class="foot">只读 · {{ pc ? `来自 ${pc} 上的 FluentCal` : 'FluentCal' }}</footer>
+    <footer class="foot">{{ tr("只读 ·") }}{{ pc ? tr("来自 {0} 上的 FluentCal", pc) : 'FluentCal' }}</footer>
     <TaskDetails />
   </div>
 </template>
@@ -159,6 +174,9 @@ onBeforeUnmount(() => {
 }
 .grow {
   flex: 1;
+}
+.language {
+  flex-shrink: 0;
 }
 .notice {
   margin: 0 10px 4px;

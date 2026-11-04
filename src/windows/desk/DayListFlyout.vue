@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, ref } from 'vue';
 import { FButton, FFlyout } from '@/fluent';
 import type { ISODate } from '@/types';
 import { formatFriendly } from '@/lib/date';
-import { dayInfo } from '@/lib/lunar';
+import { displayInfo as dayInfo } from '@/lib/lunar';
 import { occurrences } from '@/lib/recur';
 import type { Chip } from '@/lib/layout';
 import { addTask, setOccurrenceDone } from '@/lib/tasks';
@@ -49,7 +50,7 @@ async function add() {
     <div class="day-list" style="--text-glow: none">
       <div class="hd">
         <span class="title">{{ date ? formatFriendly(date) : '' }}</span>
-        <span v-if="info" class="sub">农历{{ info.lunarLabel }}</span>
+        <span v-if="info" class="sub">{{ tr("农历") }}{{ info.lunarLabel }}</span>
       </div>
       <div class="items">
         <div v-for="c in chips" :key="c.key" class="item">
@@ -61,11 +62,11 @@ async function add() {
             @key="(e) => e.key === 'Enter' && openEditor({ mode: 'edit', taskId: c.occ.task.id, date: c.occ.date })"
           />
         </div>
-        <p v-if="!chips.length" class="empty">这一天还没有任务</p>
+        <p v-if="!chips.length" class="empty">{{ tr("这一天还没有任务") }}</p>
       </div>
       <div v-if="!storeState.readOnly" class="add">
-        <input v-model="text" placeholder="添加任务，回车保存" maxlength="200" aria-label="添加任务" @keydown.enter.prevent="add" />
-        <FButton variant="subtle" size="icon" icon="add" title="添加" @click="add" />
+        <input v-model="text" :placeholder="tr('添加任务，回车保存')" maxlength="200" :aria-label="tr('添加任务')" @keydown.enter.prevent="add" />
+        <FButton variant="subtle" size="icon" icon="add" :title="tr('添加')" @click="add" />
       </div>
     </div>
   </FFlyout>

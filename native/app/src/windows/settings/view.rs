@@ -1,6 +1,8 @@
 //! What the settings pages show (0.2's computed values in the pages' scripts): from the
 //! settings, the document and `Info` (the app's state, or a parity scene's stand-in).
 
+use fluentcal_core::i18n::{tr, trf};
+
 use crate::{SAbout, SAddress, SAppearance, SBackup, SCalendar, SData, SGantt, SGeneral, SGroup, SMsg, SReminders, SSync, SUpcoming, SWeb, SelectOption, SetState, SettingsWindow, Severity, Swatch};
 use fluentcal_core::cloud::service::Status;
 use fluentcal_core::datadir::DataDir;
@@ -176,7 +178,7 @@ pub fn setup_with(w: &SettingsWindow, scale: f32) {
     g.set_bg_swatches(model(bg.iter().map(|h| swatch(h, h, h)).collect()));
     let detail = ["#C42B1C", "#E74856", "#FF8C00", "#107C10", "#0078D4", "#8764B8", "#E3008C", "#767676"];
     g.set_detail_swatches(model(detail.iter().map(|h| swatch(h, h, h)).collect()));
-    g.set_task_swatches(model(TASK_COLORS.iter().map(|c| swatch(c.key, c.bar, c.label)).collect()));
+    refresh_labels(w);
     let sh = [fluentcal_core::theme::Shadow { x: 0.0, y: 2.0, blur: 6.0, color: Rgba::new(0.0, 0.0, 0.0, 0.25) }];
     g.set_thumb_shadow(crate::shadow::render(&sh, 4.0, scale));
     g.set_icon(icon());
@@ -197,6 +199,12 @@ pub fn setup_with(w: &SettingsWindow, scale: f32) {
 
 pub fn setup(w: &SettingsWindow, app: &crate::app::App) {
     setup_with(w, scale_of(w, app));
+}
+
+/// Refresh translated labels without rebuilding editable groups or thumbnail images.
+pub fn refresh_labels(w: &SettingsWindow) {
+    let g = w.global::<SetState>();
+    update(g.get_task_swatches(), TASK_COLORS.iter().map(|c| swatch(c.key, c.bar, tr(c.label))).collect(), |m| g.set_task_swatches(m));
 }
 
 /// The window's scale; before Windows has created it (just shown), the screen it opens on.
@@ -221,8 +229,9 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
     let cur_screen = info.screens.iter().find(|x| x.2).map_or(String::new(), |x| x.0.clone());
     g.set_screens(model(info.screens.iter().map(|(v, l, _)| SelectOption { value: s(v), label: s(l), icon: s(""), disabled: false }).collect()));
     g.set_general(SGeneral {
+        language: s(&st.general.language),
         autostart: st.general.autostart,
-        autostart_desc: s(if info.debug { "开发版本不会写入开机启动项" } else { "登录 Windows 后自动显示桌面日历" }),
+        autostart_desc: s(if info.debug { tr("开发版本不会写入开机启动项") } else { tr("登录 Windows 后自动显示桌面日历") }),
         pin_mode: s(&d.pin_mode),
         pin_hint: s(sp::pin_hint(&d.pin_mode)),
         locked: d.locked,
@@ -302,9 +311,9 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
     let dd = &info.data_dir;
     g.set_data(SData {
         samples: samples as i32,
-        samples_desc: s(&format!("第一次启动时生成的示例任务和示例项目，还剩 {samples} 项。改过名称的不算示例，会保留")),
-        backups_desc: s(&format!("每天自动备份一次，保留最近 14 天。共 {} 个备份", local.backups.len())),
-        dir_desc: s(&format!("{}{}", dd.path, if dd.custom { "（自定义，可放在同步盘多机共用）" } else { "" })),
+        samples_desc: s(&trf("第一次启动时生成的示例任务和示例项目，还剩 {0} 项。改过名称的不算示例，会保留", &[format!("{}", samples)])),
+        backups_desc: s(&trf("每天自动备份一次，保留最近 14 天。共 {0} 个备份", &[format!("{}", local.backups.len())])),
+        dir_desc: s(&format!("{}{}", dd.path, if dd.custom { tr("（自定义，可放在同步盘多机共用）") } else { "" })),
         custom: dd.custom,
         missing: s(dd.missing.as_deref().unwrap_or("")),
     });
@@ -340,7 +349,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         path: s(&git.path),
         secret_key: s(key),
         secret_saved: saved,
-        secret_hint: s(if saved { "已保存（输入新值可替换）" } else { "" }),
+        secret_hint: s(if saved { tr("已保存（输入新值可替换）") } else { "" }),
         interval: s(&sy.interval.to_string()),
         proxy: s(&sy.proxy),
         proxy_mode: s(sp::proxy_mode(&sy.proxy)),
@@ -360,7 +369,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         .addresses
         .iter()
         .map(|(ip, label, virt, url)| {
-            let note = format!("{label}{}", if *virt { "（虚拟网卡，手机一般连不上）" } else { "" });
+            let note = format!("{label}{}", if *virt { tr("（虚拟网卡，手机一般连不上）") } else { "" });
             SAddress { ip: s(ip), text: s(&format!("http://{ip}:{}", wv.port)), note: s(&note), url: s(url) }
         })
         .collect();
@@ -373,7 +382,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         .iter()
         .map(|gr| {
             let n = doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(gr.id.as_str())).count();
-            SGroup { id: s(&gr.id), name: s(&gr.name), color: s(&gr.color), desc: s(&format!("{n} 个任务")) }
+            SGroup { id: s(&gr.id), name: s(&gr.name), color: s(&gr.color), desc: s(&trf("{0} 个任务", &[format!("{}", n)])) }
         })
         .collect();
     update(g.get_groups(), groups, |m| g.set_groups(m));

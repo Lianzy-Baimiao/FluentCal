@@ -2,6 +2,8 @@
 //! `toLocaleString('zh-CN')` formats them, patches from a setting's path (useSetting), the
 //! presets (presets.ts), the reminder editor's list (ReminderEditor.vue) and the like.
 
+use crate::i18n::{tr, trf};
+
 use crate::date::{local_of_ms, parts, weekday, WEEKDAY_SHORT};
 use crate::reminders::{offset_label, REMINDER_OFFSETS};
 use crate::settings::Settings;
@@ -19,7 +21,7 @@ pub fn zh_datetime(ms: i64, offset_min: i32) -> String {
 pub fn zh_reminder_time(ms: i64, offset_min: i32) -> String {
     let (day, minute) = local_of_ms(ms, offset_min);
     let (_, m, d) = parts(&day);
-    format!("{m}/{d}周{} {:02}:{:02}", WEEKDAY_SHORT[weekday(&day) as usize], minute / 60, minute % 60)
+    trf("{0}/{1}周{2} {3}:{4}", &[format!("{}", m), format!("{}", d), format!("{}", crate::i18n::tr(WEEKDAY_SHORT[weekday(&day) as usize])), format!("{:02}", minute / 60), format!("{:02}", minute % 60)])
 }
 
 /// "12 KB" (at least 1).
@@ -99,7 +101,7 @@ pub fn rest_days(days: &[u32], day: u32, on: bool) -> Vec<u32> {
 
 /// ReminderEditor's options (allDay = false): the standard offsets and any other in the list.
 pub fn offset_options(list: &[i64]) -> Vec<(i64, String)> {
-    let mut out: Vec<(i64, String)> = REMINDER_OFFSETS.iter().map(|(v, l)| (*v, (*l).to_owned())).collect();
+    let mut out: Vec<(i64, String)> = REMINDER_OFFSETS.iter().map(|(v, l)| (*v, tr(l).to_owned())).collect();
     for v in list {
         if !out.iter().any(|(o, _)| o == v) {
             out.push((*v, offset_label(*v)));
@@ -155,30 +157,30 @@ pub fn proxy_for_mode(mode: &str) -> &'static str {
 /// GeneralPage pinHint.
 pub fn pin_hint(mode: &str) -> &'static str {
     match mode {
-        "desktop" => "钉在桌面上：在所有窗口之下，按 Win+D 显示桌面时仍可见，不占任务栏。",
-        "top" => "始终显示在其他窗口之上（会挡住其他程序）。",
-        "normal" => "和普通程序一样，可出现在任务栏和 Alt+Tab 中。",
+        "desktop" => tr("钉在桌面上：在所有窗口之下，按 Win+D 显示桌面时仍可见，不占任务栏。"),
+        "top" => tr("始终显示在其他窗口之上（会挡住其他程序）。"),
+        "normal" => tr("和普通程序一样，可出现在任务栏和 Alt+Tab 中。"),
         _ => "",
     }
 }
 
 /// GeneralPage: the holiday card's description.
 pub fn holiday_desc(last_check: i64, years: &[String], offset_min: i32) -> String {
-    let last = if last_check > 0 { zh_datetime(last_check, offset_min) } else { "从未".to_owned() };
+    let last = if last_check > 0 { zh_datetime(last_check, offset_min) } else { tr("从未").to_owned() };
     let mut y = years.to_vec();
     y.sort();
-    let years = if y.is_empty() { "无（使用内置数据）".to_owned() } else { y.join("、") };
-    format!("联网获取国务院公布的放假和调休安排。上次检查：{last}；在线数据：{years}")
+    let years = if y.is_empty() { tr("无（使用内置数据）").to_owned() } else { y.join("、") };
+    trf("联网获取国务院公布的放假和调休安排。上次检查：{0}；在线数据：{1}", &[format!("{}", last), format!("{}", years)])
 }
 
 /// GeneralPage checkHolidays: the message after an update round.
 pub fn holiday_result(updated: &[i32], failed: bool) -> String {
     if failed {
-        "无法连接节假日数据源，请检查网络。".into()
+        tr("无法连接节假日数据源，请检查网络。").into()
     } else if updated.is_empty() {
-        "已是最新，暂无新的放假安排。".into()
+        tr("已是最新，暂无新的放假安排。").into()
     } else {
         let y: Vec<String> = updated.iter().map(i32::to_string).collect();
-        format!("已更新 {} 年放假安排。", y.join("、"))
+        trf("已更新 {0} 年放假安排。", &[format!("{}", y.join("、"))])
     }
 }

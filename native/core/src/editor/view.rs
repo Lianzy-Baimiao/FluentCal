@@ -1,9 +1,11 @@
 //! What the editor window shows besides the fields themselves: hints, the repeat summary,
 //! the choices of the selects (EditorApp, RepeatEditor, ReminderEditor, DepsEditor).
 
+use crate::i18n::{tr, trf};
+
 use super::Editor;
 use crate::date::{days_in_month, diff_days, format_range, parts, weekday, WEEKDAY_SHORT};
-use crate::lunar::day_info;
+use crate::lunar::display_info as day_info;
 use crate::model::Freq;
 use crate::recur::{describe_rule, task_end};
 use crate::reminders::{offset_label, REMINDER_OFFSETS};
@@ -67,9 +69,9 @@ impl Editor {
         let Some(t) = &self.draft else { return Vec::new() };
         let all_day = t.time.is_none();
         let at = &doc.settings.reminders.all_day_time;
-        let base: Vec<(i64, String)> = REMINDER_OFFSETS.iter().filter(|(v, _)| !all_day || *v == 0 || *v >= 1440).map(|(v, l)| (*v, (*l).to_owned())).collect();
+        let base: Vec<(i64, String)> = REMINDER_OFFSETS.iter().filter(|(v, _)| !all_day || *v == 0 || *v >= 1440).map(|(v, l)| (*v, tr(l).to_owned())).collect();
         let extra: Vec<(i64, String)> = t.reminders.iter().flatten().filter(|v| !base.iter().any(|(b, _)| b == *v)).map(|v| (*v, offset_label(*v))).collect();
-        base.into_iter().chain(extra).map(|(v, l)| (v, if all_day && v == 0 { format!("当天 {at}") } else { l })).collect()
+        base.into_iter().chain(extra).map(|(v, l)| (v, if all_day && v == 0 { trf("当天 {0}", &[format!("{}", at)]) } else { l })).collect()
     }
 
     /// DepsEditor options: tasks that may become a predecessor (not repeating, not already
@@ -103,15 +105,15 @@ impl Editor {
         let (y, m, d) = parts(&t.start);
         let nth = d.div_ceil(7);
         let last = nth >= 5 || d + 7 > days_in_month(y, m);
-        let wd = WEEKDAY_SHORT[weekday(&t.start) as usize];
+        let wd = crate::i18n::tr(WEEKDAY_SHORT[weekday(&t.start) as usize]);
         let r = &doc.settings.reminders;
-        let mut groups = vec![opt("", "未分组")];
+        let mut groups = vec![opt("", tr("未分组"))];
         let mut gs: Vec<_> = doc.groups.values().collect();
         gs.sort_by(|a, b| a.order.partial_cmp(&b.order).unwrap_or(std::cmp::Ordering::Equal));
         groups.extend(gs.into_iter().map(|g| opt(g.id.clone(), g.name.clone())));
-        groups.push(opt("__new__", "新建分组…"));
+        groups.push(opt("__new__", tr("新建分组…")));
         View {
-            span: format!("{}农历{lunar}", if t.is_milestone() || n == 1 { String::new() } else { format!("共 {n} 天 · ") }),
+            span: trf("{0}农历{1}", &[format!("{}", if t.is_milestone() || n == 1 { String::new() } else { trf("共 {0} 天 · ", &[n.to_string()]) }), format!("{}", lunar)]),
             show_progress: rule.is_none(),
             show_postpone: rule.is_none() && t.start == t.end,
             postpone: t.auto_postpone.unwrap_or(doc.settings.tasks.auto_postpone),
@@ -123,8 +125,8 @@ impl Editor {
             monthly: freq == Some(Freq::Monthly),
             month_mode: rule.and_then(|r| r.month_mode.clone()).unwrap_or_else(|| "day".into()),
             month_modes: vec![
-                opt("day", format!("每月 {d} 日")),
-                opt("nthWeekday", if last { format!("每月最后一个周{wd}") } else { format!("每月第 {nth} 个周{wd}") }),
+                opt("day", trf("每月 {0} 日", &[format!("{}", d)])),
+                opt("nthWeekday", if last { trf("每月最后一个周{0}", &[format!("{}", wd)]) } else { trf("每月第 {0} 个周{1}", &[format!("{}", nth), format!("{}", wd)]) }),
             ],
             has_end: rule.is_some() && freq != Some(Freq::Ebbinghaus),
             end_mode: self.end_mode(),
@@ -134,9 +136,9 @@ impl Editor {
             reminders: t.reminders.clone().unwrap_or_default(),
             reminder_options: self.reminder_options(doc).into_iter().map(|(v, l)| opt(v.to_string(), l)).collect(),
             reminder_hint: if !r.enabled {
-                "提醒已在设置中关闭".into()
+                tr("提醒已在设置中关闭").into()
             } else if t.time.is_none() && t.reminders.as_ref().is_some_and(|l| !l.is_empty()) {
-                format!("全天任务在 {} 提醒", r.all_day_time)
+                trf("全天任务在 {0} 提醒", &[format!("{}", r.all_day_time)])
             } else {
                 String::new()
             },

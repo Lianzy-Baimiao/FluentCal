@@ -1,6 +1,8 @@
 //! The Gantt view's keys, the table splitter, cancelling a drag, and connecting the view's
 //! callbacks to the app.
 
+use fluentcal_core::i18n::{tr};
+
 use crate::app::{run, App};
 use crate::{DeskWindow, GanttData};
 use serde_json::json;
@@ -30,7 +32,7 @@ impl App {
         if is(text, Key::Delete) {
             if t.repeat.is_some() {
                 // 0.2 asks first: the row is the whole series.
-                self.notify("删除重复任务的确认对话框还在移植中", false);
+                self.notify(tr("删除重复任务的确认对话框还在移植中"), false);
             } else {
                 self.desk_remove_task(&t, None);
             }

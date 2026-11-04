@@ -1,6 +1,8 @@
 //! Saving, deleting, closing and switching tasks, with 0.2's questions on the way
 //! (EditorApp save / remove / cancel / takePending / createGroup).
 
+use crate::i18n::{tr, trf};
+
 use super::{Editor, Payload};
 use crate::tasks::{delete_occurrence, delete_task, make_group, merge_edit, save_group, save_task, DeleteMode, Doc, Edit};
 
@@ -29,10 +31,10 @@ impl Ask {
     /// Title, text, primary, secondary and close button labels, and whether it is dangerous.
     pub fn texts(&self) -> (String, String, &'static str, &'static str, &'static str, bool) {
         match self {
-            Ask::Discard => ("放弃未保存的修改？".into(), String::new(), "放弃", "", "继续编辑", false),
-            Ask::Recreate => ("任务已在其他窗口删除".into(), "要用当前内容重新创建它吗？".into(), "重新创建", "", "放弃", false),
-            Ask::DeleteRepeat { title } => ("删除重复任务".into(), format!("“{title}”是重复任务，要删除哪些？"), "全部删除", "仅这一次", "取消", true),
-            Ask::Delete { title } => ("删除任务？".into(), format!("“{title}”将被永久删除。"), "删除", "", "取消", true),
+            Ask::Discard => (tr("放弃未保存的修改？").into(), String::new(), tr("放弃"), "", tr("继续编辑"), false),
+            Ask::Recreate => (tr("任务已在其他窗口删除").into(), tr("要用当前内容重新创建它吗？").into(), tr("重新创建"), "", tr("放弃"), false),
+            Ask::DeleteRepeat { title } => (tr("删除重复任务").into(), trf("“{0}”是重复任务，要删除哪些？", &[format!("{}", title)]), tr("全部删除"), tr("仅这一次"), tr("取消"), true),
+            Ask::Delete { title } => (tr("删除任务？").into(), trf("“{0}”将被永久删除。", &[format!("{}", title)]), tr("删除"), "", tr("取消"), true),
         }
     }
 }

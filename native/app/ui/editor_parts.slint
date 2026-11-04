@@ -35,7 +35,8 @@ export component Row inherits Rectangle {
         cross-axis-alignment: center;
         Text {
             width: 72px;
-            height: 20px;
+            min-height: 20px;
+            wrap: word-wrap;
             text: root.label;
             color: Theme.c.text-secondary;
             vertical-alignment: center;
@@ -71,7 +72,8 @@ export component TopRow inherits Rectangle {
             padding-top: 6px;
             alignment: start;
             Text {
-                height: 20px;
+                min-height: 20px;
+                wrap: word-wrap;
                 text: root.label;
                 color: Theme.c.text-secondary;
                 vertical-alignment: center;
@@ -103,7 +105,7 @@ export component DayButton inherits Rectangle {
     border-color: on ? Theme.c.accent-fill : Theme.c.control-stroke;
     background: on ? Theme.c.accent-fill : ta.has-hover ? Theme.c.control-fill-hover : Theme.c.control-fill;
     accessible-role: button;
-    accessible-label: "周" + label;
+    accessible-label: @tr("周{0}", label);
     accessible-checked: on;
     accessible-action-default => { toggled(); }
     Text {
@@ -153,7 +155,7 @@ export component DepTagView inherits Rectangle {
             border-radius: 10px;
             background: xa.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
-            accessible-label: "移除 " + root.title;
+            accessible-label: @tr("移除 ") + root.title;
             accessible-action-default => { root.remove(); }
             Icon { glyph: Glyph.close; size: 9px; color: Theme.c.text-secondary; }
             xa := TouchArea { clicked => { root.remove(); } }

@@ -1,6 +1,8 @@
 //! Passwords and tokens for cloud sync live in Windows Credential Manager (per user, protected
 //! by DPAPI), never in data.json, backups, exports or error messages.
 
+use crate::i18n::{tr, trf};
+
 use windows::core::{HSTRING, PWSTR};
 use windows::Win32::Security::Credentials::{
     CredDeleteW, CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
@@ -27,7 +29,7 @@ fn target(key: &str) -> HSTRING {
 
 pub fn set(key: &str, value: &str) -> Result<(), String> {
     if value.len() > 2048 {
-        return Err("内容太长".into());
+        return Err(tr("内容太长").into());
     }
     let target = target(key);
     let mut blob = value.as_bytes().to_vec();
@@ -39,7 +41,7 @@ pub fn set(key: &str, value: &str) -> Result<(), String> {
         Persist: CRED_PERSIST_LOCAL_MACHINE,
         ..Default::default()
     };
-    unsafe { CredWriteW(&cred, 0) }.map_err(|e| format!("无法写入 Windows 凭据管理器：{}", e.message()))
+    unsafe { CredWriteW(&cred, 0) }.map_err(|e| trf("无法写入 Windows 凭据管理器：{0}", &[format!("{}", e.message())]))
 }
 
 pub fn get(key: &str) -> Option<String> {

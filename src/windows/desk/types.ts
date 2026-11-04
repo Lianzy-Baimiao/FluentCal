@@ -6,7 +6,7 @@ export interface CellInfo {
   label: string;
   lunar: string;
   lunarKind: 'lunar' | 'month' | 'term' | 'festival';
-  badge?: '休' | '班';
+  badge?: string;
   rest: boolean;
   today: boolean;
   dim: boolean;

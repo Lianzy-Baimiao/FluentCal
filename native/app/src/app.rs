@@ -167,6 +167,9 @@ impl App {
     }
 
     pub fn settings_changed(&mut self, old: &Settings) {
+        if old.general.language != self.doc.settings.general.language {
+            self.refresh_language();
+        }
         crate::shell::apply_settings(self, old);
         self.editor_refresh();
         self.settings_refresh();

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { confirm, FButton, FSegmented, showMenu, type MenuItem } from '@/fluent';
 import type { Task } from '@/types';
@@ -24,39 +25,39 @@ const label = ref('');
 let center = '';
 const updateLabel = () => {
   const [y, m] = parts(centerDate(0.3));
-  label.value = `${y}年${m}月`;
+  label.value = tr("{0}年{1}月", y, m);
   center = centerDate(0.5);
 };
 
 const scale = computed({ get: () => gs.value.scale, set: (v: string) => patchSettings({ gantt: { scale: v as 'day' } }) });
 const scales = [
-  { value: 'day', label: '日' },
-  { value: 'week', label: '周' },
-  { value: 'month', label: '月' },
+  { value: 'day', label: tr("按日") },
+  { value: 'week', label: tr("周") },
+  { value: 'month', label: tr("月") },
 ];
 
 function optionsMenu(e: MouseEvent) {
   const g = gs.value;
   const flip = (k: 'showTable' | 'showDeps' | 'hideDone' | 'hideSingleDay') => () => patchSettings({ gantt: { [k]: !g[k] } });
   const items: MenuItem[] = [
-    { label: '显示任务表', checked: g.showTable, action: flip('showTable') },
-    { label: '显示依赖连线', checked: g.showDeps, action: flip('showDeps') },
-    { label: '隐藏已完成任务', checked: g.hideDone, action: flip('hideDone') },
-    { label: '隐藏未分组的单日任务', checked: g.hideSingleDay, action: flip('hideSingleDay') },
+    { label: tr("显示任务表"), checked: g.showTable, action: flip('showTable') },
+    { label: tr("显示依赖连线"), checked: g.showDeps, action: flip('showDeps') },
+    { label: tr("隐藏已完成任务"), checked: g.hideDone, action: flip('hideDone') },
+    { label: tr("隐藏未分组的单日任务"), checked: g.hideSingleDay, action: flip('hideSingleDay') },
     { separator: true },
     {
-      label: '导出图片',
+      label: tr("导出图片"),
       icon: 'download',
       children: [
-        { label: 'PNG 图片…', action: () => void saveImage('png') },
-        { label: 'SVG 矢量图…', action: () => void saveImage('svg') },
+        { label: tr("PNG 图片…"), action: () => void saveImage('png') },
+        { label: tr("SVG 矢量图…"), action: () => void saveImage('svg') },
       ],
     },
     {
-      label: '只显示分组',
+      label: tr("只显示分组"),
       icon: 'filter',
       children: [
-        { label: '全部分组', radio: true, checked: !g.groupFilter.length, action: () => patchSettings({ gantt: { groupFilter: [] } }) },
+        { label: tr("全部分组"), radio: true, checked: !g.groupFilter.length, action: () => patchSettings({ gantt: { groupFilter: [] } }) },
         ...groupList.value.map((x) => ({ label: x.name, radio: true, checked: g.groupFilter.length === 1 && g.groupFilter[0] === x.id, action: () => patchSettings({ gantt: { groupFilter: [x.id] } }) })),
       ],
     },
@@ -67,9 +68,9 @@ function optionsMenu(e: MouseEvent) {
 async function saveImage(kind: 'png' | 'svg') {
   try {
     const path = await exportGantt(kind);
-    if (path) notify(`已导出到 ${path}`);
+    if (path) notify(tr("已导出到 {0}", path));
   } catch (e) {
-    notify(`导出失败：${e}`);
+    notify(tr("导出失败：{0}", e));
   }
 }
 
@@ -98,7 +99,7 @@ watch(() => ui.ganttFocus, (id) => id && (focusTask(id), (ui.ganttFocus = '')));
 async function removeRow(t: Task) {
   if (storeState.readOnly) return;
   if (t.repeat) {
-    const r = await confirm({ title: '删除整个重复任务？', content: `“${t.title}”的所有重复都会被删除（可以用 Ctrl+Z 撤销）。`, primaryText: '全部删除', danger: true });
+    const r = await confirm({ title: tr("删除整个重复任务？"), content: tr("“{0}”的所有重复都会被删除（可以用 Ctrl+Z 撤销）。", t.title), primaryText: tr("全部删除"), danger: true });
     if (r !== 'primary') return;
   }
   await removeTask(t);
@@ -149,16 +150,16 @@ onBeforeUnmount(() => {
     <div class="g-toolbar">
       <span class="g-label">{{ label }}</span>
       <FSegmented v-model="scale" :options="scales" size="small" />
-      <FButton variant="subtle" size="small" icon="today" @click="scrollToDate(now, 0.3, true)">今天</FButton>
+      <FButton variant="subtle" size="small" icon="today" @click="scrollToDate(now, 0.3, true)">{{ tr("今天") }}</FButton>
       <span class="spacer" />
-      <FButton v-if="!storeState.readOnly" variant="subtle" size="small" icon="add" @click="newGroup">新建分组</FButton>
-      <FButton variant="subtle" size="icon" icon="filter" title="显示选项" @click="optionsMenu" />
+      <FButton v-if="!storeState.readOnly" variant="subtle" size="small" icon="add" @click="newGroup">{{ tr("新建分组") }}</FButton>
+      <FButton variant="subtle" size="icon" icon="filter" :title="tr('显示选项')" @click="optionsMenu" />
     </div>
-    <div ref="el" class="g-scroll" tabindex="0" aria-label="甘特图" @scroll.passive="updateLabel" @keydown="onKey">
+    <div ref="el" class="g-scroll" tabindex="0" :aria-label="tr('甘特图')" @scroll.passive="updateLabel" @keydown="onKey">
       <div class="g-canvas" :style="{ width: `${tableW + chartW}px`, height: `${HEAD + bodyH}px` }">
         <div class="g-head" :style="{ height: `${HEAD}px` }">
           <div class="g-corner" :style="{ width: `${tableW}px` }">
-            <span>任务</span>
+            <span>{{ tr("任务") }}</span>
           </div>
           <div class="g-tiers" :style="{ width: `${chartW}px` }">
             <div class="tier top">
@@ -185,8 +186,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div v-if="!rows.length" class="g-empty">
-        <p>还没有可显示的任务。</p>
-        <FButton v-if="!storeState.readOnly" variant="accent" icon="add" @click="newGroup">新建分组</FButton>
+        <p>{{ tr("还没有可显示的任务。") }}</p>
+        <FButton v-if="!storeState.readOnly" variant="accent" icon="add" @click="newGroup">{{ tr("新建分组") }}</FButton>
       </div>
     </div>
     <div v-if="dragTip.show" class="g-dragtip" :style="{ left: `${dragTip.x}px`, top: `${dragTip.y}px` }">{{ dragTip.text }}</div>

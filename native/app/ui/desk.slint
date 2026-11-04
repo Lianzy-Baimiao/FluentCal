@@ -213,12 +213,12 @@ component DayCell inherits Rectangle {
         width: b.preferred-width + 4px;
         height: 14px * fs;
         border-radius: 3px;
-        background: cell.badge == "休" ? Theme.desk.holiday-text.transparentize(0.86) : Theme.c.subtle-fill-hover;
+        background: cell.badge == @tr("休") ? Theme.desk.holiday-text.transparentize(0.86) : Theme.c.subtle-fill-hover;
         b := Text {
             text: cell.badge;
             font-size: 10px * fs;
             font-weight: 600;
-            color: cell.badge == "休" ? Theme.desk.holiday-text : Theme.c.text-secondary;
+            color: cell.badge == @tr("休") ? Theme.desk.holiday-text : Theme.c.text-secondary;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -310,7 +310,7 @@ component WeekRow inherits Rectangle {
         border-radius: 4px;
         background: mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
         accessible-role: button;
-        accessible-label: "还有 \{n} 项";
+        accessible-label: @tr("还有 {0} 项" , n);
         GText {
             x: 4px;
             width: parent.width - 8px;
@@ -362,7 +362,7 @@ component WeekRow inherits Rectangle {
                 x: 7px;
                 width: parent.width - 14px;
                 height: parent.height;
-                text: "添加任务，回车保存";
+                text: @tr("添加任务，回车保存");
                 font-size: 12px * fs;
                 color: Theme.c.text-tertiary;
                 vertical-alignment: center;
@@ -380,7 +380,7 @@ component WeekRow inherits Rectangle {
                 selection-foreground-color: Theme.c.text-on-accent;
                 vertical-alignment: center;
                 single-line: true;
-                accessible-label: "快速添加任务";
+                accessible-label: @tr("快速添加任务");
                 init => {
                     // An inactive desktop window cannot give the input has-focus yet.
                     // Request native activation before waiting for focus changes.
@@ -460,7 +460,7 @@ component MonthView inherits TouchArea {
         y: 0;
         width: 18px;
         height: wd-h;
-        text: "周";
+        text: @tr("周");
         font-size: 10px * fs;
         color: Theme.c.text-tertiary;
         horizontal-alignment: center;
@@ -583,7 +583,7 @@ component TitleBar inherits Rectangle {
                     enabled: title-btn.is-button;
                     changed has-hover => {
                         if self.has-hover && title-btn.is-button {
-                            title-btn.tip-token = Tip.enter("选择年月", title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height, false);
+                            title-btn.tip-token = Tip.enter(@tr("选择年月"), title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height, false);
                         } else {
                             Tip.leave(title-btn.tip-token);
                         }
@@ -596,7 +596,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.chevron-left;
-                accessible-label: root.view == "weeks" ? "上一周" : "上个月";
+                accessible-label: root.view == "weeks" ? @tr("上一周") : @tr("上个月");
                 tip: self.accessible-label;
                 tip-bottom: true;
                 clicked => { root.page(-1); }
@@ -605,7 +605,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.chevron-right;
-                accessible-label: root.view == "weeks" ? "下一周" : "下个月";
+                accessible-label: root.view == "weeks" ? @tr("下一周") : @tr("下个月");
                 tip: self.accessible-label;
                 tip-bottom: true;
                 clicked => { root.page(1); }
@@ -613,7 +613,7 @@ component TitleBar inherits Rectangle {
             if root.view != "gantt" && wide: Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.small;
-                text: "今天";
+                text: @tr("今天");
                 tip: root.today-tip;
                 clicked => { root.go-today(); }
             }
@@ -628,9 +628,9 @@ component TitleBar inherits Rectangle {
                 small: true;
                 value: root.view;
                 options: [
-                    { value: "month", label: "月", title: "月视图" },
-                    { value: "weeks", label: "多周", title: "多周视图（滚动显示最近几周）" },
-                    { value: "gantt", label: "甘特", title: "甘特图" },
+                    { value: "month", label: @tr("月"), title: @tr("月视图") },
+                    { value: "weeks", label: @tr("多周"), title: @tr("多周视图（滚动显示最近几周）") },
+                    { value: "gantt", label: @tr("甘特"), title: @tr("甘特图") },
                 ];
                 selected(v) => { root.set-view(v); }
             }
@@ -639,7 +639,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.search;
-                accessible-label: "搜索 (Ctrl+F)";
+                accessible-label: @tr("搜索 (Ctrl+F)");
                 tip: self.accessible-label;
                 tip-bottom: true;
                 clicked => { root.search(); }
@@ -677,7 +677,7 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: root.locked ? Glyph.lock : Glyph.unlock;
                 color-override: root.locked ? transparent : Theme.c.accent-text;
-                accessible-label: root.locked ? "解锁以调整位置和大小" : "完成调整并锁定";
+                accessible-label: root.locked ? @tr("解锁以调整位置和大小") : @tr("完成调整并锁定");
                 tip: self.accessible-label;
                 tip-bottom: true;
                 clicked => { root.toggle-lock(); }
@@ -686,8 +686,8 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.settings;
-                accessible-label: "设置";
-                tip: "设置";
+                accessible-label: @tr("设置");
+                tip: @tr("设置");
                 tip-bottom: true;
                 clicked => { root.settings(); }
             }
@@ -695,8 +695,8 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.more;
-                accessible-label: "更多";
-                tip: "更多";
+                accessible-label: @tr("更多");
+                tip: @tr("更多");
                 tip-bottom: true;
                 clicked => { root.more-menu(more-btn.absolute-position.x, more-btn.absolute-position.y, more-btn.width, more-btn.height); }
             }
@@ -712,7 +712,7 @@ component CountdownBar inherits Rectangle {
     height: 22px * fs;
     clip: true;
     accessible-role: groupbox;
-    accessible-label: "倒数日";
+    accessible-label: @tr("倒数日");
     HorizontalLayout {
         spacing: 4px;
         alignment: start;
@@ -724,7 +724,7 @@ component CountdownBar inherits Rectangle {
             horizontal-stretch: 0;
             min-width: self.preferred-width;
             accessible-role: button;
-            accessible-label: c.days == 0 ? "\{c.label} 就是今天" : "距\{c.label}还有 \{c.days} 天";
+            accessible-label: c.days == 0 ? @tr("{0} 就是今天" , c.label) : @tr("距{0}还有 {1} 天" , c.label, c.days);
             HorizontalLayout {
                 padding-left: 8px;
                 padding-right: 8px;
@@ -735,22 +735,11 @@ component CountdownBar inherits Rectangle {
                     size: 11px;
                     color: pill.fg;
                 }
-                if c.days != 0: GText { text: "距"; font-size: 12px * fs; color: pill.fg; }
-                // <b> with margin: 0 2px
-                HorizontalLayout {
-                    padding-left: 2px;
-                    padding-right: 2px;
-                    GText {
-                        text: c.label;
-                        font-size: 12px * fs;
-                        font-weight: 600;
-                        color: Theme.c.text-primary;
-                    }
+                GText {
+                    text: c.days == 0 ? @tr("{0} 就是今天", c.label) : @tr("距{0}还有 {1} 天", c.label, c.days);
+                    font-size: 12px * fs;
+                    color: pill.fg;
                 }
-                if c.days == 0: GText { text: "就是今天"; font-size: 12px * fs; color: pill.fg; }
-                if c.days != 0: GText { text: "还有"; font-size: 12px * fs; color: pill.fg; }
-                if c.days != 0: GText { text: c.days; font-size: 12px * fs; font-weight: 700; color: Theme.c.accent-text; }
-                if c.days != 0: GText { text: "天"; font-size: 12px * fs; color: pill.fg; }
             }
             property <int> tip-token: -1;
             pfs := FocusScope {
@@ -927,7 +916,7 @@ export component DeskWindow inherits Window {
     // A confirmation (0.2's confirm()): "primary" / "close".
     in property <string> confirm-title;
     in property <string> confirm-text;
-    in property <string> confirm-primary: "确定";
+    in property <string> confirm-primary: @tr("确定");
     in property <bool> confirm-danger;
     callback confirm-result(string);
     public function open-confirm() { confirm.open(); }
@@ -1006,16 +995,16 @@ export component DeskWindow inherits Window {
                 }
                 if !root.locked: InfoBar {
                     severity: Severity.info;
-                    title: "调整模式";
-                    text: "按住日历任意位置拖动来移动（可拖到其他屏幕），拖动四边或四角调整大小。";
-                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: "完成"; clicked => { root.lock(); } }
+                    title: @tr("调整模式");
+                    text: @tr("按住日历任意位置拖动来移动（可拖到其他屏幕），拖动四边或四角调整大小。");
+                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: @tr("完成"); clicked => { root.lock(); } }
                 }
                 if root.welcome && root.locked: InfoBar {
                     severity: Severity.info;
-                    title: "欢迎使用 FluentCal";
-                    text: "双击日期添加任务，右键任务可完成、改颜色、删除；Ctrl+Alt+D 唤出日历。现在显示的是示例任务。";
-                    Button { size: ButtonSize.small; text: "清除示例数据"; clicked => { root.clear-samples(); } }
-                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: "知道了"; clicked => { root.onboarded(); } }
+                    title: @tr("欢迎使用 FluentCal");
+                    text: @tr("双击日期添加任务，右键任务可完成、改颜色、删除；Ctrl+Alt+D 唤出日历。现在显示的是示例任务。");
+                    Button { size: ButtonSize.small; text: @tr("清除示例数据"); clicked => { root.clear-samples(); } }
+                    Button { size: ButtonSize.small; variant: ButtonVariant.accent; text: @tr("知道了"); clicked => { root.onboarded(); } }
                 }
                 if root.notice != "": InfoBar {
                     severity: Severity.warning;
@@ -1025,8 +1014,8 @@ export component DeskWindow inherits Window {
                 }
                 if root.save-error != "": InfoBar {
                     severity: Severity.error;
-                    title: "无法保存";
-                    text: "数据暂存在内存中，正在重试。请检查磁盘空间或是否有程序占用数据文件。（" + root.save-error + "）";
+                    title: @tr("无法保存");
+                    text: @tr("数据暂存在内存中，正在重试。请检查磁盘空间或是否有程序占用数据文件。（") + root.save-error + "）";
                 }
                 body := Rectangle {
                 vertical-stretch: 1;
@@ -1159,14 +1148,14 @@ export component DeskWindow inherits Window {
                     if toast.last-undo: Button {
                         size: ButtonSize.small;
                         variant: ButtonVariant.accent;
-                        text: "撤销";
+                        text: @tr("撤销");
                         clicked => { root.toast-undo-clicked(); }
                     }
                     Button {
                         size: ButtonSize.icon;
                         variant: ButtonVariant.subtle;
                         icon: Glyph.close;
-                        accessible-label: "关闭";
+                        accessible-label: @tr("关闭");
                         clicked => { root.toast-close(); }
                     }
                 }
@@ -1217,7 +1206,7 @@ export component DeskWindow inherits Window {
         }
         ym-fly := Flyout {
             panel-width: 248px;
-            label: "选择年月";
+            label: @tr("选择年月");
             YearMonthPanel {
                 year <=> root.ym-year;
                 cursor: root.ym-cursor;

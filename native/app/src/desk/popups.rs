@@ -3,6 +3,8 @@
 //! the search panel, confirmations and the info bars. All are drawn by the window
 //! (ui/desk.slint); the view models are in overlays.rs.
 
+use fluentcal_core::i18n::{trf};
+
 use super::menus::Target;
 use super::overlays;
 use crate::app::{run, App};
@@ -279,7 +281,7 @@ impl App {
         let (edit, n) = tasks::clear_sample_data(&self.doc, now_ms());
         self.apply(edit, true);
         self.patch_settings(json!({ "general": { "onboarded": true } }));
-        self.notify(&format!("已删除 {n} 个示例任务"), true);
+        self.notify(&trf("已删除 {0} 个示例任务", &[format!("{}", n)]), true);
     }
 
     /// Shows a save dialog on the next turn (it is modal: the app must not be borrowed), then
@@ -292,8 +294,8 @@ impl App {
             let Some(path) = crate::platform::dialog::save_file(owner, &name, &filter, &exts) else { return };
             let res = data().and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string()));
             run(move |app| match res {
-                Ok(()) => app.notify(&format!("已导出到 {path}"), false),
-                Err(e) => app.notify(&format!("导出失败：{e}"), false),
+                Ok(()) => app.notify(&trf("已导出到 {0}", &[format!("{}", path)]), false),
+                Err(e) => app.notify(&trf("导出失败：{0}", &[format!("{}", e)]), false),
             });
         });
     }

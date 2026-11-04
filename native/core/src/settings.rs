@@ -18,6 +18,8 @@ macro_rules! section {
 }
 
 section!(General {
+    /// Local display language: system | zh-CN | zh-TW | en-US. Never synced.
+    language: String = "system".into(),
     autostart: bool = true,
     seeded: bool = false,
     /// The first-run welcome bar was dismissed (or the samples cleared).
@@ -189,7 +191,11 @@ impl Settings {
     /// Stored settings with the defaults filled in (merge_defaults).
     pub fn from_value(v: &Value) -> Settings {
         let defaults = serde_json::to_value(Settings::default()).unwrap_or(Value::Null);
-        serde_json::from_value(merge_defaults(&defaults, v)).unwrap_or_default()
+        let mut settings: Settings = serde_json::from_value(merge_defaults(&defaults, v)).unwrap_or_default();
+        if !crate::i18n::valid_preference(&settings.general.language) {
+            settings.general.language = "system".into();
+        }
+        settings
     }
 
     pub fn of_doc(doc: &Value) -> Settings {

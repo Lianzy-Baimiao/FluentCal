@@ -1,5 +1,7 @@
 //! Field edits (EditorApp's computed setters, RepeatEditor, ReminderEditor, DepsEditor).
 
+use crate::i18n::{tr};
+
 use super::Editor;
 use crate::date::{add_days, add_months, diff_days, weekday};
 use crate::model::{Freq, RepeatRule};
@@ -22,10 +24,10 @@ pub const FREQS: [(&str, &str); 10] = [
 /// The unit after "每 N" (RepeatEditor UNIT); "" = no interval for this frequency.
 pub fn unit_of(f: Option<Freq>) -> &'static str {
     match f {
-        Some(Freq::Daily) => "天",
-        Some(Freq::Weekly) => "周",
-        Some(Freq::Monthly) | Some(Freq::MonthLastDay) => "个月",
-        Some(Freq::Yearly) | Some(Freq::LunarYearly) => "年",
+        Some(Freq::Daily) => tr("天"),
+        Some(Freq::Weekly) => tr("周"),
+        Some(Freq::Monthly) | Some(Freq::MonthLastDay) => tr("个月"),
+        Some(Freq::Yearly) | Some(Freq::LunarYearly) => tr("年"),
         _ => "",
     }
 }

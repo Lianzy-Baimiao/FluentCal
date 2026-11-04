@@ -12,6 +12,7 @@ src-tauri/.cargo/config.toml
 
 # native/: same machine-specific toolchain paths as src-tauri
 native/.cargo/config.toml
+native/target/
 
 # native/: visual parity renderings (scripts/parity.mjs)
 native/.parity/

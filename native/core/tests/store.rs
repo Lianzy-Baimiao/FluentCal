@@ -132,10 +132,12 @@ fn external_edits_and_conflict_copies_are_merged() {
     let mut items = Map::new();
     items.insert("mine".into(), json!({"id": "mine", "title": "本机"}));
     s.put("tasks", &items);
-    s.patch_settings(&json!({"desk": {"pinMode": "top"}}));
+    s.patch_settings(&json!({"desk": {"pinMode": "top"}, "general": {"language": "en-US"}}));
     assert!(s.flush());
     let shared: Value = serde_json::from_str(&fs::read_to_string(dir.join("data.json")).unwrap()).unwrap();
     assert!(shared.get("settings").is_none(), "settings stay out of the shared file");
+    let local: Value = serde_json::from_str(&fs::read_to_string(dir.join("local-settings.json")).unwrap()).unwrap();
+    assert_eq!(local["general"]["language"], "en-US");
     assert!(!sync_once(&s), "our own write is not an external change");
 
     // Another PC adds a task (newer timestamp) and its sync tool leaves a conflict copy.
@@ -154,6 +156,7 @@ fn external_edits_and_conflict_copies_are_merged() {
     assert_eq!(d["tasks"]["fromcopy"]["title"], "冲突副本");
     assert_eq!(d["tasks"]["mine"]["title"], "本机");
     assert_eq!(d["settings"]["desk"]["pinMode"], "top", "local settings kept");
+    assert_eq!(d["settings"]["general"]["language"], "en-US", "local language kept");
     assert!(!dir.join("data-OTHERPC.json").exists(), "conflict copy renamed aside");
     drop(s);
     let _ = fs::remove_dir_all(&dir);

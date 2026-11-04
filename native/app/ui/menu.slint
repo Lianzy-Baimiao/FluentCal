@@ -658,7 +658,7 @@ export component ColorSwatches {
     preferred-width: cells * (size + 6px) - 6px;
     forward-focus: fs;
     accessible-role: radio-group;
-    accessible-label: "颜色";
+    accessible-label: @tr("颜色");
     FlexboxLayout {
         spacing: 6px;
         cross-axis-alignment: center;
@@ -666,7 +666,7 @@ export component ColorSwatches {
             size: root.size;
             none: true;
             selected: root.value == "";
-            label: "无";
+            label: @tr("无");
             picked => { root.picked(""); }
         }
         for c[i] in root.colors: SwatchCell {
@@ -688,7 +688,7 @@ export component ColorSwatches {
         if root.custom: add := SwatchCell {
             size: root.size;
             add: true;
-            label: "自定义颜色";
+            label: @tr("自定义颜色");
             picked => {
                 root.draft = root.custom-value != "" ? root.custom-value : "#0078D4";
                 fly.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height);
@@ -713,7 +713,7 @@ export component ColorSwatches {
     }
     fly := Flyout {
         panel-width: 232px;
-        label: "自定义颜色";
+        label: @tr("自定义颜色");
         HorizontalLayout {
             spacing: 12px;
             alignment: start;
@@ -743,7 +743,7 @@ export component ColorSwatches {
             Cell {
                 Button {
                     width: parent.width;
-                    text: "确定";
+                    text: @tr("确定");
                     variant: ButtonVariant.accent;
                     enabled: Fluent.normalize-hex(root.draft) != "";
                     clicked => {
@@ -755,7 +755,7 @@ export component ColorSwatches {
             Cell {
                 Button {
                     width: parent.width;
-                    text: "取消";
+                    text: @tr("取消");
                     clicked => { fly.close(); }
                 }
             }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 import FFlyout from './FFlyout.vue';
 import FIcon from './FIcon.vue';
@@ -18,7 +19,7 @@ const props = withDefaults(
     disabled?: boolean;
     label?: string;
   }>(),
-  { placeholder: '时间', step: 30, width: 120 },
+  { placeholder: tr("时间"), step: 30, width: 120 },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 const split = useSplitAttrs();
@@ -100,7 +101,7 @@ function key(e: KeyboardEvent) {
           type="button"
           class="clk-btn"
           :disabled="disabled"
-          aria-label="选择时间"
+          :aria-label="tr('选择时间')"
           :aria-expanded="open"
           @mousedown.prevent
           @click="open = !open"
@@ -109,7 +110,7 @@ function key(e: KeyboardEvent) {
         </button>
       </template>
     </FTextBox>
-    <FFlyout v-model:open="open" :anchor="root" width="anchor" :padding="false" :autofocus="false" label="时间" @opened="onOpened">
+    <FFlyout v-model:open="open" :anchor="root" width="anchor" :padding="false" :autofocus="false" :label="tr('时间')" @opened="onOpened">
       <div ref="list" class="f-times" role="listbox" @keydown="key">
         <button
           v-for="t in times"

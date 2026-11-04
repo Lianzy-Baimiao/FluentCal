@@ -1,6 +1,8 @@
 //! Dates as in 0.2's src/lib/date.ts: ISO strings `YYYY-MM-DD` (local time) in the data, and
 //! day numbers (days since 1970-01-01) for arithmetic, so adding days never drifts.
 
+use crate::i18n::{tr, trf};
+
 /// Days since 1970-01-01 (proleptic Gregorian; H. Hinnant's algorithm).
 pub fn days_from_civil(y: i32, m: u32, d: u32) -> i32 {
     let y = if m <= 2 { y - 1 } else { y };
@@ -128,18 +130,18 @@ pub const WEEKDAY_SHORT: [&str; 7] = ["日", "一", "二", "三", "四", "五", 
 
 pub fn format_md(iso: &str) -> String {
     let (_, m, d) = parts(iso);
-    format!("{m}月{d}日")
+    trf("{0}月{1}日", &[format!("{}", m), format!("{}", d)])
 }
 
 pub fn format_ymd(iso: &str) -> String {
     let (y, m, d) = parts(iso);
-    format!("{y}年{m}月{d}日")
+    trf("{0}年{1}月{2}日", &[format!("{}", y), format!("{}", m), format!("{}", d)])
 }
 
 /// "10月30日 周五", with the year when it differs from `now`'s.
 pub fn format_friendly(iso: &str, now: &str) -> String {
     let base = if parts(iso).0 == parts(now).0 { format_md(iso) } else { format_ymd(iso) };
-    format!("{base} 周{}", WEEKDAY_SHORT[weekday(iso) as usize])
+    trf("{0} 周{1}", &[format!("{}", base), format!("{}", crate::i18n::tr(WEEKDAY_SHORT[weekday(iso) as usize]))])
 }
 
 pub fn format_range(start: &str, end: &str, now: &str) -> String {
@@ -151,13 +153,13 @@ pub fn format_range(start: &str, end: &str, now: &str) -> String {
 
 pub fn relative_day(iso: &str, now: &str) -> String {
     match diff_days(now, iso) {
-        0 => "今天".into(),
-        1 => "明天".into(),
-        2 => "后天".into(),
-        -1 => "昨天".into(),
-        -2 => "前天".into(),
-        d if d > 0 => format!("{d} 天后"),
-        d => format!("{} 天前", -d),
+        0 => tr("今天").into(),
+        1 => tr("明天").into(),
+        2 => tr("后天").into(),
+        -1 => tr("昨天").into(),
+        -2 => tr("前天").into(),
+        d if d > 0 => trf("{0} 天后", &[format!("{}", d)]),
+        d => trf("{0} 天前", &[format!("{}", -d)]),
     }
 }
 

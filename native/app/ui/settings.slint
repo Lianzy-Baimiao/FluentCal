@@ -16,7 +16,7 @@ import { SyncPage } from "settings_sync.slint";
 import { WebPage, AboutPage } from "settings_web.slint";
 
 export component SettingsWindow inherits Window {
-    title: "FluentCal 设置";
+    title: @tr("FluentCal 设置");
     // Mica shows through a transparent window (Windows 11); else the solid background.
     in property <bool> mica;
     background: mica ? transparent : Theme.c.solid-base;
@@ -28,9 +28,9 @@ export component SettingsWindow inherits Window {
     min-height: 520px;
     in property <string> confirm-title;
     in property <string> confirm-content;
-    in property <string> confirm-primary: "确定";
+    in property <string> confirm-primary: @tr("确定");
     in property <string> confirm-secondary;
-    in property <string> confirm-close: "取消";
+    in property <string> confirm-close: @tr("取消");
     in property <bool> confirm-danger;
     // The AboutSlint badge follows the app's theme, not the system's.
     init => { Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light; }
@@ -48,19 +48,19 @@ export component SettingsWindow inherits Window {
         nav := NavView {
             width: 100%;
             height: 100%;
-            title: "设置";
+            title: @tr("设置");
             selected: SetState.page;
             items: [
-                { key: "general", label: "常规", icon: Glyph.settings },
-                { key: "appearance", label: "外观", icon: Glyph.palette },
-                { key: "calendar", label: "日历", icon: Glyph.calendar },
-                { key: "gantt", label: "甘特图", icon: "svg:gantt" },
-                { key: "reminders", label: "提醒", icon: Glyph.alarm },
-                { key: "data", label: "数据", icon: Glyph.data },
-                { key: "sync", label: "同步", icon: Glyph.cloud },
-                { key: "web", label: "网页查看", icon: Glyph.globe },
+                { key: "general", label: @tr("常规"), icon: Glyph.settings },
+                { key: "appearance", label: @tr("外观"), icon: Glyph.palette },
+                { key: "calendar", label: @tr("日历"), icon: Glyph.calendar },
+                { key: "gantt", label: @tr("甘特图"), icon: "svg:gantt" },
+                { key: "reminders", label: @tr("提醒"), icon: Glyph.alarm },
+                { key: "data", label: @tr("数据"), icon: Glyph.data },
+                { key: "sync", label: @tr("同步"), icon: Glyph.cloud },
+                { key: "web", label: @tr("网页查看"), icon: Glyph.globe },
             ];
-            footer-items: [{ key: "about", label: "关于", icon: Glyph.info }];
+            footer-items: [{ key: "about", label: @tr("关于"), icon: Glyph.info }];
             navigate(k) => { SetState.navigate(k); }
             if SetState.page == "general": GeneralPage { spacing: 4px; }
             if SetState.page == "appearance": AppearancePage { spacing: 4px; }

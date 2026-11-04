@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import { FIcon, taskColor } from '@/fluent';
 import type { Task } from '@/types';
@@ -47,7 +48,7 @@ function splitDown(e: PointerEvent) {
 </script>
 
 <template>
-  <div class="g-table" role="list" aria-label="任务列表" :style="{ width: `${tableW}px` }">
+  <div class="g-table" role="list" :aria-label="tr('任务列表')" :style="{ width: `${tableW}px` }">
     <template v-for="r in rows" :key="r.key">
       <div
         v-if="r.kind === 'group'"
@@ -60,7 +61,7 @@ function splitDown(e: PointerEvent) {
           type="button"
           class="chev"
           :aria-expanded="!collapsed(r.group.id, r.group.collapsed)"
-          :aria-label="`${collapsed(r.group.id, r.group.collapsed) ? '展开' : '折叠'}分组 ${r.group.name}`"
+          :aria-label="tr('{0}分组 {1}', collapsed(r.group.id, r.group.collapsed) ? tr('展开') : tr('折叠'), r.group.name)"
           @click.stop="toggleCollapse(r.group)"
         >
           <FIcon :name="collapsed(r.group.id, r.group.collapsed) ? 'chevronRight' : 'chevronDown'" :size="10" />
@@ -96,7 +97,7 @@ function splitDown(e: PointerEvent) {
           type="button"
           role="checkbox"
           :aria-checked="r.task.done"
-          :aria-label="`完成 ${r.task.title}`"
+          :aria-label="tr('完成 {0}', r.task.title)"
           :style="{ '--bar': taskColor(r.task.color, isDark).bar }"
           @click.stop="!storeState.readOnly && setOccurrenceDone(r.task, r.task.start, !r.task.done)"
           @dblclick.stop
@@ -117,13 +118,13 @@ function splitDown(e: PointerEvent) {
           @blur="commitRename"
         />
         <span v-else class="name" @dblclick.stop="startRename('task', r.task.id)">{{ r.task.title }}</span>
-        <span v-if="showDates" class="meta" :title="`${diffDays(r.task.start, r.task.end) + 1} 天`">{{ dates(r.task) }}</span>
+        <span v-if="showDates" class="meta" :title="tr('{0} 天', diffDays(r.task.start, r.task.end) + 1)">{{ dates(r.task) }}</span>
         <span v-if="showPct && !r.task.milestone && !r.task.repeat" class="pct">{{ r.task.done ? 100 : r.task.progress }}%</span>
       </div>
       <div v-else class="t-row add" role="listitem">
-        <button v-if="!storeState.readOnly" type="button" @click="addInGroup(r.groupId)"><FIcon name="add" :size="11" /> 添加任务</button>
+        <button v-if="!storeState.readOnly" type="button" @click="addInGroup(r.groupId)"><FIcon name="add" :size="11" />{{ tr("添加任务") }}</button>
       </div>
     </template>
-    <div class="g-split" aria-hidden="true" title="拖动调整宽度" @pointerdown.prevent="splitDown" />
+    <div class="g-split" aria-hidden="true" :title="tr('拖动调整宽度')" @pointerdown.prevent="splitDown" />
   </div>
 </template>

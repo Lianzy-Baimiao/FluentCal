@@ -1,6 +1,8 @@
 //! What the desk window's buttons, cells and chips do (0.2's desk/state.ts and the handlers
 //! of TitleBar, MonthView, WeekRow and TaskChip). Keyboard, wheel, drag: input.rs.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use super::vm::{self, shown_range};
 use crate::app::App;
 use fluentcal_core::date::{add_days, now_ms, start_of_month, start_of_week};
@@ -144,7 +146,7 @@ impl App {
         self.apply(edit, true);
         // Stays open for the next entry; tell when the new task went behind "+N".
         if let Some(n) = self.desk_overflow_on(&date).filter(|n| *n > 0) {
-            self.notify(&format!("已添加“{title}”（点 +{n} 查看）"), false);
+            self.notify(&trf("已添加“{0}”（点 +{1} 查看）", &[format!("{}", title), format!("{}", n)]), false);
         }
     }
 
@@ -169,7 +171,7 @@ impl App {
         self.apply(edit, true);
         let short: String = t.title.chars().take(16).collect();
         let name = if t.title.chars().count() > 16 { format!("{short}…") } else { short };
-        self.notify(&format!("已删除“{name}”"), true);
+        self.notify(&trf("已删除“{0}”", &[format!("{}", name)]), true);
     }
 
     // ------------------------------------------------------------- chips
@@ -188,14 +190,14 @@ impl App {
         self.history.boundary();
         let doc = &self.doc;
         let r = self.history.undo(|c, id| doc.raw(c, id));
-        self.replayed(r, "撤销", from_toast);
+        self.replayed(r, tr("撤销"), from_toast);
     }
 
     pub fn desk_redo(&mut self) {
         self.history.boundary();
         let doc = &self.doc;
         let r = self.history.redo(|c, id| doc.raw(c, id));
-        self.replayed(r, "重做", false);
+        self.replayed(r, tr("重做"), false);
     }
 
     fn replayed(&mut self, r: fluentcal_core::history::Replay, verb: &str, quiet: bool) {
@@ -204,11 +206,11 @@ impl App {
         if quiet {
             self.desk_close_toast();
         } else if !done {
-            self.notify(&format!("没有可{verb}的操作"), false);
+            self.notify(&trf("没有可{0}的操作", &[format!("{}", verb)]), false);
         } else if skipped > 0 {
-            self.notify(&format!("已{verb}（{skipped} 项已在其他窗口修改，保持不变）"), false);
+            self.notify(&trf("已{0}（{1} 项已在其他窗口修改，保持不变）", &[format!("{}", verb), format!("{}", skipped)]), false);
         } else {
-            self.notify(&format!("已{verb}"), false);
+            self.notify(&trf("已{0}", &[format!("{}", verb)]), false);
         }
     }
 }

@@ -20,6 +20,8 @@
   </Dependencies>
   <Resources>
     <Resource Language="zh-CN" />
+    <Resource Language="zh-TW" />
+    <Resource Language="en-US" />
   </Resources>
   <Applications>
     <Application Id="FluentCal" Executable="fluentcal.exe" EntryPoint="Windows.FullTrustApplication">

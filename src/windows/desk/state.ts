@@ -1,3 +1,4 @@
+import { t as tr } from '@/i18n';
 import { reactive } from 'vue';
 import type { ISODate } from '@/types';
 import { addDays, addMonths, parts, startOfMonth, startOfWeek } from '@/lib/date';
@@ -35,7 +36,7 @@ export async function openInBrowser(): Promise<void> {
   try {
     await call('open_url', { url: await call<string>('web_local_url') });
   } catch (e) {
-    notify(`无法在浏览器中查看：${String(e)}（端口在 设置 › 网页查看 中修改）`);
+    notify(tr("无法在浏览器中查看：{0}（端口在 设置 › 网页查看 中修改）", String(e)));
   }
 }
 
@@ -61,17 +62,17 @@ export function openSettings(page?: string): void {
 /** "2026年10月", the range of the weeks view, or "甘特图" (title bar and web view). */
 export function viewTitle(): string {
   const view = doc.settings.calendar.view;
-  if (view === 'gantt') return '甘特图';
+  if (view === 'gantt') return tr("甘特图");
   if (view === 'weeks') {
     const s = ui.weeksStart || defaultWeeksStart();
     const e = addDays(s, doc.settings.calendar.weeksRows * 7 - 1);
     const [sy, sm, sd] = parts(s);
     const [ey, em, ed] = parts(e);
-    const yr = sy === parts(now.value)[0] ? '' : `${sy}年`;
-    return sy === ey ? `${yr}${sm}月${sd}日 – ${em}月${ed}日` : `${sy}年${sm}月${sd}日 – ${ey}年${em}月${ed}日`;
+    const yr = sy === parts(now.value)[0] ? '' : tr("{0}年", sy);
+    return sy === ey ? tr("{0}{1}月{2}日 – {3}月{4}日", yr, sm, sd, em, ed) : tr("{0}年{1}月{2}日 – {3}年{4}月{5}日", sy, sm, sd, ey, em, ed);
   }
   const [y, m] = parts(ui.cursor);
-  return `${y}年${m}月`;
+  return tr("{0}年{1}月", y, m);
 }
 
 /** First week of the rolling multi-week view (for today, or for `day`). */

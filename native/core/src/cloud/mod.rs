@@ -3,6 +3,8 @@
 //! round (testable without Tauri), `service` schedules rounds, the providers implement
 //! `Remote`.
 
+use crate::i18n::{tr, trf};
+
 
 pub mod engine;
 pub mod git;
@@ -57,13 +59,13 @@ impl SyncError {
         Self::new(ErrKind::Server, m)
     }
     pub fn conflict() -> Self {
-        Self::new(ErrKind::Conflict, "云端文件刚被另一台电脑修改")
+        Self::new(ErrKind::Conflict, tr("云端文件刚被另一台电脑修改"))
     }
     /// For status codes a provider has no special message for.
     pub fn status(code: u16) -> Self {
         match code {
-            500..=599 => Self::server(format!("服务器出错（{code}），稍后会自动重试")),
-            _ => Self::server(format!("服务器返回了意外的结果（{code}）")),
+            500..=599 => Self::server(trf("服务器出错（{0}），稍后会自动重试", &[format!("{}", code)])),
+            _ => Self::server(trf("服务器返回了意外的结果（{0}）", &[format!("{}", code)])),
         }
     }
 }
@@ -146,7 +148,7 @@ pub fn view_sig(view: &Value) -> u64 {
 }
 
 pub fn device_name() -> String {
-    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "此电脑".into())
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| tr("此电脑").into())
 }
 
 /// The cloud file: `{ app, format, device, savedAt, data: cloud_view }`.
@@ -164,17 +166,17 @@ pub struct CloudFile {
 /// Parses a cloud file. Anything that isn't FluentCal data is refused, so it is never
 /// overwritten (SYN-13). An empty file counts as missing.
 pub fn decode(bytes: &[u8]) -> Result<Option<CloudFile>, SyncError> {
-    let text = std::str::from_utf8(bytes).map_err(|_| SyncError::new(ErrKind::Remote, "云端文件不是 FluentCal 数据（无法读取），为安全起见没有覆盖它"))?;
+    let text = std::str::from_utf8(bytes).map_err(|_| SyncError::new(ErrKind::Remote, tr("云端文件不是 FluentCal 数据（无法读取），为安全起见没有覆盖它")))?;
     let text = text.trim_start_matches('\u{FEFF}').trim();
     if text.is_empty() {
         return Ok(None);
     }
-    let v: Value = serde_json::from_str(text).map_err(|_| SyncError::new(ErrKind::Remote, "云端文件已损坏或不是 FluentCal 数据，为安全起见没有覆盖它"))?;
+    let v: Value = serde_json::from_str(text).map_err(|_| SyncError::new(ErrKind::Remote, tr("云端文件已损坏或不是 FluentCal 数据，为安全起见没有覆盖它")))?;
     if v.get("app").and_then(Value::as_str) != Some("FluentCal") || !v.get("data").is_some_and(Value::is_object) {
-        return Err(SyncError::new(ErrKind::Remote, "云端同名文件不是 FluentCal 同步数据，为安全起见没有覆盖它。请换一个文件夹或文件路径"));
+        return Err(SyncError::new(ErrKind::Remote, tr("云端同名文件不是 FluentCal 同步数据，为安全起见没有覆盖它。请换一个文件夹或文件路径")));
     }
     if v.get("format").and_then(Value::as_i64).unwrap_or(0) > FORMAT {
-        return Err(SyncError::new(ErrKind::Remote, "云端数据来自更新版本的 FluentCal，请先升级本机的 FluentCal"));
+        return Err(SyncError::new(ErrKind::Remote, tr("云端数据来自更新版本的 FluentCal，请先升级本机的 FluentCal")));
     }
     Ok(Some(CloudFile {
         view: cloud_view(&v["data"]),

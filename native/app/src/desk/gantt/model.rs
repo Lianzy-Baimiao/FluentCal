@@ -1,6 +1,8 @@
 //! What the Gantt view shows (0.2's gantt/model.ts): rows, bars, summaries, links and the
 //! header, for the whole chart; mod.rs hands the visible part to the window.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use crate::theme::color;
 use crate::{GBar, GCell, GLink, GRow, GStripe, GSummary};
 use fluentcal_core::date::{add_days, diff_days, format_range, parts};
@@ -136,7 +138,7 @@ fn row(r: &Row, t: &Tokens, ungrouped_collapsed: bool) -> GRow {
                 color: color(c.bar),
                 check_ring: color(c.bar.mix(0.7, t.text_secondary)),
                 meta: dates.into(),
-                meta_tip: format!("{} 天", diff_days(&task.start, &task.end) + 1).into(),
+                meta_tip: trf("{0} 天", &[format!("{}", diff_days(&task.start, &task.end) + 1)]).into(),
                 pct: pct.into(),
                 checked: task.done,
                 done: task.done && task.repeat.is_none(),
@@ -165,10 +167,10 @@ fn bars_of(doc: &Doc, task: &Task, row: usize, range: &(String, String), dw: f64
         let x = diff_days(&range.0, &start) as f64 * dw;
         let w = (diff_days(&start, &end) + 1) as f64 * dw;
         let progress = if done { 100.0 } else if rep { 0.0 } else { task.progress };
-        let status = if task.is_milestone() { "里程碑".to_owned() } else if rep { "重复任务（双击编辑整个系列）".to_owned() } else { format!("进度 {progress}%") };
-        let mut tip = vec![task.title.clone(), format!("{} · {} 天", format_range(&start, &end, today), diff_days(&start, &end) + 1), status];
+        let status = if task.is_milestone() { tr("里程碑").to_owned() } else if rep { tr("重复任务（双击编辑整个系列）").to_owned() } else { trf("进度 {0}%", &[format!("{}", progress)]) };
+        let mut tip = vec![task.title.clone(), trf("{0} · {1} 天", &[format!("{}", format_range(&start, &end, today)), format!("{}", diff_days(&start, &end) + 1)]), status];
         if !deps.is_empty() {
-            tip.push(format!("前置：{}", deps.join("、")));
+            tip.push(trf("前置：{0}", &[format!("{}", deps.join("、"))]));
         }
         out.push(Bar {
             g: GBar {

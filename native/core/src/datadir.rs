@@ -2,6 +2,8 @@
 //! (e.g. in OneDrive). Settings then stay per PC in `<app data>\settings.json`; data.json in
 //! the folder holds the shared tasks. Switching folders merges and restarts the app.
 
+use crate::i18n::{tr};
+
 use crate::store::{normalize, Store};
 use serde::Serialize;
 use serde_json::Value;
@@ -47,7 +49,7 @@ pub fn set(default: &Path, store: &Arc<Store>, path: Option<String>) -> Result<(
     let default = default.to_path_buf();
     let target = path.map(PathBuf::from).unwrap_or_else(|| default.clone());
     if !target.is_dir() {
-        return Err("文件夹不存在".into());
+        return Err(tr("文件夹不存在").into());
     }
     std::fs::create_dir_all(target.join("backups")).map_err(|e| e.to_string())?;
     store.flush();

@@ -1,6 +1,8 @@
 //! Repeating tasks (0.2's src/lib/recur.ts): occurrences in a date range, the next occurrence,
 //! and the rule in words.
 
+use crate::i18n::{tr, trf};
+
 use crate::date::{add_days, add_months, day_num, days_in_month, diff_days, from_day_num, parts, weekday, ymd, WEEKDAY_SHORT};
 use crate::lunar::{day_info, is_legal_workday, lunar_day_name, lunar_month_name, lunar_to_solar};
 use crate::model::{Freq, RepeatRule, Task};
@@ -179,44 +181,44 @@ pub fn next_occurrence(task: &Task, from: &str) -> Option<String> {
 
 /// Human readable rule, e.g. "每 2 周的周一、周三".
 pub fn describe_rule(rule: Option<&RepeatRule>, start: &str) -> String {
-    let Some(rule) = rule else { return "不重复".into() };
+    let Some(rule) = rule else { return tr("不重复").into() };
     let i = rule.interval.unwrap_or(1).max(1);
-    let every = |unit: &str| if i == 1 { format!("每{unit}") } else { format!("每 {i} {unit}") };
+    let every = |unit: &str| if i == 1 { trf("每{0}", &[format!("{}", unit)]) } else { trf("每 {0} {1}", &[format!("{}", i), format!("{}", unit)]) };
     let (y, m, d) = parts(start);
     let mut s = match rule.freq {
-        None => return "不重复".into(),
-        Some(Freq::Daily) => if i == 1 { "每天".into() } else { format!("每 {i} 天") },
+        None => return tr("不重复").into(),
+        Some(Freq::Daily) => if i == 1 { tr("每天").into() } else { trf("每 {0} 天", &[format!("{}", i)]) },
         Some(Freq::Weekly) => {
             let mut days: Vec<u32> = rule.weekdays.clone().filter(|w| !w.is_empty()).unwrap_or_else(|| vec![weekday(start)]);
             days.sort_by_key(|x| (x + 6) % 7);
-            let days: Vec<String> = days.iter().map(|x| format!("周{}", WEEKDAY_SHORT[*x as usize % 7])).collect();
-            format!("{}的{}", every("周"), days.join("、"))
+            let days: Vec<String> = days.iter().map(|x| trf("周{0}", &[format!("{}", crate::i18n::tr(WEEKDAY_SHORT[*x as usize % 7]))])).collect();
+            trf("{0}的{1}", &[format!("{}", every(tr("周"))), format!("{}", days.join("、"))])
         }
         Some(Freq::Monthly) => {
             if rule.month_mode.as_deref() == Some("nthWeekday") {
                 let nth = d.div_ceil(7);
                 let last = nth >= 5 || d + 7 > days_in_month(y, m);
-                let which = if last { "最后一个".to_owned() } else { format!("第 {nth} 个") };
-                format!("{}的{which}周{}", every("个月"), WEEKDAY_SHORT[weekday(start) as usize])
+                let which = if last { tr("最后一个").to_owned() } else { trf("第 {0} 个", &[format!("{}", nth)]) };
+                trf("{0}的{1}周{2}", &[format!("{}", every(tr("个月"))), format!("{}", which), format!("{}", crate::i18n::tr(WEEKDAY_SHORT[weekday(start) as usize]))])
             } else {
-                format!("{}的 {d} 日", every("个月"))
+                trf("{0}的 {1} 日", &[format!("{}", every(tr("个月"))), format!("{}", d)])
             }
         }
-        Some(Freq::Yearly) => format!("{}的 {m} 月 {d} 日", if i == 1 { "每年".to_owned() } else { format!("每 {i} 年") }),
-        Some(Freq::Workday) => "每个工作日（周一至周五）".into(),
-        Some(Freq::LegalWorkday) => "每个法定工作日（含调休）".into(),
+        Some(Freq::Yearly) => trf("{0}的 {1} 月 {2} 日", &[format!("{}", if i == 1 { tr("每年").to_owned() } else { trf("每 {0} 年", &[i.to_string()]) }), format!("{}", m), format!("{}", d)]),
+        Some(Freq::Workday) => tr("每个工作日（周一至周五）").into(),
+        Some(Freq::LegalWorkday) => tr("每个法定工作日（含调休）").into(),
         Some(Freq::LunarYearly) => {
             let info = day_info(start);
-            let each = if i == 1 { "每年".to_owned() } else { format!("每 {i} 年") };
-            format!("{each}农历{}{}", lunar_month_name(info.lunar_month), lunar_day_name(info.lunar_day))
+            let each = if i == 1 { tr("每年").to_owned() } else { trf("每 {0} 年", &[format!("{}", i)]) };
+            trf("{0}农历{1}{2}", &[format!("{}", each), format!("{}", lunar_month_name(info.lunar_month)), format!("{}", lunar_day_name(info.lunar_day))])
         }
-        Some(Freq::MonthLastDay) => format!("{}的最后一天", every("个月")),
-        Some(Freq::Ebbinghaus) => return "艾宾浩斯记忆曲线（第 1、2、3、5、8、16、31 天复习）".into(),
+        Some(Freq::MonthLastDay) => trf("{0}的最后一天", &[format!("{}", every(tr("个月")))]),
+        Some(Freq::Ebbinghaus) => return tr("艾宾浩斯记忆曲线（第 1、2、3、5、8、16、31 天复习）").into(),
     };
     if let Some(c) = rule.count.filter(|c| *c > 0) {
-        s += &format!("，共 {c} 次");
+        s += &trf("，共 {0} 次", &[format!("{}", c)]);
     } else if let Some(u) = &rule.until {
-        s += &format!("，直到 {u}");
+        s += &trf("，直到 {0}", &[format!("{}", u)]);
     }
     s
 }

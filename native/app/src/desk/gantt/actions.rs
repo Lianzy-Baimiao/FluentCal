@@ -1,6 +1,8 @@
 //! Gantt toolbar, table and keyboard (0.2's gantt/actions.ts and the handlers of GanttView and
 //! GanttTable). Dragging: drag.rs.
 
+use fluentcal_core::i18n::{tr};
+
 use super::model::RH;
 use crate::app::App;
 use crate::{GRow, GanttData};
@@ -124,7 +126,7 @@ impl App {
             end = add_days(start, 1);
         }
         let p = Task {
-            title: if milestone { "新里程碑" } else { "新任务" }.into(),
+            title: if milestone { tr("新里程碑") } else { tr("新任务") }.into(),
             start: start.into(),
             end: if milestone { start.into() } else { end },
             group_id: gid,
@@ -153,7 +155,7 @@ impl App {
 
     pub fn gantt_new_group(&mut self) {
         let palette = ["blue", "purple", "teal", "orange", "pink", "green", "indigo", "red"];
-        let g = tasks::make_group(&self.doc, "新分组", palette[self.doc.groups.len() % palette.len()]);
+        let g = tasks::make_group(&self.doc, tr("新分组"), palette[self.doc.groups.len() % palette.len()]);
         self.history.boundary();
         let edit = tasks::save_group(&self.doc, g.clone());
         self.apply(edit, true);

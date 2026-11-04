@@ -27,6 +27,8 @@ FluentCal 位于所有窗口之下、不占任务栏，按 Win+D 显示桌面时
 
 外观：浅色、深色或跟随系统；跟随 Windows 强调色或自选颜色；背景色、透明度、亚克力、圆角、字号、间距均可调，内置 5 套预设方案。
 
+语言：默认跟随 Windows 显示语言，可手动切换简体中文、繁体中文和 English，立即生效并记住选择。网页查看默认跟随浏览器语言，可独立切换。
+
 数据：保存在本机，每天自动备份，可导出 JSON、CSV（Excel）和 ICS（Outlook、Google 日历）。提醒使用 Windows 通知或屏幕右下角的提醒卡片。
 
 可选功能：通过你自己的 WebDAV 网盘或 GitHub/Gitee 私有仓库在多台电脑间同步；在本机浏览器或同一局域网的手机上只读查看日历。
@@ -49,7 +51,7 @@ FluentCal 位于所有窗口之下、不占任务栏，按 Win+D 显示桌面时
 
 ### English short description
 
-A calendar and Gantt chart pinned to the Windows desktop, in Windows 11 Fluent style, with the Chinese lunar calendar and public holidays. Works offline, with no account or advertising.
+A desktop calendar and Gantt chart with tasks, reminders, lunar dates and public holidays. Works offline with no account or ads. Supports English, Simplified Chinese and Traditional Chinese.
 
 ### English description
 
@@ -62,6 +64,8 @@ Calendar: month and scrolling multi-week views with the Chinese lunar calendar, 
 Gantt chart: the same data as the calendar, with day, week and month scales. Drag bars to move tasks, drag their ends to change dates, drag the handle to set progress, and drag from one bar to another to add a dependency. Group summaries, milestones and PNG/SVG export.
 
 Appearance: light, dark or follow Windows; the Windows accent colour or your own; background colour, transparency, acrylic, corner radius, font size and spacing, with five presets.
+
+Language: follows your Windows display language by default. Switch instantly between English, Simplified Chinese and Traditional Chinese, and keep your choice across restarts. The browser view follows the browser language and remembers its own selection.
 
 Data is stored on your PC with a daily backup, and can be exported as JSON, CSV (Excel) and ICS (Outlook, Google Calendar). Reminders use Windows notifications or a card at the bottom right of the screen.
 
@@ -78,10 +82,50 @@ No account, no advertising, no usage data collected. Sync and the web view are o
 5. Light/dark themes, accent colours, transparency, acrylic, presets
 6. Stored on your PC with daily backups; export JSON/CSV/ICS
 7. Optional sync (WebDAV, GitHub, Gitee) and a read-only web view
+8. English, Simplified Chinese and Traditional Chinese; follows the system
 
 ### English keywords
 
 desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countdown
+
+### 繁體中文簡短描述
+
+釘選在桌面上的行事曆與甘特圖，支援工作、提醒、農曆與節假日。可離線使用，不需要帳號、沒有廣告。支援繁體中文、簡體中文與英文。
+
+### 繁體中文描述
+
+釘選在 Windows 桌面上的行事曆與甘特圖。
+
+FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面時仍然可見；也能切換為永遠置頂或一般視窗、鎖定位置，或讓滑鼠點擊穿透。
+
+行事曆：月檢視與多週捲動檢視，顯示農曆、二十四節氣、傳統節日，以及中國大陸法定節假日與補班資訊（可連網自動更新）。按兩下日期即可新增工作，勾選完成、拖曳改期，按右鍵變更顏色或刪除；跨日工作會以橫條顯示。支援重複工作、倒數日與搜尋。
+
+甘特圖：與行事曆共用資料，提供日、週、月刻度。拖曳工作列可調整日期，拖曳兩端可變更起訖時間，也能調整進度、建立相依關係。支援群組彙總、里程碑，以及 PNG/SVG 圖片匯出。
+
+外觀：淺色、深色或跟隨系統；使用 Windows 輔色或自選顏色。背景色、透明度、壓克力效果、圓角、字型大小與間距皆可調整，內建五套預設方案。
+
+語言：預設跟隨 Windows 顯示語言，可立即切換繁體中文、簡體中文與 English，並記住選擇。網頁檢視預設跟隨瀏覽器語言，可獨立切換。
+
+資料：儲存在本機，每日自動備份，可匯出 JSON、CSV（Excel）與 ICS（Outlook、Google 日曆）。提醒使用 Windows 通知或螢幕右下角的提醒卡片。
+
+選用功能：透過自己的 WebDAV 儲存空間或 GitHub/Gitee 私人儲存庫，在多部電腦間同步；也能在本機瀏覽器或同一區域網路的手機上，以唯讀方式檢視行事曆。
+
+不需要帳號、沒有廣告、不收集使用資料。同步與網頁檢視預設關閉，僅在你設定後才會啟用。
+
+### 繁體中文功能
+
+1. 釘選在桌面：位於所有視窗下方，Win+D 後仍可見
+2. 月檢視與多週檢視：農曆、節氣及中國大陸節假日與補班資訊
+3. 甘特圖：拖曳改期、相依關係、群組彙總與里程碑
+4. 重複工作、提醒、倒數日與搜尋
+5. 淺色／深色主題、輔色、透明度、壓克力效果與預設方案
+6. 本機儲存、每日備份，匯出 JSON／CSV／ICS
+7. 選用 WebDAV／GitHub／Gitee 同步及瀏覽器唯讀檢視
+8. 繁體中文、簡體中文與英文介面，預設跟隨系統語言
+
+### 繁體中文關鍵字
+
+桌面行事曆；甘特圖；農曆；行程；待辦；節假日；倒數日
 
 ### runFullTrust 用途说明（≤ 500 字符）
 
@@ -89,15 +133,17 @@ desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countd
 
 ### 审核说明（Additional testing info）
 
-> FluentCal needs no account, sign-in, credentials or purchase. The interface is in Simplified Chinese. On first start it shows sample tasks and a welcome bar.
+> FluentCal needs no account, sign-in, credentials or purchase. The interface supports English, Simplified Chinese and Traditional Chinese and follows the Windows display language by default. On first start it shows sample tasks and a welcome bar.
 >
-> Where the window is: by default the calendar sits on the desktop layer, below other windows. Press Win+D (show desktop) to see it, or press Ctrl+Alt+D or left-click the tray icon to bring it forward. Starting the app again from Start opens its Settings window. The tray menu has 显示日历 (show calendar), 设置… (Settings) and 退出 (quit).
+> Language: open Settings > General > Display language to choose Follow system, English, Simplified Chinese or Traditional Chinese. Changes apply immediately and persist across restarts. The optional browser view follows the browser language and has its own saved language selection. Switching language preserves user-created task text and unsaved edits.
 >
-> What to try: the header switches between 月 (month), 多周 (multi-week) and 甘特 (Gantt chart). Double-click a day to add a task, right-click a day or a task for its menu, and drag tasks to reschedule. The 更多 (…) button in the header has search, the theme, the window level (desktop layer / always on top / normal window), 外观… (appearance) and 设置… (Settings).
+> Where the window is: by default the calendar sits on the desktop layer, below other windows. Press Win+D (show desktop) to see it, or press Ctrl+Alt+D or left-click the tray icon to bring it forward. Starting the app again from Start opens its Settings window. The tray menu provides Show calendar, Settings and Quit (localized to the selected language).
 >
-> Start with Windows is on by default, through the package's startup task; it takes effect after the first launch. It can be turned off in Settings › 常规 › 开机自动启动 or in Task Manager's Startup tab.
+> What to try: switch between Month, Multi-week and Gantt views in the header. Double-click a day to add a task, type a title and press Enter to save; right-click a day or task for its menu, and drag tasks to reschedule. The More (...) menu has search, theme, window level (desktop / always on top / normal), appearance and Settings.
 >
-> Network: China's public holiday data is downloaded from fastly.jsdelivr.net (falling back to raw.githubusercontent.com); Settings › 常规 › 自动更新法定节假日 turns this off. Cloud sync (WebDAV/GitHub/Gitee) and the LAN web view are optional and off by default; they are not needed to review the app.
+> Start with Windows is on by default, through the package's startup task; it takes effect after the first launch. It can be turned off in Settings > General > Start with Windows or in Task Manager's Startup tab.
+>
+> Network: China's public holiday data is downloaded from fastly.jsdelivr.net (falling back to raw.githubusercontent.com); automatic holiday updates can be disabled in Settings > General. Cloud sync (WebDAV/GitHub/Gitee) and the LAN web view are optional and off by default; they are not needed to review the app.
 
 ### 年龄分级（IARC）
 
@@ -152,3 +198,18 @@ desktop calendar; Gantt chart; lunar calendar; schedule; to-do; holidays; countd
 - 已点击“提交进行认证”。后台确认 **正在认证更新 / 预处理正在进行**，并明确显示 **产品在通过认证后立即开始发布**。本次更新已送审，尚未确认新版本上架；上一版仍可在商店获取。
 - 认证与自动发布状态截图：`release/store-proof/certification-0.3.2-2026-11-03.jpg`（本地忽略目录，2026-11-03 20:09，UTC+8）。后续状态以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 为准。
 - GitHub **v0.3.2** 已发布，修复提交为 `9427505`；安装包见 [Release](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.2)。
+- 2026-11-03 提交 0.3.3.0 前，在产品概述页确认 Submission 2 已发布，后台显示“恭喜!你的产品现已更新”。
+
+### 0.3.3.0 多语言更新（2026-11-03 21:32 送审，正在认证）
+
+- 用户要求“发微软商店吧，上一个版本已经过了”，据此创建 **Submission 3 / 1152921505702305669** 并提交认证。产品为 **FluentCal 桌面日历 / 9NTT06453DG5**。
+- 应用版本为 **0.3.3**，商店包版本为 **0.3.3.0**；新增简体中文、繁体中文和英文，默认跟随系统／浏览器语言并记住手动选择。网页语言切换使用现有 Fluent 下拉框，适配深浅主题和手机窄屏，切换时保留任务原文与未保存的编辑内容。
+- 包：`release/FluentCal_0.3.3.0_x64.msix`，SHA-256 `d25aa8889fae3c53dcd19f01620f593246c42264df61636591c3a2d4897e1468`。MakeAppx 校验通过，Partner Center 显示 **Validated**。保存包页面后，后台自动移除被替代的 `0.3.2.0` 包，送审前概述页仅列出新包。
+- 独立安装包：`release/FluentCal_0.3.3_x64-setup.exe`，SHA-256 `ba7beb1255716b961f11ba5c57be1cd735ae33b0e2794ce4665151cb3e90f608`。MSIX 中的 `fluentcal.exe` 与已验证的 release EXE 一致，SHA-256 `719fc276ea2f6416fe17819ac3578dd74f1cdd7ecf94dffde7ef1eb4226f3bf8`。
+- 沿用正式商店身份 `ice.FluentCal`、发布者 `CN=56079E3F-5861-4D9C-B9C3-93F76224C42E`、发布者显示名“白描ice”。仅 x64 桌面设备，最低 Windows 10 1809（17763）；包中声明 `zh-CN`、`zh-TW`、`en-US`。
+- 简体中文 Store 一览已更新多语言说明和本版新增功能，保留原有四张桌面截图。新增英文与繁体中文的描述、简短描述、八项功能、七个关键词与更新说明。三种语言均在“管理 Store 一览语言”页显示 **完成**。
+- 英文和繁体中文各上传五张对应语言的原生界面截图：`month-light.png`、`month-dark.png`、`gantt.png`、`settings-appearance.png`、`settings-language.png`。文件位于 `release/store-0.3.3/en-US/` 和 `release/store-0.3.3/zh-TW/`；使用示例数据，已检查截图布局。
+- 已更新并重新载入核对“其他测试信息”：三种界面语言、Settings > General > Display language 路径、网页独立语言选择、数据与编辑内容保留；无需账号或购买，凭据表为空。
+- 保留原有免费定价、属性和年龄分级；核对 `runFullTrust` 用途说明与上一版一致，发布选项为 **在此提交通过认证后立即予以发布**。
+- 点击“提交进行认证”后，后台明确显示 **正在认证更新 / 预处理正在进行**、**产品在通过认证后立即开始发布**，以及 **产品更新：正在认证（Submission 3）**。此记录表示已送审，尚未确认 0.3.3.0 上架。
+- 认证凭证：`release/store-proof/certification-0.3.3-2026-11-03.jpg`（本地忽略目录，UTC+8）。后续状态以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 为准；公开商店链接为 https://apps.microsoft.com/detail/9NTT06453DG5 。

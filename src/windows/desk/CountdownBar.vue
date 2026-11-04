@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import { FIcon, vTip } from '@/fluent';
 import { countdowns } from '@/lib/countdown';
@@ -7,15 +8,15 @@ import { doc, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { jumpTo } from './state';
 
-const items = computed(() => countdowns(taskList.value, now.value, doc.settings.calendar.holidayCountdown).slice(0, 6));
+const items = computed(() => countdowns(taskList.value, now.value, doc.settings.calendar.holidayCountdown).slice(0, 6)
+  .map(c => ({ ...c, label: c.taskId ? c.label : tr(c.label) })));
 </script>
 
 <template>
-  <div v-if="items.length" class="countdown" role="group" aria-label="倒数日">
+  <div v-if="items.length" class="countdown" role="group" :aria-label="tr('倒数日')">
     <button v-for="c in items" :key="c.key" type="button" class="cd" v-tip="formatFriendly(c.date)" @click="jumpTo(c.date)">
       <FIcon :name="c.taskId ? 'flag' : 'calendarDay'" :size="11" />
-      <template v-if="c.days === 0"><b>{{ c.label }}</b> 就是今天</template>
-      <template v-else>距<b>{{ c.label }}</b>还有 <em>{{ c.days }}</em> 天</template>
+      <span>{{ c.days === 0 ? tr('{0} 就是今天', c.label) : tr('距{0}还有 {1} 天', c.label, c.days) }}</span>
     </button>
   </div>
 </template>

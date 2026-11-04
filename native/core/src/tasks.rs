@@ -2,6 +2,8 @@
 //! returns an Edit (the items to write); the app writes it with the store and records it for
 //! undo. Times are passed in, so everything here is plain data and testable.
 
+use crate::i18n::{trf};
+
 use crate::date::{add_days, diff_days};
 use crate::model::{self, Group, Task};
 use crate::recur::{task_end, Occurrence};
@@ -279,7 +281,7 @@ pub fn delete_occurrence(doc: &Doc, t: &Task, date: &str, mode: DeleteMode, now_
 
 pub fn duplicate_task(doc: &Doc, t: &Task, now_ms: i64) -> (Edit, Task) {
     let mut p = t.clone();
-    p.title = format!("{}（副本）", t.title);
+    p.title = trf("{0}（副本）", &[format!("{}", t.title)]);
     p.sample = None;
     add_task(doc, p, None, now_ms)
 }

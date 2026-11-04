@@ -14,7 +14,7 @@ Unicode true
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\${NAME}"
 !define MSGCLASS "com.fluentcal.desktop-sic"
 
-Name "${NAME} 桌面日历"
+Name "${NAME}"
 OutFile "${OUT}"
 InstallDir "$LOCALAPPDATA\${NAME}"
 RequestExecutionLevel user
@@ -22,21 +22,39 @@ SetCompressor /SOLID lzma
 BrandingText "${NAME} ${VERSION}"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=2052 "ProductName" "${NAME}"
-VIAddVersionKey /LANG=2052 "FileDescription" "${NAME} 安装程序"
+VIAddVersionKey /LANG=2052 "FileDescription" "${NAME} Setup"
 VIAddVersionKey /LANG=2052 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${VERSION}"
 
 !define MUI_ICON "..\res\icon.ico"
 !define MUI_UNICON "..\res\icon.ico"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\fluentcal.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "启动 FluentCal"
+!define MUI_FINISHPAGE_RUN_TEXT "$(LaunchFluentCal)"
+!define MUI_LANGDLL_REGISTRY_ROOT "HKCU"
+!define MUI_LANGDLL_REGISTRY_KEY "${UNINST}"
+!define MUI_LANGDLL_REGISTRY_VALUENAME "InstallerLanguage"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
+; English is the fallback for unsupported Windows languages.
+!insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "SimpChinese"
+!insertmacro MUI_LANGUAGE "TradChinese"
+!insertmacro MUI_RESERVEFILE_LANGDLL
+LangString LaunchFluentCal ${LANG_ENGLISH} "Launch FluentCal"
+LangString LaunchFluentCal ${LANG_SIMPCHINESE} "启动 FluentCal"
+LangString LaunchFluentCal ${LANG_TRADCHINESE} "啟動 FluentCal"
+
+Function .onInit
+  !insertmacro MUI_LANGDLL_DISPLAY
+FunctionEnd
+
+Function un.onInit
+  !insertmacro MUI_UNGETLANGUAGE
+FunctionEnd
 
 ; Asks a running FluentCal (0.2 or this one) to exit, then makes sure it has.
 !macro CloseRunning

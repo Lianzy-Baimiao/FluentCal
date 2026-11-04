@@ -1,6 +1,8 @@
 //! One sync round (需求文档 7.5): conditional fetch → merge into the store → conditional
 //! upload, retried on conflict. No Tauri here, so tests can drive it with a mock server.
 
+use crate::i18n::{trf};
+
 use super::{cloud_view, decode, encode, view_sig, ErrKind, Fetched, Remote, Rev, SyncError};
 use crate::store::{now_ms, Store};
 use serde::{Deserialize, Serialize};
@@ -125,7 +127,7 @@ pub fn cycle(store: &Store, remote: &mut dyn Remote, st: &mut SyncState, mode: M
             Err(e) => return Err(e),
         }
     }
-    Err(SyncError::new(ErrKind::Server, format!("{}，重试 {ATTEMPTS} 次仍未成功，稍后会再试", last.message)))
+    Err(SyncError::new(ErrKind::Server, trf("{0}，重试 {1} 次仍未成功，稍后会再试", &[format!("{}", last.message), format!("{}", ATTEMPTS)])))
 }
 
 fn upload(remote: &mut dyn Remote, view: &Value, base: Option<&Rev>, st: &mut SyncState) -> Result<(), SyncError> {

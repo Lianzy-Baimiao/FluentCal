@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import FIcon from './FIcon.vue';
 
@@ -27,7 +28,7 @@ const glyph = computed(() => ({
       <span class="msg"><slot /></span>
       <span v-if="$slots.action" class="action"><slot name="action" /></span>
     </div>
-    <button v-if="closable" type="button" class="close" aria-label="关闭" @click="emit('close')">
+    <button v-if="closable" type="button" class="close" :aria-label="tr('关闭')" @click="emit('close')">
       <FIcon name="close" :size="12" />
     </button>
   </div>

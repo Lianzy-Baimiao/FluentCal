@@ -5,6 +5,8 @@
 //! "<id>-sic", title "<id>-siw", arguments by WM_COPYDATA), so the native release and 0.2 never
 //! run at the same time on the same data, whichever starts first.
 
+use fluentcal_core::i18n::{tr};
+
 use std::sync::OnceLock;
 use windows::core::{HSTRING, PCWSTR};
 use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS, HWND, LPARAM, LRESULT, WPARAM};
@@ -190,9 +192,9 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> 
 
 /// Registers `accel` ("Ctrl+Alt+D", 0.2's format) as hotkey `id`; Err with the reason.
 pub fn register_hotkey(id: i32, accel: &str) -> Result<(), String> {
-    let (mods, vk) = parse_accel(accel).ok_or_else(|| "无法识别的快捷键".to_owned())?;
-    let h = hwnd().ok_or_else(|| "程序窗口还没有创建".to_owned())?;
-    unsafe { RegisterHotKey(Some(h), id, mods | MOD_NOREPEAT, vk) }.map_err(|_| "已被其他程序占用".to_owned())
+    let (mods, vk) = parse_accel(accel).ok_or_else(|| tr("无法识别的快捷键").to_owned())?;
+    let h = hwnd().ok_or_else(|| tr("程序窗口还没有创建").to_owned())?;
+    unsafe { RegisterHotKey(Some(h), id, mods | MOD_NOREPEAT, vk) }.map_err(|_| tr("已被其他程序占用").to_owned())
 }
 
 pub fn unregister_hotkey(id: i32) {

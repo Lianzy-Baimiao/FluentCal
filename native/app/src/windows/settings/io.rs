@@ -1,5 +1,7 @@
 //! Import, the data folder (with the restart), cloud sync's test/enable/now.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use super::actions::job;
 use super::commands::plan_edit;
 use crate::app::{App, ORIGIN};
@@ -17,7 +19,7 @@ impl App {
         }
         let owner = self.settings_win.as_ref().and_then(|s| crate::platform::window::hwnd(slint::ComponentHandle::window(&s.window)));
         slint::Timer::single_shot(Duration::ZERO, move || {
-            if let Some(p) = crate::platform::dialog::open_file(owner, "FluentCal 备份", &["json"]) {
+            if let Some(p) = crate::platform::dialog::open_file(owner, tr("FluentCal 备份"), &["json"]) {
                 crate::app::run(move |app| app.settings_import_file(&p));
             }
         });
@@ -34,20 +36,17 @@ impl App {
         };
         let n = incoming.get("tasks").and_then(Value::as_object).map_or(0, |m| m.len());
         let plan = fluentcal_core::export::plan_merge(&self.store.snapshot(), &incoming);
-        let content = format!(
-            "文件中有 {n} 个任务。合并：加入 {} 个新任务，{} 个在文件中更新过的任务用文件版本，其余 {} 个保留本机版本。替换：用文件内容覆盖全部任务。导入前会自动备份当前数据。",
-            plan.added, plan.updated, plan.kept
-        );
-        self.settings_confirm("导入备份", &content, "合并", "替换", false, move |app, r| {
+        let content = trf("文件中有 {0} 个任务。合并：加入 {1} 个新任务，{2} 个在文件中更新过的任务用文件版本，其余 {3} 个保留本机版本。替换：用文件内容覆盖全部任务。导入前会自动备份当前数据。", &[format!("{}", n), format!("{}", plan.added), format!("{}", plan.updated), format!("{}", plan.kept)]);
+        self.settings_confirm(tr("导入备份"), &content, tr("合并"), tr("替换"), false, move |app, r| {
             if r == "close" {
                 return;
             }
             if r == "primary" {
                 if let Err(e) = app.store.backup_create() {
-                    return app.settings_say(Severity::Error, &format!("导入前备份失败，已取消导入：{e}"));
+                    return app.settings_say(Severity::Error, &trf("导入前备份失败，已取消导入：{0}", &[format!("{}", e)]));
                 }
                 app.apply(plan_edit(&plan), false);
-                app.settings_say(Severity::Success, &format!("已合并：新增 {} 个，更新 {} 个，保留本机 {} 个。", plan.added, plan.updated, plan.kept));
+                app.settings_say(Severity::Success, &trf("已合并：新增 {0} 个，更新 {1} 个，保留本机 {2} 个。", &[format!("{}", plan.added), format!("{}", plan.updated), format!("{}", plan.kept)]));
             } else {
                 // The file's tasks, groups and day colours; this PC's settings and holidays.
                 let cur = app.store.snapshot();
@@ -58,10 +57,10 @@ impl App {
                 }
                 // store.import backs the current data up first.
                 if let Err(e) = app.store.import(ORIGIN, doc) {
-                    return app.settings_say(Severity::Error, &format!("导入失败：{e}"));
+                    return app.settings_say(Severity::Error, &trf("导入失败：{0}", &[format!("{}", e)]));
                 }
                 app.reload();
-                app.settings_say(Severity::Success, &format!("已用备份替换，共 {n} 个任务。"));
+                app.settings_say(Severity::Success, &trf("已用备份替换，共 {0} 个任务。", &[format!("{}", n)]));
             }
             app.settings_load_backups();
             app.settings_refresh();
@@ -84,11 +83,11 @@ impl App {
 
     fn settings_confirm_dir(&mut self, path: Option<String>) {
         let (title, content, primary) = match &path {
-            None => ("恢复默认数据文件夹？", "数据会合并回本机的默认文件夹，然后程序重新启动。".to_owned(), "恢复并重启"),
+            None => (tr("恢复默认数据文件夹？"), tr("数据会合并回本机的默认文件夹，然后程序重新启动。").to_owned(), tr("恢复并重启")),
             Some(p) => (
-                "更改数据文件夹？",
-                format!("数据将保存到：{p}\n\n放在 OneDrive 等同步盘里可以多台电脑共用；文件夹里已有的 FluentCal 数据会与本机数据合并（按每个任务的最后修改时间），不会被覆盖。设置（外观、位置等）仍保存在每台电脑上。程序会重新启动。"),
-                "更改并重启",
+                tr("更改数据文件夹？"),
+                trf("数据将保存到：{0}\n\n放在 OneDrive 等同步盘里可以多台电脑共用；文件夹里已有的 FluentCal 数据会与本机数据合并（按每个任务的最后修改时间），不会被覆盖。设置（外观、位置等）仍保存在每台电脑上。程序会重新启动。", &[format!("{}", p)]),
+                tr("更改并重启"),
             ),
         };
         self.settings_confirm(title, &content, primary, "", false, move |app, r| {
@@ -97,7 +96,7 @@ impl App {
             }
             match fluentcal_core::datadir::set(&app.local_dir, &app.store, path) {
                 Ok(()) => app.restart(),
-                Err(e) => app.settings_say(Severity::Error, &format!("更改失败：{e}")),
+                Err(e) => app.settings_say(Severity::Error, &trf("更改失败：{0}", &[format!("{}", e)])),
             }
         });
     }
@@ -112,7 +111,7 @@ impl App {
         }
         let Ok(exe) = std::env::current_exe() else { return };
         if let Err(e) = std::process::Command::new(exe).arg("--restart").spawn() {
-            self.settings_say(Severity::Error, &format!("无法重新启动：{e}"));
+            self.settings_say(Severity::Error, &trf("无法重新启动：{0}", &[format!("{}", e)]));
             return;
         }
         crate::startup::quit(self);
@@ -150,7 +149,7 @@ impl App {
                 app.settings_busy(false);
                 let p = match res {
                     Ok(p) => p,
-                    Err(e) => return app.settings_say(Severity::Error, &format!("连接失败：{e}")),
+                    Err(e) => return app.settings_say(Severity::Error, &trf("连接失败：{0}", &[format!("{}", e)])),
                 };
                 if !then_enable {
                     let text = app.settings_describe(&p);
@@ -161,8 +160,8 @@ impl App {
                     let (now, off) = (fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes());
                     let by = uploaded_by(p.device.as_deref(), p.saved_at, now, off);
                     let by = if by.is_empty() { String::new() } else { format!("（{by}）") };
-                    let content = format!("云端：{} 个任务{by}\n本机：{local} 个任务\n\n“合并”保留两边的任务，同一个任务取最后修改的一方。\n“用云端数据”会替换本机的任务（适合刚装好的新电脑）。\n两种方式都会先备份本机数据。", p.tasks);
-                    app.settings_confirm("本机和云端都有数据", &content, "合并", "用云端数据", false, |app, r| match r {
+                    let content = trf("云端：{0} 个任务{1}\n本机：{2} 个任务\n\n“合并”保留两边的任务，同一个任务取最后修改的一方。\n“用云端数据”会替换本机的任务（适合刚装好的新电脑）。\n两种方式都会先备份本机数据。", &[format!("{}", p.tasks), format!("{}", by), format!("{}", local)]);
+                    app.settings_confirm(tr("本机和云端都有数据"), &content, tr("合并"), tr("用云端数据"), false, |app, r| match r {
                         "primary" => app.settings_enable(false),
                         "secondary" => app.settings_enable(true),
                         _ => {}
@@ -176,10 +175,10 @@ impl App {
 
     fn settings_describe(&self, p: &Probe) -> String {
         if !p.exists {
-            return format!("连接成功。云端还没有数据，开启后会上传本机的 {} 个任务。", self.doc.tasks.len());
+            return trf("连接成功。云端还没有数据，开启后会上传本机的 {0} 个任务。", &[format!("{}", self.doc.tasks.len())]);
         }
         let by = uploaded_by(p.device.as_deref(), p.saved_at, fluentcal_core::date::now_ms(), fluentcal_core::date::utc_offset_minutes());
-        format!("连接成功。云端已有 {} 个任务、{} 个分组{}。", p.tasks, p.groups, if by.is_empty() { String::new() } else { format!("，{by}") })
+        trf("连接成功。云端已有 {0} 个任务、{1} 个分组{2}。", &[format!("{}", p.tasks), format!("{}", p.groups), format!("{}", if by.is_empty() { String::new() } else { format!("，{by}") })])
     }
 
     fn settings_busy(&mut self, busy: bool) {
@@ -206,9 +205,9 @@ impl App {
                         if replace {
                             app.reload();
                         }
-                        app.settings_say(Severity::Success, if replace { "已开启同步，本机任务已换成云端数据。" } else { "已开启同步。" });
+                        app.settings_say(Severity::Success, if replace { tr("已开启同步，本机任务已换成云端数据。") } else { tr("已开启同步。") });
                     }
-                    Err(e) => app.settings_say(Severity::Error, &format!("开启失败：{e}")),
+                    Err(e) => app.settings_say(Severity::Error, &trf("开启失败：{0}", &[format!("{}", e)])),
                 }
             },
         );

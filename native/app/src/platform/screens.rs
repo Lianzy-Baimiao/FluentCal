@@ -1,6 +1,8 @@
 //! Screens for the desk window (0.2's screens.rs): enumerate monitors, read and place the
 //! window. The decisions (where the calendar goes) are in fluentcal_core::layout.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use fluentcal_core::layout::{Mon, Rect};
 use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM, RECT};
@@ -66,5 +68,5 @@ pub fn number(name: &str, i: usize) -> usize {
 
 /// "显示器 2（主）  2560×1600" (tray menu, settings).
 pub fn title(m: &Mon, i: usize) -> String {
-    format!("显示器 {}{}  {}×{}", number(&m.name, i), if m.primary { "（主）" } else { "" }, m.rect.w, m.rect.h)
+    trf("显示器 {0}{1}  {2}×{3}", &[format!("{}", number(&m.name, i)), format!("{}", if m.primary { tr("（主）") } else { "" }), format!("{}", m.rect.w), format!("{}", m.rect.h)])
 }

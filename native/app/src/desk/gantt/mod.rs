@@ -1,6 +1,8 @@
 //! The desk window's Gantt view (0.2's gantt/): its state, what the window gets (only the
 //! items near the visible part: the chart can be years wide) and scrolling.
 
+use fluentcal_core::i18n::{trf};
+
 pub mod actions;
 pub mod drag;
 pub mod export;
@@ -121,7 +123,7 @@ impl View<'_> {
         }
         self.virtualize(false);
         let (y, mo, _) = parts(&self.date_at(0.3));
-        let label = format!("{y}年{mo}月");
+        let label = trf("{0}年{1}月", &[format!("{}", y), format!("{}", mo)]);
         if label != self.g.label {
             gd.set_label(label.clone().into());
             self.g.label = label;

@@ -37,18 +37,18 @@ export component GanttView inherits Rectangle {
                 horizontal-stretch: 0;
                 small: true;
                 value: GanttData.scale;
-                options: [{ value: "day", label: "日" }, { value: "week", label: "周" }, { value: "month", label: "月" }];
+                options: [{ value: "day", label: @tr("按日") }, { value: "week", label: @tr("周") }, { value: "month", label: @tr("月") }];
                 selected(v) => { GanttData.set-scale(v); }
             }
-            Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.today; text: "今天"; clicked => { GanttData.go-today(); } }
+            Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.today; text: @tr("今天"); clicked => { GanttData.go-today(); } }
             Rectangle { horizontal-stretch: 1; }
-            if !GanttData.read-only: Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.add; text: "新建分组"; clicked => { GanttData.new-group(); } }
+            if !GanttData.read-only: Button { variant: ButtonVariant.subtle; size: ButtonSize.small; icon: Glyph.add; text: @tr("新建分组"); clicked => { GanttData.new-group(); } }
             opt := Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.filter;
-                accessible-label: "显示选项";
-                tip: "显示选项";
+                accessible-label: @tr("显示选项");
+                tip: @tr("显示选项");
                 tip-bottom: true;
                 clicked => { GanttData.options(opt.absolute-position.x, opt.absolute-position.y, opt.width, opt.height); }
             }
@@ -59,7 +59,7 @@ export component GanttView inherits Rectangle {
             background: Theme.desk.cell-bg;
             clip: true;
             accessible-role: table;
-            accessible-label: "甘特图";
+            accessible-label: @tr("甘特图");
             chart := Flickable {
                 x: tw;
                 y: head;
@@ -201,7 +201,7 @@ export component GanttView inherits Rectangle {
                 width: tw;
                 height: head;
                 background: Theme.desk.panel-bg;
-                Text { x: 10px; y: head - 6px - 20px; height: 20px; text: "任务"; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
+                Text { x: 10px; y: head - 6px - 20px; height: 20px; text: @tr("任务"); font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
                 Rectangle { y: head - 1px; height: 1px; background: Theme.c.divider; }
                 Rectangle { x: tw - 1px; width: 1px; background: Theme.c.divider; }
             }
@@ -221,10 +221,10 @@ export component GanttView inherits Rectangle {
                 height: parent.height - head;
                 alignment: center;
                 spacing: 8px;
-                Text { text: "还没有可显示的任务。"; font-size: 12px; color: Theme.c.text-secondary; horizontal-alignment: center; }
+                Text { text: @tr("还没有可显示的任务。"); font-size: 12px; color: Theme.c.text-secondary; horizontal-alignment: center; }
                 if !GanttData.read-only: HorizontalLayout {
                     alignment: center;
-                    Button { variant: ButtonVariant.accent; icon: Glyph.add; text: "新建分组"; clicked => { GanttData.new-group(); } }
+                    Button { variant: ButtonVariant.accent; icon: Glyph.add; text: @tr("新建分组"); clicked => { GanttData.new-group(); } }
                 }
             }
         }

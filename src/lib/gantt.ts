@@ -1,4 +1,5 @@
 import type { GanttScale, Group, ISODate, Task } from '@/types';
+import { t } from '@/i18n';
 import { addDays, addMonths, dayNum, diffDays, endOfMonth, isoWeek, maxDate, minDate, parts, startOfMonth, startOfWeek, weekday } from './date';
 
 /** Pixels per day for each zoom level. */
@@ -37,7 +38,7 @@ export function buildRows(tasks: Task[], groups: Group[], o: RowOptions): GanttR
     byGroup.get(gid)!.push(t);
   }
   const ordered = [...groups].sort((a, b) => a.order - b.order);
-  if (byGroup.has(UNGROUPED)) ordered.push(UNGROUPED_GROUP);
+  if (byGroup.has(UNGROUPED)) ordered.push({ ...UNGROUPED_GROUP, name: t('未分组') });
   const rows: GanttRow[] = [];
   for (const g of ordered) {
     if (o.groupFilter.length && !o.groupFilter.includes(g.id)) continue;
@@ -121,11 +122,11 @@ export function headerTiers(
   if (scale === 'month') {
     const [sy] = parts(range.start);
     const [ey] = parts(range.end);
-    for (let y = sy; y <= ey; y++) top.push(cell(`y${y}`, `${y}年`, `${y}-01-01`, `${y}-12-31`));
+    for (let y = sy; y <= ey; y++) top.push(cell(`y${y}`, t('{0}年', y), `${y}-01-01`, `${y}-12-31`));
   } else {
     for (let m = startOfMonth(range.start); m <= range.end; m = addMonths(m, 1)) {
       const [y, mm] = parts(m);
-      top.push(cell(`m${m}`, `${y}年${mm}月`, m, endOfMonth(m)));
+      top.push(cell(`m${m}`, t('{0}年{1}月', y, mm), m, endOfMonth(m)));
     }
   }
 
@@ -143,7 +144,7 @@ export function headerTiers(
   } else {
     for (let m = startOfMonth(range.start); m <= range.end; m = addMonths(m, 1)) {
       const mm = parts(m)[1];
-      bottom.push(cell(`b${m}`, `${mm}月`, m, endOfMonth(m), { today: startOfMonth(now) === m }));
+      bottom.push(cell(`b${m}`, t('{0}月', mm), m, endOfMonth(m), { today: startOfMonth(now) === m }));
     }
   }
   return { top, bottom };
@@ -151,7 +152,7 @@ export function headerTiers(
 
 /** Label for the week header tooltip: "第 44 周". */
 export function weekLabel(iso: ISODate): string {
-  return `第 ${isoWeek(iso)} 周`;
+  return t('第 {0} 周', isoWeek(iso));
 }
 
 /** SVG path for a finish-to-start dependency arrow between two bars. */

@@ -2,6 +2,8 @@
 //! contain and what each entry does. How they are drawn is popups.rs (the Fluent menu once the
 //! control library is merged; a system menu until then).
 
+use fluentcal_core::i18n::{tr};
+
 use crate::app::App;
 use fluentcal_core::theme::TASK_COLORS;
 
@@ -51,10 +53,10 @@ pub fn shortcut(mut e: Entry, s: &str) -> Entry {
 pub fn swatches(prefix: &str, selected: Option<&str>, with_default: bool) -> Entry {
     let mut s = Vec::new();
     if with_default {
-        s.push((String::new(), String::new(), "默认".to_owned(), selected.is_none_or(str::is_empty)));
+        s.push((String::new(), String::new(), tr("默认").to_owned(), selected.is_none_or(str::is_empty)));
     }
     for c in TASK_COLORS {
-        s.push((c.key.into(), c.bar.into(), c.label.into(), selected == Some(c.key)));
+        s.push((c.key.into(), c.bar.into(), tr(c.label).into(), selected == Some(c.key)));
     }
     Entry { id: prefix.into(), swatches: s, ..Default::default() }
 }

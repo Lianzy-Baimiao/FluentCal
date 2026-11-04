@@ -224,7 +224,7 @@ export component TextBox {
                 border-radius: Theme.radius-control;
                 background: cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
                 accessible-role: button;
-                accessible-label: "清除";
+                accessible-label: @tr("清除");
                 Icon { glyph: Glyph.close; size: 10px; color: Theme.c.text-secondary; }
                 cta := TouchArea {
                     clicked => {
@@ -381,7 +381,7 @@ export component NumberBox {
                 border-radius: Theme.radius-control;
                 background: can && sta.pressed ? Theme.c.subtle-fill-pressed : can && sta.has-hover ? Theme.c.subtle-fill-hover : transparent;
                 accessible-role: button;
-                accessible-label: d > 0 ? "增加" : "减少";
+                accessible-label: d > 0 ? @tr("增加") : @tr("减少");
                 Icon {
                     glyph: d > 0 ? Glyph.chevron-up : Glyph.chevron-down;
                     size: 10px;
@@ -404,7 +404,7 @@ export struct SelectOption { value: string, label: string, icon: string, disable
 export component Select {
     in property <[SelectOption]> options;
     in property <string> value;
-    in property <string> placeholder: "请选择";
+    in property <string> placeholder: @tr("请选择");
     in property <bool> enabled: true;
     callback selected(string);
     property <int> sel: index-of(value);
@@ -646,12 +646,12 @@ export component CalendarView {
     property <[CalDay]> days: Fluent.month-grid(vy, vm, first-day, lunar, markers);
     property <length> cw: (root.width - 8px) / 7;
     property <length> ch: lunar ? 44px : 42px;
-    property <[string]> week: ["日", "一", "二", "三", "四", "五", "六"];
+    property <[string]> week: [@tr("日"), @tr("一"), @tr("二"), @tr("三"), @tr("四"), @tr("五"), @tr("六")];
     forward-focus: fs;
     width: lunar ? 316px : 300px;
     height: months ? 2px + 40px + 16px + 3 * 56px + 2 * 4px + 6px : 2px + 40px + 32px + 6 * ch + 6px;
     accessible-role: table;
-    accessible-label: "\{vy}年\{vm}月";
+    accessible-label: @tr("{0}年{1}月" , vy, vm);
     changed selected => {
         if selected != "" {
             cursor = selected;
@@ -693,7 +693,7 @@ export component CalendarView {
             accessible-role: button;
             Text {
                 x: 8px;
-                text: root.months ? "\{root.vy}年" : "\{root.vy}年\{root.vm}月";
+                text: root.months ? @tr("{0}年" , root.vy) : @tr("{0}年{1}月" , root.vy, root.vm);
                 font-weight: 600;
                 color: Theme.c.text-primary;
                 vertical-alignment: center;
@@ -709,7 +709,7 @@ export component CalendarView {
             border-radius: Theme.radius-control;
             background: nta.pressed ? Theme.c.subtle-fill-pressed : nta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
-            accessible-label: root.months ? (d < 0 ? "上一年" : "下一年") : (d < 0 ? "上个月" : "下个月");
+            accessible-label: root.months ? (d < 0 ? @tr("上一年") : @tr("下一年")) : (d < 0 ? @tr("上个月") : @tr("下个月"));
             Icon { glyph: d < 0 ? Glyph.chevron-up : Glyph.chevron-down; size: 12px; color: Theme.c.text-secondary; }
             nta := TouchArea {
                 clicked => {
@@ -752,7 +752,7 @@ export component CalendarView {
             border-width: sel ? 1px : 0;
             border-color: Theme.c.accent-fill;
             accessible-role: button;
-            accessible-label: "\{Fluent.year-of(d.iso)}年\{Fluent.month-of(d.iso)}月\{d.day}";
+            accessible-label: @tr("{0}年{1}月{2}" , Fluent.year-of(d.iso), Fluent.month-of(d.iso), d.day);
             accessible-checked: sel;
             // today + selected: inset 2px accent ring, then 1px on-accent ring
             if cell.today && cell.sel: Rectangle {
@@ -797,7 +797,7 @@ export component CalendarView {
                 height: 10px;
                 text: d.marker;
                 font-size: 9px;
-                color: cell.today ? Theme.c.text-on-accent : d.marker == "休" ? Theme.c.critical : Theme.c.text-secondary;
+                color: cell.today ? Theme.c.text-on-accent : d.marker == @tr("休") ? Theme.c.critical : Theme.c.text-secondary;
                 vertical-alignment: center;
             }
             dta := TouchArea {
@@ -825,7 +825,7 @@ export component CalendarView {
             background: cur ? Theme.c.accent-fill : mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
             Text {
-                text: "\{i + 1}月";
+                text: @tr("{0}月" , i + 1);
                 color: parent.cur ? Theme.c.text-on-accent : Theme.c.text-primary;
                 horizontal-alignment: center;
                 vertical-alignment: center;
@@ -888,7 +888,7 @@ component FieldButton inherits Rectangle {
 // 0.2's FDatePicker: typed dates (parse-date) or the calendar in a flyout.
 export component DatePicker {
     in property <string> value;
-    in property <string> placeholder: "选择日期";
+    in property <string> placeholder: @tr("选择日期");
     in property <int> first-day: 1;
     in property <bool> lunar;
     in property <bool> markers;
@@ -943,7 +943,7 @@ export component DatePicker {
             padding-left: 2px;
             padding-right: 2px;
             Text {
-                text: "周" + ["日", "一", "二", "三", "四", "五", "六"][root.wd];
+                text: @tr("周{0}", [@tr("日"), @tr("一"), @tr("二"), @tr("三"), @tr("四"), @tr("五"), @tr("六")][root.wd]);
                 font-size: 12px;
                 color: Theme.c.text-secondary;
                 vertical-alignment: center;
@@ -956,7 +956,7 @@ export component DatePicker {
             FieldButton {
                 glyph: Glyph.calendar;
                 enabled: root.enabled;
-                label: "打开日历";
+                label: @tr("打开日历");
                 clicked => {
                     if fly.is-open {
                         fly.close();
@@ -969,7 +969,7 @@ export component DatePicker {
     }
     fly := Flyout {
         padded: false;
-        label: "日历";
+        label: @tr("日历");
         CalendarView {
             selected: root.value;
             first-day: root.first-day;
@@ -988,7 +988,7 @@ export component DatePicker {
 // 0.2's FTimePicker: typed times (parse-time) or a list every `step` minutes in a flyout.
 export component TimePicker {
     in property <string> value;
-    in property <string> placeholder: "时间";
+    in property <string> placeholder: @tr("时间");
     in property <int> step: 30;
     in property <bool> clearable;
     in property <bool> enabled: true;
@@ -1048,7 +1048,7 @@ export component TimePicker {
             FieldButton {
                 glyph: Glyph.clock;
                 enabled: root.enabled;
-                label: "选择时间";
+                label: @tr("选择时间");
                 clicked => {
                     if fly.is-open {
                         fly.close();
@@ -1061,7 +1061,7 @@ export component TimePicker {
     }
     fly := Flyout {
         padded: false;
-        label: "时间";
+        label: @tr("时间");
         min-panel-width: root.width;
         property <int> count: floor(24 * 60 / max(1, root.step));
         // The pointer moved over the list since it opened (the focus ring goes then).
@@ -1146,7 +1146,7 @@ export component DashedBorder {
 // Backspace/Delete clears.
 export component ShortcutBox {
     in property <string> value;
-    in property <string> placeholder: "未设置";
+    in property <string> placeholder: @tr("未设置");
     in property <bool> enabled: true;
     callback changed-value(string);
     property <bool> recording;
@@ -1164,8 +1164,8 @@ export component ShortcutBox {
     max-height: 32px;
     preferred-height: 32px;
     accessible-role: button;
-    accessible-label: "快捷键 " + value;
-    accessible-description: recording ? "按下新的快捷键，Esc 取消，Backspace 清除" : "";
+    accessible-label: @tr("快捷键 ") + value;
+    accessible-description: recording ? @tr("按下新的快捷键，Esc 取消，Backspace 清除") : "";
     accessible-enabled: enabled;
     function start() {
         if enabled {
@@ -1230,7 +1230,7 @@ export component ShortcutBox {
             padding-left: 6px;
             padding-right: 6px;
             Text {
-                text: root.recording ? "按下快捷键…" : root.placeholder;
+                text: root.recording ? @tr("按下快捷键…") : root.placeholder;
                 color: root.enabled ? Theme.c.text-secondary : Theme.c.text-disabled;
                 vertical-alignment: center;
             }

@@ -22,9 +22,9 @@ component AddBox inherits Rectangle {
     border-width: 1px;
     border-color: Theme.c.control-stroke;
     accessible-role: text-input;
-    accessible-label: "添加任务";
+    accessible-label: @tr("添加任务");
     accessible-value: root.text;
-    accessible-placeholder-text: "添加任务，回车保存";
+    accessible-placeholder-text: @tr("添加任务，回车保存");
     forward-focus: input;
     // the bottom border: control-strong-stroke, 2px accent when focused
     Rectangle {
@@ -35,7 +35,7 @@ component AddBox inherits Rectangle {
     if root.text == "" && input.preedit-text == "": Text {
         x: 9px;
         width: parent.width - 18px;
-        text: "添加任务，回车保存";
+        text: @tr("添加任务，回车保存");
         font-size: 13px;
         color: Theme.c.text-secondary;
         vertical-alignment: center;
@@ -96,7 +96,7 @@ export component DayListPanel inherits VerticalLayout {
         if root.lunar != "": Text {
             x: title-t.width + 8px;
             y: 1.5px;
-            text: "农历" + root.lunar;
+            text: @tr("农历") + root.lunar;
             font-size: 12px;
             vertical-alignment: center;
             color: Theme.c.text-secondary;
@@ -127,7 +127,7 @@ export component DayListPanel inherits VerticalLayout {
         padding-bottom: 4px;
         Text {
             height: 20px;
-            text: "这一天还没有任务";
+            text: @tr("这一天还没有任务");
             font-size: 12px;
             vertical-alignment: center;
             color: Theme.c.text-tertiary;
@@ -146,9 +146,9 @@ export component DayListPanel inherits VerticalLayout {
             variant: ButtonVariant.subtle;
             size: ButtonSize.icon;
             icon: Glyph.add;
-            tip: "添加";
+            tip: @tr("添加");
             tip-layer: 1;
-            accessible-label: "添加";
+            accessible-label: @tr("添加");
             clicked => { root.add(root.add-text); }
         }
     }
@@ -168,7 +168,7 @@ export component YearMonthPanel inherits VerticalLayout {
             horizontal-stretch: 1;
             padding-left: 6px;
             Text {
-                text: root.year + "年";
+                text: @tr("{0}年", root.year);
                 font-weight: 600;
                 vertical-alignment: center;
                 color: Theme.c.text-primary;
@@ -178,18 +178,18 @@ export component YearMonthPanel inherits VerticalLayout {
             variant: ButtonVariant.subtle;
             size: ButtonSize.icon;
             icon: Glyph.chevron-up;
-            tip: "上一年";
+            tip: @tr("上一年");
             tip-layer: 1;
-            accessible-label: "上一年";
+            accessible-label: @tr("上一年");
             clicked => { root.year -= 1; }
         }
         Button {
             variant: ButtonVariant.subtle;
             size: ButtonSize.icon;
             icon: Glyph.chevron-down;
-            tip: "下一年";
+            tip: @tr("下一年");
             tip-layer: 1;
-            accessible-label: "下一年";
+            accessible-label: @tr("下一年");
             clicked => { root.year += 1; }
         }
     }
@@ -197,7 +197,7 @@ export component YearMonthPanel inherits VerticalLayout {
     Rectangle {
         height: 3 * 48px + 2 * 4px;
         accessible-role: list;
-        accessible-label: root.year + "年";
+        accessible-label: @tr("{0}年", root.year);
         for m[i] in 12: Rectangle {
             property <string> key: root.year + "-" + (i < 9 ? "0" : "") + (i + 1);
             property <bool> cur: key == root.cursor;
@@ -209,11 +209,11 @@ export component YearMonthPanel inherits VerticalLayout {
             border-radius: 4px;
             background: cur ? Theme.c.accent-fill : mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: list-item;
-            accessible-label: (i + 1) + "月";
+            accessible-label: @tr("{0}月", i + 1);
             accessible-item-selected: cur;
             accessible-item-selectable: true;
             Text {
-                text: (i + 1) + "月";
+                text: @tr("{0}月", i + 1);
                 font-weight: is-now ? 600 : 400;
                 color: cur ? Theme.c.text-on-accent : is-now ? Theme.c.accent-text : Theme.c.text-primary;
                 horizontal-alignment: center;
@@ -252,7 +252,7 @@ export component SearchPanel inherits Rectangle {
     border-width: 1px;
     border-color: Theme.c.card-stroke;
     accessible-role: groupbox;
-    accessible-label: "搜索任务";
+    accessible-label: @tr("搜索任务");
     // presses on the panel don't reach the calendar below
     TouchArea { }
     VerticalLayout {
@@ -264,7 +264,7 @@ export component SearchPanel inherits Rectangle {
                 horizontal-stretch: 1;
                 text <=> root.query;
                 icon: Glyph.search;
-                placeholder: "搜索任务、备注或分组";
+                placeholder: @tr("搜索任务、备注或分组");
                 clearable: true;
                 autofocus: true;
                 edited => { root.filters-changed(); }
@@ -276,8 +276,8 @@ export component SearchPanel inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.close;
-                tip: "关闭 (Esc)";
-                accessible-label: "关闭 (Esc)";
+                tip: @tr("关闭 (Esc)");
+                accessible-label: @tr("关闭 (Esc)");
                 clicked => { root.close(); }
             }
         }
@@ -289,10 +289,10 @@ export component SearchPanel inherits Rectangle {
                 width: 120px;
                 value: root.range;
                 options: [
-                    { value: "all", label: "全部时间" },
-                    { value: "1m", label: "前后一月" },
-                    { value: "3m", label: "前后三月" },
-                    { value: "1y", label: "前后一年" },
+                    { value: "all", label: @tr("全部时间") },
+                    { value: "1m", label: @tr("前后一月") },
+                    { value: "3m", label: @tr("前后三月") },
+                    { value: "1y", label: @tr("前后一年") },
                 ];
                 selected(v) => { root.range = v; root.filters-changed(); }
             }
@@ -300,9 +300,9 @@ export component SearchPanel inherits Rectangle {
                 width: 120px;
                 value: root.status;
                 options: [
-                    { value: "all", label: "全部" },
-                    { value: "undone", label: "未完成" },
-                    { value: "done", label: "已完成" },
+                    { value: "all", label: @tr("全部") },
+                    { value: "undone", label: @tr("未完成") },
+                    { value: "done", label: @tr("已完成") },
                 ];
                 selected(v) => { root.status = v; root.filters-changed(); }
             }
@@ -334,7 +334,7 @@ export component SearchPanel inherits Rectangle {
             content-height: root.hits.length * 32px;
             mouse-drag-pan-enabled: false;
             accessible-role: list;
-            accessible-label: "搜索结果";
+            accessible-label: @tr("搜索结果");
             for h[i] in root.hits: Rectangle {
                 y: i * 32px;
                 width: parent.width;

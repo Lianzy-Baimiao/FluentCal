@@ -9,6 +9,7 @@ import { Severity } from "cards.slint";
 export struct SMsg { shown: bool, severity: Severity, title: string, text: string }
 
 export struct SGeneral {
+    language: string,
     autostart: bool, autostart-desc: string,
     pin-mode: string, pin-hint: string,
     locked: bool, click-through: bool, no-activate: bool,

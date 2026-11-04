@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 import FIcon from './FIcon.vue';
 import { addDays, daysInMonth, iso, toDate, todayIso } from './dates';
@@ -33,7 +34,7 @@ watch(() => props.modelValue, (v) => {
 });
 
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
-const weekdays = computed(() => [...WEEK.slice(props.firstDay), ...WEEK.slice(0, props.firstDay)]);
+const weekdays = computed(() => [...WEEK.slice(props.firstDay), ...WEEK.slice(0, props.firstDay)].map(v => tr(v)));
 
 const days = computed(() => {
   const { y, m } = view.value;
@@ -97,18 +98,18 @@ function key(e: KeyboardEvent) {
   <div class="f-cal" :class="{ lunar: !!lunar }">
     <div class="head">
       <button type="button" class="title" @click="mode = mode === 'days' ? 'months' : 'days'">
-        {{ mode === 'days' ? `${view.y}年${view.m}月` : `${view.y}年` }}
+        {{ mode === 'days' ? tr("{0}年{1}月", view.y, view.m) : tr("{0}年", view.y) }}
       </button>
-      <button type="button" class="nav" :aria-label="mode === 'days' ? '上个月' : '上一年'" @click="mode === 'days' ? shift(-1) : (view.y--)">
+      <button type="button" class="nav" :aria-label="mode === 'days' ? tr('上个月') : tr('上一年')" @click="mode === 'days' ? shift(-1) : (view.y--)">
         <FIcon name="chevronUp" :size="12" />
       </button>
-      <button type="button" class="nav" :aria-label="mode === 'days' ? '下个月' : '下一年'" @click="mode === 'days' ? shift(1) : (view.y++)">
+      <button type="button" class="nav" :aria-label="mode === 'days' ? tr('下个月') : tr('下一年')" @click="mode === 'days' ? shift(1) : (view.y++)">
         <FIcon name="chevronDown" :size="12" />
       </button>
     </div>
     <template v-if="mode === 'days'">
       <div class="week"><span v-for="w in weekdays" :key="w">{{ w }}</span></div>
-      <div ref="grid" class="grid" role="group" :aria-label="`${view.y}年${view.m}月`" @keydown="key">
+      <div ref="grid" class="grid" role="group" :aria-label="tr('{0}年{1}月', view.y, view.m)" @keydown="key">
         <button
           v-for="d in days"
           :key="d.iso"
@@ -121,10 +122,10 @@ function key(e: KeyboardEvent) {
           :aria-current="d.iso === today ? 'date' : undefined"
           @click="pick(d.iso)"
         >
-          <span class="visually-hidden">{{ +d.iso.slice(0, 4) }}年{{ +d.iso.slice(5, 7) }}月</span>
+          <span class="visually-hidden">{{ +d.iso.slice(0, 4) }}{{ tr("年") }}{{ +d.iso.slice(5, 7) }}{{ tr("月") }}</span>
           <span class="num">{{ d.day }}</span>
           <span v-if="d.lunar" class="lun">{{ d.lunar }}</span>
-          <span v-if="d.marker" class="mark" :class="{ off: d.marker === '休' }">{{ d.marker }}</span>
+          <span v-if="d.marker" class="mark" :class="{ off: d.marker === tr('休') }">{{ d.marker }}</span>
         </button>
       </div>
     </template>
@@ -136,7 +137,7 @@ function key(e: KeyboardEvent) {
         class="mon"
         :class="{ cur: m === view.m }"
         @click="pickMonth(m)"
-      >{{ m }}月</button>
+      >{{ m }}{{ tr("月") }}</button>
     </div>
   </div>
 </template>

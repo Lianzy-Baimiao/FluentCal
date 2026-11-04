@@ -11,6 +11,7 @@ pub mod editor;
 pub mod export;
 pub mod gantt;
 pub mod history;
+pub mod i18n;
 pub mod holidays;
 pub mod layout;
 pub mod lunar;

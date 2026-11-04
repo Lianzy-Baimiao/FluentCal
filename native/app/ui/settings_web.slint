@@ -33,30 +33,30 @@ component Bullet inherits Rectangle {
 
 export component WebPage inherits VerticalLayout {
     spacing: 4px;
-    if SetState.web.error != "": InfoBar { severity: Severity.error; title: "网页服务没有启动"; text: SetState.web.error; }
+    if SetState.web.error != "": InfoBar { severity: Severity.error; title: @tr("网页服务没有启动"); text: SetState.web.error; }
     if SetState.msg.shown: PageMsg { }
     SettingsGroup {
-        title: "这台电脑";
+        title: @tr("这台电脑");
         SettingsCard {
             icon: Glyph.desktop;
-            title: "在浏览器中查看";
-            description: "用这台电脑的浏览器查看日历、列表和甘特图（只读）。只有本机能访问，不需要下面的开关，也不会弹出防火墙询问；日历上右键也能打开";
-            Button { text: "打开"; clicked => { SetState.action("web-open-local"); } }
+            title: @tr("在浏览器中查看");
+            description: @tr("用这台电脑的浏览器查看日历、列表和甘特图（只读）。只有本机能访问，不需要下面的开关，也不会弹出防火墙询问；日历上右键也能打开");
+            Button { text: @tr("打开"); clicked => { SetState.action("web-open-local"); } }
         }
     }
     SettingsGroup {
         first: false;
-        title: "手机和其他设备";
+        title: @tr("手机和其他设备");
         SettingsCard {
             icon: Glyph.globe;
-            title: "允许局域网内的设备查看";
-            description: "同一 Wi-Fi/局域网内的手机、平板或电脑打开链接或扫二维码即可查看。只能查看，不能修改";
+            title: @tr("允许局域网内的设备查看");
+            description: @tr("同一 Wi-Fi/局域网内的手机、平板或电脑打开链接或扫二维码即可查看。只能查看，不能修改");
             Toggle { checked: SetState.web.enabled; toggled(v) => { SetState.set-bool("web.enabled", v); } }
         }
     }
     if SetState.web.enabled && SetState.web.running: SettingsGroup {
         first: false;
-        title: "打开方式";
+        title: @tr("打开方式");
         // .share: 16px padding, 20px gap, card fill
         Rectangle {
             border-radius: Theme.radius-overlay;
@@ -75,7 +75,7 @@ export component WebPage inherits VerticalLayout {
                         source: SetState.web.qr;
                         image-rendering: pixelated;
                         accessible-role: image;
-                        accessible-label: "网页查看的二维码";
+                        accessible-label: @tr("网页查看的二维码");
                     }
                 }
                 VerticalLayout {
@@ -83,7 +83,7 @@ export component WebPage inherits VerticalLayout {
                     spacing: 8px;
                     alignment: start;
                     Text {
-                        text: SetState.web.has-addresses ? "用手机相机或微信扫码，或在浏览器中打开：" : "这台电脑没有连接局域网，只能在本机浏览器中查看。";
+                        text: SetState.web.has-addresses ? @tr("用手机相机或微信扫码，或在浏览器中打开：") : @tr("这台电脑没有连接局域网，只能在本机浏览器中查看。");
                         font-size: 12px;
                         color: Theme.c.text-secondary;
                         wrap: word-wrap;
@@ -95,12 +95,12 @@ export component WebPage inherits VerticalLayout {
                         alignment: start;
                         Text { text: a.text; font-family: "Consolas"; font-size: 14px; color: Theme.c.text-primary; vertical-alignment: center; }
                         Text { text: a.note; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
-                        Button { text: "复制链接"; size: ButtonSize.small; clicked => { SetState.action-arg("copy", a.url); } }
+                        Button { text: @tr("复制链接"); size: ButtonSize.small; clicked => { SetState.action-arg("copy", a.url); } }
                     }
                     HorizontalLayout {
                         padding-top: 4px;
                         alignment: start;
-                        Button { text: "更换访问码"; size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.key; clicked => { SetState.action("web-reset-token"); } }
+                        Button { text: @tr("更换访问码"); size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.key; clicked => { SetState.action("web-reset-token"); } }
                     }
                 }
             }
@@ -108,20 +108,20 @@ export component WebPage inherits VerticalLayout {
     }
     SettingsGroup {
         first: false;
-        title: "高级";
+        title: @tr("高级");
         SettingsCard {
             icon: Glyph.settings;
-            title: "端口";
-            description: "被其他程序占用时换一个（1024–65535）";
+            title: @tr("端口");
+            description: @tr("被其他程序占用时换一个（1024–65535）");
             NumberBox { width: 120px; value: SetState.web.port; minimum: 1024; maximum: 65535; changed-value(v) => { SetState.set-num("web.port", v); } }
         }
     }
     // ul.note.list: the scoped .note { margin: 0 } comes after .list's margin-top, so none
     VerticalLayout {
-        Bullet { text: "第一次打开“允许局域网内的设备查看”时 Windows 防火墙会询问是否允许 FluentCal 访问网络，请勾选“专用网络”并允许，否则手机连不上。"; }
-        Bullet { text: "链接里带有访问码，知道链接的人都能查看你的日程；不小心发给了别人就点“更换访问码”。"; }
-        Bullet { text: "局域网内传输没有加密，只在家里、公司等信任的网络中使用。"; }
-        Bullet { text: "网页由这台电脑上运行的 FluentCal 提供：电脑关机或退出 FluentCal 后打不开。在电脑上的修改几秒内会出现在网页上。"; }
+        Bullet { text: @tr("第一次打开“允许局域网内的设备查看”时 Windows 防火墙会询问是否允许 FluentCal 访问网络，请勾选“专用网络”并允许，否则手机连不上。"); }
+        Bullet { text: @tr("链接里带有访问码，知道链接的人都能查看你的日程；不小心发给了别人就点“更换访问码”。"); }
+        Bullet { text: @tr("局域网内传输没有加密，只在家里、公司等信任的网络中使用。"); }
+        Bullet { text: @tr("网页由这台电脑上运行的 FluentCal 提供：电脑关机或退出 FluentCal 后打不开。在电脑上的修改几秒内会出现在网页上。"); }
     }
 }
 
@@ -135,30 +135,30 @@ export component AboutPage inherits VerticalLayout {
         Image { width: 64px; height: 64px; source: SetState.icon; accessible-role: none; }
         VerticalLayout {
             alignment: center;
-            Text { text: "FluentCal 桌面日历"; font-size: 20px; font-weight: 600; height: 20px; vertical-alignment: center; color: Theme.c.text-primary; }
+            Text { text: @tr("FluentCal 桌面日历"); font-size: 20px; font-weight: 600; height: 20px; vertical-alignment: center; color: Theme.c.text-primary; }
             Rectangle { height: 4px; }
-            Text { text: "版本 " + SetState.about.version + " · Windows 内部版本 " + SetState.about.build; font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
-            Text { text: "钉在桌面上的 Windows 11 风格日历与甘特图。数据只保存在本机。"; font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
+            Text { text: @tr("版本 ") + SetState.about.version + @tr(" · Windows 内部版本 ") + SetState.about.build; font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
+            Text { text: @tr("钉在桌面上的 Windows 11 风格日历与甘特图。数据只保存在本机。"); font-size: 12px; height: 20px; vertical-alignment: center; color: Theme.c.text-secondary; }
         }
     }
     SettingsGroup {
-        title: "使用技巧";
-        SettingsCard { icon: Glyph.help; title: "双击日期空白处快速添加任务"; description: "回车保存后可继续输入下一条，Esc 结束"; has-content: false; }
-        SettingsCard { icon: Glyph.mouse; title: "拖动任务改期"; description: "在月视图中拖到其他日期；在甘特图中拖动任务条、两端或底部圆点调整日期和进度"; has-content: false; }
-        SettingsCard { icon: Glyph.keyboard; title: "键盘"; description: "方向键选择日期，Enter 添加，PageUp/PageDown 翻页，Home 回到今天，Ctrl+F 搜索。嵌入桌面时点日历不会抢走键盘，先按 Ctrl+Alt+D 唤出日历再用"; has-content: false; }
+        title: @tr("使用技巧");
+        SettingsCard { icon: Glyph.help; title: @tr("双击日期空白处快速添加任务"); description: @tr("回车保存后可继续输入下一条，Esc 结束"); has-content: false; }
+        SettingsCard { icon: Glyph.mouse; title: @tr("拖动任务改期"); description: @tr("在月视图中拖到其他日期；在甘特图中拖动任务条、两端或底部圆点调整日期和进度"); has-content: false; }
+        SettingsCard { icon: Glyph.keyboard; title: @tr("键盘"); description: @tr("方向键选择日期，Enter 添加，PageUp/PageDown 翻页，Home 回到今天，Ctrl+F 搜索。嵌入桌面时点日历不会抢走键盘，先按 Ctrl+Alt+D 唤出日历再用"); has-content: false; }
     }
     SettingsGroup {
         first: false;
-        title: "开源组件";
+        title: @tr("开源组件");
         for l in [
-            { name: "Slint", desc: "界面框架（免版税许可 / GPL-3.0）", url: "https://slint.dev" },
-            { name: "tyme4rs", desc: "农历、节气、法定节假日（MIT）", url: "https://github.com/6tail/tyme4rs" },
-            { name: "holiday-cn", desc: "国务院放假安排数据（MIT）", url: "https://github.com/NateScarlet/holiday-cn" },
-            { name: "resvg", desc: "甘特图导出图片（Apache-2.0 / MIT）", url: "https://github.com/linebender/resvg" },
+            { name: "Slint", desc: @tr("界面框架（免版税许可 / GPL-3.0）"), url: "https://slint.dev" },
+            { name: "tyme4rs", desc: @tr("农历、节气、法定节假日（MIT）"), url: "https://github.com/6tail/tyme4rs" },
+            { name: "holiday-cn", desc: @tr("国务院放假安排数据（MIT）"), url: "https://github.com/NateScarlet/holiday-cn" },
+            { name: "resvg", desc: @tr("甘特图导出图片（Apache-2.0 / MIT）"), url: "https://github.com/linebender/resvg" },
         ]: SettingsCard {
             title: l.name;
             description: l.desc;
-            Button { text: "主页"; variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", l.url); } }
+            Button { text: @tr("主页"); variant: ButtonVariant.subtle; icon: Glyph.link; clicked => { SetState.action-arg("open-url", l.url); } }
         }
         // Slint's royalty-free licence: the "Made with Slint" badge on the About page.
         Rectangle {

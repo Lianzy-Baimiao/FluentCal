@@ -20,7 +20,7 @@ export component GTableRow inherits Rectangle {
         : ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
     accessible-role: list-item;
     // the add row: named by its button (0.2's listitem holds "添加任务")
-    accessible-label: add ? "添加任务" : r.name;
+    accessible-label: add ? @tr("添加任务") : r.name;
     accessible-item-selected: sel;
     ta := TouchArea {
         clicked => { if group { GanttData.row-chevron(r); } else if task { GanttData.row-click(r); } }
@@ -45,7 +45,7 @@ export component GTableRow inherits Rectangle {
             Icon { glyph: r.collapsed ? Glyph.chevron-right : Glyph.chevron-down; size: 10px; color: Theme.c.text-secondary; }
             cta := TouchArea { clicked => { GanttData.row-chevron(r); } }
             accessible-role: button;
-            accessible-label: (r.collapsed ? "展开分组 " : "折叠分组 ") + r.name;
+            accessible-label: (r.collapsed ? @tr("展开分组 ") : @tr("折叠分组 ")) + r.name;
         }
         if group: Rectangle { width: 8px; height: 8px; border-radius: 2px; background: r.color; }
         if task && !r.repeat: Rectangle {
@@ -59,7 +59,7 @@ export component GTableRow inherits Rectangle {
             TouchArea { clicked => { if !GanttData.read-only { GanttData.row-check(r); } } double-clicked => { } }
             accessible-role: checkbox;
             accessible-checked: r.checked;
-            accessible-label: "完成 " + r.name;
+            accessible-label: @tr("完成 ") + r.name;
         }
         if task && r.repeat: Icon { glyph: Glyph.repeat; size: 11px; color: Theme.c.text-secondary; }
         if task && r.milestone: Path {
@@ -139,10 +139,10 @@ export component GTableRow inherits Rectangle {
             spacing: 4px;
             cross-axis-alignment: center;
             Icon { glyph: Glyph.add; size: 11px; color: ata.has-hover ? Theme.c.accent-text : Theme.c.text-secondary; }
-            Text { text: "添加任务"; font-size: 12px; color: ata.has-hover ? Theme.c.accent-text : Theme.c.text-secondary; vertical-alignment: center; }
+            Text { text: @tr("添加任务"); font-size: 12px; color: ata.has-hover ? Theme.c.accent-text : Theme.c.text-secondary; vertical-alignment: center; }
         }
         ata := TouchArea { clicked => { GanttData.add-task(r.id); } }
         accessible-role: button;
-        accessible-label: "添加任务";
+        accessible-label: @tr("添加任务");
     }
 }

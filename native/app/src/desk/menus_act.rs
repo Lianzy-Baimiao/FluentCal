@@ -1,5 +1,7 @@
 //! What the menu entries do (the actions of 0.2's menus.ts and gantt/actions.ts).
 
+use fluentcal_core::i18n::{tr, trf};
+
 use super::menus::Target;
 use crate::app::App;
 use fluentcal_core::date::{add_days, now_ms};
@@ -149,9 +151,9 @@ impl App {
     pub fn gantt_delete_group(&mut self, gid: &str) {
         let Some(g) = self.doc.groups.get(gid).cloned() else { return };
         let n = self.doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(gid)).count();
-        let text = if n > 0 { format!("组内 {n} 个任务会移到“未分组”，不会被删除。") } else { String::new() };
+        let text = if n > 0 { trf("组内 {0} 个任务会移到“未分组”，不会被删除。", &[format!("{}", n)]) } else { String::new() };
         let gid = gid.to_owned();
-        self.confirm_later(&format!("删除分组“{}”？", g.name), &text, "删除", move |app| {
+        self.confirm_later(&trf("删除分组“{0}”？", &[format!("{}", g.name)]), &text, tr("删除"), move |app| {
             let e = tasks::delete_group(&app.doc, &gid, now_ms());
             app.apply(e, true);
         });

@@ -1,5 +1,7 @@
 //! Reminder times (0.2's src/lib/reminders.ts).
 
+use crate::i18n::{tr, trf};
+
 use crate::date::{local_ms, local_of_ms, relative_day};
 use crate::model::Task;
 use crate::recur::occurrences;
@@ -21,15 +23,15 @@ pub const REMINDER_OFFSETS: [(i64, &str); 12] = [
 
 pub fn offset_label(min: i64) -> String {
     if let Some((_, l)) = REMINDER_OFFSETS.iter().find(|(v, _)| *v == min) {
-        return (*l).into();
+        return tr(l).into();
     }
     if min % 1440 == 0 {
-        return format!("提前 {} 天", min / 1440);
+        return trf("提前 {0} 天", &[format!("{}", min / 1440)]);
     }
     if min % 60 == 0 {
-        return format!("提前 {} 小时", min / 60);
+        return trf("提前 {0} 小时", &[format!("{}", min / 60)]);
     }
-    format!("提前 {min} 分钟")
+    trf("提前 {0} 分钟", &[format!("{}", min)])
 }
 
 #[derive(Debug, Clone, PartialEq)]

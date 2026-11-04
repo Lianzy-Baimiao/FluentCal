@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import FButton from './FButton.vue';
 import { provideField } from './field';
@@ -15,7 +16,7 @@ const props = withDefaults(
     danger?: boolean;
     width?: number;
   }>(),
-  { closeText: '取消' },
+  { closeText: tr("取消") },
 );
 const emit = defineEmits<{ 'update:open': [boolean]; primary: []; secondary: []; close: [] }>();
 

@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { TASK_COLORS } from '@/fluent';
 import type { ISODate } from '@/types';
 import { addDays, addMonths, diffDays, formatYMD, isoWeek, monthWeeks, parts, startOfMonth, weekday, WEEKDAY_SHORT } from '@/lib/date';
-import { almanac, dayInfo } from '@/lib/lunar';
+import { almanac, displayInfo as dayInfo } from '@/lib/lunar';
 import { occurrences, type Occurrence } from '@/lib/recur';
 import { layoutWeek, type Chip } from '@/lib/layout';
 import { moveOccurrence, setOccurrenceDone } from '@/lib/tasks';
@@ -75,28 +76,28 @@ function cellInfo(date: ISODate): CellInfo {
   const legal = c.showHolidays ? info.legal : undefined;
   const rest = legal ? !legal.work : c.restDays.includes(weekday(date));
   const lunar = c.showLunar || info.kind === 'festival' ? info.text : '';
-  const wd = `周${WEEKDAY_SHORT[weekday(date)]}`;
-  const tip = [`${formatYMD(date)} ${wd}`, `农历${info.lunarLabel} · ${info.ganzhiYear}`];
+  const wd = tr("周{0}", tr(WEEKDAY_SHORT[weekday(date)]));
+  const tip = [`${formatYMD(date)} ${wd}`, tr("农历{0} · {1}", info.lunarLabel, info.ganzhiYear)];
   if (info.festivals.length) tip.push(info.festivals.join('、'));
-  if (info.term) tip.push(`节气：${info.term}`);
-  if (legal) tip.push(`${legal.name} · ${legal.work ? '调休上班' : '放假'}`);
+  if (info.term) tip.push(tr("节气：{0}", info.term));
+  if (legal) tip.push(`${legal.name} · ${legal.work ? tr("调休上班") : tr("放假")}`);
   if (c.showAlmanac) {
     const a = almanac(date);
-    tip.push(`宜：${a.recommends.slice(0, 8).join(' ') || '—'}`, `忌：${a.avoids.slice(0, 8).join(' ') || '—'}`);
+    tip.push(tr("宜：{0}", a.recommends.slice(0, 8).map(v => tr(v)).join(' · ') || '—'), tr("忌：{0}", a.avoids.slice(0, 8).map(v => tr(v)).join(' · ') || '—'));
   }
   const count = occs.value.filter((o) => o.start <= date && o.end >= date).length;
   return {
     date,
-    label: d === 1 && date.slice(0, 7) !== focusMonth.value ? `${m}月` : String(d),
+    label: d === 1 && date.slice(0, 7) !== focusMonth.value ? tr("{0}月{1}日", m, d) : String(d),
     lunar,
     lunarKind: info.kind,
-    badge: legal ? (legal.work ? '班' : '休') : undefined,
+    badge: legal ? (legal.work ? tr("班") : tr("休")) : undefined,
     rest,
     today: date === now.value,
     dim: props.mode === 'month' && date.slice(0, 7) !== focusMonth.value,
     mark: markColor(doc.dayMarks[date]?.color),
     tip: tip.join('\n'),
-    aria: `${m}月${d}日 ${wd}，农历${info.lunarLabel}${legal ? `，${legal.work ? '调休上班' : '放假'}` : ''}，${count ? `${count} 项任务` : '无任务'}`,
+    aria: tr("{0}月{1}日 {2}，农历{3}{4}，{5}", m, d, wd, info.lunarLabel, legal ? `，${legal.work ? tr("调休上班") : tr("放假")}` : '', count ? tr("{0} 项任务", count) : tr("无任务")),
   };
 }
 
@@ -107,7 +108,7 @@ const weekNos = computed(() =>
 const headers = computed(() =>
   Array.from({ length: 7 }, (_, i) => {
     const wd = (cal.value.weekStart + i) % 7;
-    return { label: WEEKDAY_SHORT[wd], rest: cal.value.restDays.includes(wd) };
+    return { label: tr(WEEKDAY_SHORT[wd]), rest: cal.value.restDays.includes(wd) };
   }),
 );
 
@@ -258,7 +259,7 @@ watch(
 <template>
   <div class="month" @wheel.passive="onWheel">
     <div class="weekdays" aria-hidden="true">
-      <span v-if="cal.showWeekNumbers" class="wn">周</span>
+      <span v-if="cal.showWeekNumbers" class="wn">{{ tr("周") }}</span>
       <div class="wd-grid">
         <span v-for="(h, i) in headers" :key="i" :class="{ rest: h.rest }">{{ h.label }}</span>
       </div>
@@ -267,7 +268,7 @@ watch(
       ref="gridEl"
       class="grid"
       role="grid"
-      :aria-label="mode === 'month' ? `${ui.cursor.slice(0, 4)}年${+ui.cursor.slice(5, 7)}月` : '多周视图'"
+      :aria-label="mode === 'month' ? tr('{0}年{1}月', ui.cursor.slice(0, 4), +ui.cursor.slice(5, 7)) : tr('多周视图')"
       :style="{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }"
       @keydown="onGridKey"
     >

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import FIcon from './FIcon.vue';
 
@@ -57,7 +58,7 @@ function key(e: KeyboardEvent) {
 <template>
   <div class="f-nav">
     <div class="layout">
-    <nav ref="pane" class="pane" :aria-label="title ?? '导航'" @keydown="key">
+    <nav ref="pane" class="pane" :aria-label="title ?? tr('导航')" @keydown="key">
       <div v-if="title || $slots.paneHeader" class="pane-title">
         <slot name="paneHeader">{{ title }}</slot>
       </div>

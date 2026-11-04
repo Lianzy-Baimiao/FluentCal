@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { ref, watch } from 'vue';
 import { FButton, FFlyout } from '@/fluent';
 import { parts, ymd } from '@/lib/date';
@@ -23,11 +24,11 @@ const isNow = (m: number) => now.value.startsWith(`${year.value}-${String(m).pad
   <FFlyout v-model:open="open" :anchor="anchor" placement="bottom-start" :width="248">
     <div class="ym" style="--text-glow: none">
       <div class="hd">
-        <span class="y">{{ year }}年</span>
-        <FButton variant="subtle" size="icon" icon="chevronUp" title="上一年" @click="year--" />
-        <FButton variant="subtle" size="icon" icon="chevronDown" title="下一年" @click="year++" />
+        <span class="y">{{ year }}{{ tr("年") }}</span>
+        <FButton variant="subtle" size="icon" icon="chevronUp" :title="tr('上一年')" @click="year--" />
+        <FButton variant="subtle" size="icon" icon="chevronDown" :title="tr('下一年')" @click="year++" />
       </div>
-      <div class="grid" role="listbox" :aria-label="`${year}年`">
+      <div class="grid" role="listbox" :aria-label="tr('{0}年', year)">
         <button
           v-for="m in months"
           :key="m"
@@ -37,8 +38,7 @@ const isNow = (m: number) => now.value.startsWith(`${year.value}-${String(m).pad
           :class="{ cur: isCurrent(m), now: isNow(m) }"
           @click="pick(m)"
         >
-          {{ m }}月
-        </button>
+          {{ m }}{{ tr("月") }}</button>
       </div>
     </div>
   </FFlyout>

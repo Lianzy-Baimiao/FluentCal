@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { useFieldName, useSplitAttrs } from './field';
 
 defineOptions({ inheritAttrs: false });
@@ -13,11 +14,11 @@ const props = withDefaults(
     disabled?: boolean;
     label?: string;
   }>(),
-  { onText: '开', offText: '关', showText: true, textPosition: 'left' },
+  { onText: tr("开"), offText: tr("关"), showText: true, textPosition: 'left' },
 );
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>();
 // The 开/关 text sits outside the switch so it never conflicts with the switch's name.
-const name = useFieldName(() => props.label, () => '开关');
+const name = useFieldName(() => props.label, () => tr("开关"));
 const split = useSplitAttrs();
 
 function toggle() {

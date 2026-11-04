@@ -1,11 +1,13 @@
 //! View models of the desk calendar (0.2's MonthView/WeekRow/TaskChip/CountdownBar/TitleBar
 //! computeds): plain data for the Slint structs.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use crate::theme::color;
 use crate::{CellData, ChipData, CountdownData, WeekData, WeekdayHead};
 use fluentcal_core::countdown::countdowns;
 use fluentcal_core::date::{add_days, add_months, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
-use fluentcal_core::lunar::{almanac, day_info, Kind};
+use fluentcal_core::lunar::{almanac, display_info as day_info, Kind};
 use fluentcal_core::model::Task;
 use fluentcal_core::recur::{describe_rule, occurrences, Occurrence};
 use fluentcal_core::tasks::Doc;
@@ -79,21 +81,21 @@ fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
 pub fn view_title(doc: &Doc, ui: &DeskUi, today: &str) -> String {
     let c = &doc.settings.calendar;
     match c.view.as_str() {
-        "gantt" => "甘特图".into(),
+        "gantt" => tr("甘特图").into(),
         "weeks" => {
             let s = &ui.weeks_start;
             let e = add_days(s, c.weeks_rows as i32 * 7 - 1);
             let ((sy, sm, sd), (ey, em, ed)) = (parts(s), parts(&e));
-            let yr = if sy == parts(today).0 { String::new() } else { format!("{sy}年") };
+            let yr = if sy == parts(today).0 { String::new() } else { trf("{0}年", &[format!("{}", sy)]) };
             if sy == ey {
-                format!("{yr}{sm}月{sd}日 – {em}月{ed}日")
+                trf("{0}{1}月{2}日 – {3}月{4}日", &[format!("{}", yr), format!("{}", sm), format!("{}", sd), format!("{}", em), format!("{}", ed)])
             } else {
-                format!("{sy}年{sm}月{sd}日 – {ey}年{em}月{ed}日")
+                trf("{0}年{1}月{2}日 – {3}年{4}月{5}日", &[format!("{}", sy), format!("{}", sm), format!("{}", sd), format!("{}", ey), format!("{}", em), format!("{}", ed)])
             }
         }
         _ => {
             let (y, m, _) = parts(&ui.cursor);
-            format!("{y}年{m}月")
+            trf("{0}年{1}月", &[format!("{}", y), format!("{}", m)])
         }
     }
 }
@@ -101,7 +103,7 @@ pub fn view_title(doc: &Doc, ui: &DeskUi, today: &str) -> String {
 pub fn today_tip(today: &str) -> String {
     let i = day_info(today);
     let fest = if i.festivals.is_empty() { String::new() } else { format!("\n{}", i.festivals.join("、")) };
-    format!("{} 周{}\n农历{} · {}{fest}", format_ymd(today), WEEKDAY_SHORT[weekday(today) as usize], i.lunar_label, i.ganzhi_year)
+    trf("{0} 周{1}\n农历{2} · {3}{4}", &[format!("{}", format_ymd(today)), format!("{}", fluentcal_core::i18n::tr(WEEKDAY_SHORT[weekday(today) as usize])), format!("{}", i.lunar_label), format!("{}", i.ganzhi_year), format!("{}", fest)])
 }
 
 pub fn weekday_heads(doc: &Doc) -> ModelRc<WeekdayHead> {
@@ -110,7 +112,7 @@ pub fn weekday_heads(doc: &Doc) -> ModelRc<WeekdayHead> {
         (0..7)
             .map(|i| {
                 let wd = (c.week_start + i) % 7;
-                WeekdayHead { label: WEEKDAY_SHORT[wd as usize].into(), rest: c.rest_days.contains(&wd) }
+                WeekdayHead { label: fluentcal_core::i18n::tr(WEEKDAY_SHORT[wd as usize]).into(), rest: c.rest_days.contains(&wd) }
             })
             .collect(),
     )
@@ -124,7 +126,7 @@ pub fn countdown_items(doc: &Doc, today: &str) -> ModelRc<CountdownData> {
             .take(6)
             .map(|c| CountdownData {
                 key: c.key.into(),
-                label: c.label.into(),
+                label: if c.task_id.is_none() { tr(&c.label).into() } else { c.label.into() },
                 tip: format_friendly(&c.date, today).into(),
                 date: c.date.into(),
                 days: c.days,
@@ -183,30 +185,30 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
         None => c.rest_days.contains(&weekday(date)),
     };
     let lunar = if c.show_lunar || info.kind == Kind::Festival { info.text.clone() } else { String::new() };
-    let wd = format!("周{}", WEEKDAY_SHORT[weekday(date) as usize]);
-    let mut tip = vec![format!("{} {wd}", format_ymd(date)), format!("农历{} · {}", info.lunar_label, info.ganzhi_year)];
+    let wd = trf("周{0}", &[format!("{}", fluentcal_core::i18n::tr(WEEKDAY_SHORT[weekday(date) as usize]))]);
+    let mut tip = vec![format!("{} {wd}", format_ymd(date)), trf("农历{0} · {1}", &[format!("{}", info.lunar_label), format!("{}", info.ganzhi_year)])];
     if !info.festivals.is_empty() {
         tip.push(info.festivals.join("、"));
     }
     if let Some(term) = &info.term {
-        tip.push(format!("节气：{term}"));
+        tip.push(trf("节气：{0}", &[format!("{}", term)]));
     }
     if let Some(l) = &legal {
-        tip.push(format!("{} · {}", l.name, if l.work { "调休上班" } else { "放假" }));
+        tip.push(format!("{} · {}", l.name, if l.work { tr("调休上班") } else { tr("放假") }));
     }
     if c.show_almanac {
         let (rec, avoid) = almanac(date);
-        let join = |v: &[String]| if v.is_empty() { "—".to_owned() } else { v.iter().take(8).cloned().collect::<Vec<_>>().join(" ") };
-        tip.push(format!("宜：{}", join(&rec)));
-        tip.push(format!("忌：{}", join(&avoid)));
+        let join = |v: &[String]| if v.is_empty() { "—".to_owned() } else { v.iter().take(8).map(|s| tr(s)).collect::<Vec<_>>().join(" · ") };
+        tip.push(trf("宜：{0}", &[format!("{}", join(&rec))]));
+        tip.push(trf("忌：{0}", &[format!("{}", join(&avoid))]));
     }
     let count = occs.iter().filter(|o| o.start.as_str() <= date && o.end.as_str() >= date).count();
     let in_focus = &date[..7] == focus;
     let mark = doc.day_marks.get(date).and_then(|k| mark_color(k));
-    let legal_aria = legal.as_ref().map_or(String::new(), |l| format!("，{}", if l.work { "调休上班" } else { "放假" }));
+    let legal_aria = legal.as_ref().map_or(String::new(), |l| format!("，{}", if l.work { tr("调休上班") } else { tr("放假") }));
     CellData {
         date: date.into(),
-        label: if d == 1 && !in_focus { format!("{m}月") } else { d.to_string() }.into(),
+        label: if d == 1 && !in_focus { trf("{0}月{1}日", &[m.to_string(), d.to_string()]) } else { d.to_string() }.into(),
         lunar: lunar.into(),
         lunar_kind: match info.kind {
             Kind::Lunar => "lunar",
@@ -215,18 +217,14 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
             Kind::Festival => "festival",
         }
         .into(),
-        badge: legal.as_ref().map_or("", |l| if l.work { "班" } else { "休" }).into(),
+        badge: legal.as_ref().map_or("", |l| if l.work { tr("班") } else { tr("休") }).into(),
         rest,
         today: date == today,
         dim: month_mode && !in_focus,
         marked: mark.is_some(),
         mark: color(mark.unwrap_or(TRANSPARENT)),
         tip: tip.join("\n").into(),
-        aria: format!(
-            "{m}月{d}日 {wd}，农历{}{legal_aria}，{}",
-            info.lunar_label,
-            if count > 0 { format!("{count} 项任务") } else { "无任务".into() }
-        )
+        aria: trf("{0}月{1}日 {2}，农历{3}{4}，{5}", &[format!("{}", m), format!("{}", d), format!("{}", wd), format!("{}", info.lunar_label), format!("{}", legal_aria), format!("{}", if count > 0 { trf("{0} 项任务", &[count.to_string()]) } else { tr("无任务").into() })])
         .into(),
     }
 }
@@ -236,13 +234,13 @@ pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
     let col = task_color(task.color.as_deref(), t);
     let mut tip = vec![task.title.clone(), format_range(&ch.occ.start, &ch.occ.end, today) + &task.time.as_deref().map_or(String::new(), |tm| format!(" {tm}"))];
     if let Some(g) = task.group_id.as_deref().and_then(|id| doc.groups.get(id)) {
-        tip.push(format!("分组：{}", g.name));
+        tip.push(trf("分组：{0}", &[format!("{}", g.name)]));
     }
     if task.repeat.is_some() {
-        tip.push(format!("重复：{}", describe_rule(task.repeat.as_ref(), &task.start)));
+        tip.push(trf("重复：{0}", &[format!("{}", describe_rule(task.repeat.as_ref(), &task.start))]));
     }
     if task.repeat.is_none() && task.progress > 0.0 && !task.done {
-        tip.push(format!("进度：{}%", task.progress));
+        tip.push(trf("进度：{0}%", &[format!("{}", task.progress)]));
     }
     if let Some(n) = task.notes.as_deref().filter(|n| !n.is_empty()) {
         let short: String = n.chars().take(120).collect();

@@ -3,6 +3,8 @@
 //! shared data at /api/doc behind an access code. No Tauri here (see webcmd.rs), so tests can
 //! run it with fake assets.
 
+use crate::i18n::{tr, trf};
+
 use crate::store::{signature, Store};
 use serde_json::{json, Value};
 use std::io::Cursor;
@@ -102,7 +104,7 @@ pub fn handle(ctx: &Ctx, method: &str, url: &str, auth: Option<&str>, if_none_ma
         let token = ctx.token.lock().unwrap().clone();
         let given = auth.and_then(|a| a.strip_prefix("Bearer ")).unwrap_or("");
         if token.is_empty() || !same(given.trim(), &token) {
-            return Reply::json(401, &json!({ "error": "访问码无效" }));
+            return Reply::json(401, &json!({ "error": tr("访问码无效") }));
         }
         let view = public_view(&ctx.store.snapshot(), &(ctx.accent)(), &ctx.pc);
         let mut body = Reply::json(200, &view);
@@ -190,12 +192,12 @@ pub fn start(ctx: Arc<Ctx>, bind: &str) -> Result<Running, String> {
     let server = Arc::new(Server::http(bind).map_err(|e| {
         let text = e.to_string();
         if text.contains("10048") || text.to_lowercase().contains("in use") {
-            "端口已被其他程序占用，请换一个端口".to_owned()
+            tr("端口已被其他程序占用，请换一个端口").to_owned()
         } else {
-            format!("无法启动网页服务：{text}")
+            trf("无法启动网页服务：{0}", &[format!("{}", text)])
         }
     })?);
-    let addr = server.server_addr().to_ip().ok_or("无法启动网页服务")?;
+    let addr = server.server_addr().to_ip().ok_or(tr("无法启动网页服务"))?;
     let stop = Arc::new(AtomicBool::new(false));
     for i in 0..WORKERS {
         let (server, stop, ctx) = (server.clone(), stop.clone(), ctx.clone());

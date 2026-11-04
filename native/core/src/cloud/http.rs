@@ -2,6 +2,8 @@
 //! certificate store). Uses the Windows system proxy unless one is given. Error texts never
 //! contain URLs, because Gitee takes its token as a query parameter.
 
+use crate::i18n::{tr, trf};
+
 use super::{ErrKind, SyncError};
 use std::time::Duration;
 use ureq::http::{HeaderMap, Method, Request};
@@ -69,10 +71,10 @@ impl Http {
         let proxy = match proxy.trim() {
             "" => Proxy::try_from_env(),
             "direct" => None,
-            p if p.starts_with("socks") => return Err(SyncError::config("只支持 HTTP 代理（http://地址:端口）")),
+            p if p.starts_with("socks") => return Err(SyncError::config(tr("只支持 HTTP 代理（http://地址:端口）"))),
             p => {
                 let p = if p.contains("://") { p.to_owned() } else { format!("http://{p}") };
-                Some(Proxy::new(&p).map_err(|_| SyncError::config("代理地址格式不对，应为 http://地址:端口"))?)
+                Some(Proxy::new(&p).map_err(|_| SyncError::config(tr("代理地址格式不对，应为 http://地址:端口")))?)
             }
         };
         Ok(Http { agent: agent(proxy, timeout), direct: agent(None, timeout) })
@@ -89,7 +91,7 @@ impl Http {
             Some(bytes) => b.body(bytes).map(|r| agent.run(r)),
             None => b.body(()).map(|r| agent.run(r)),
         };
-        let mut res = result.map_err(|_| SyncError::config("地址格式不对"))?.map_err(network)?;
+        let mut res = result.map_err(|_| SyncError::config(tr("地址格式不对")))?.map_err(network)?;
         let status = res.status().as_u16();
         let headers = res.headers().clone();
         let body = res.body_mut().with_config().limit(MAX_BODY).read_to_vec().map_err(network)?;
@@ -100,16 +102,16 @@ impl Http {
 /// Network errors in plain Chinese, without the URL.
 fn network(e: ureq::Error) -> SyncError {
     let msg = match &e {
-        ureq::Error::HostNotFound => "找不到服务器，请检查网络和地址".to_owned(),
-        ureq::Error::Timeout(_) => "连接超时，请检查网络（访问 GitHub 可能需要代理）".to_owned(),
-        ureq::Error::ConnectionFailed => "无法连接服务器，请检查网络和地址".to_owned(),
-        ureq::Error::ConnectProxyFailed(_) | ureq::Error::InvalidProxyUrl => "无法通过代理连接".to_owned(),
-        ureq::Error::BodyExceedsLimit(_) => "云端文件太大（超过 32 MB）".to_owned(),
-        ureq::Error::BadUri(_) => return SyncError::config("地址格式不对"),
-        ureq::Error::Io(io) => format!("网络错误：{io}"),
-        ureq::Error::NativeTls(t) => format!("安全连接失败：{t}"),
-        ureq::Error::Tls(t) => format!("安全连接失败：{t}"),
-        other => format!("网络错误：{}", scrub(&other.to_string())),
+        ureq::Error::HostNotFound => tr("找不到服务器，请检查网络和地址").to_owned(),
+        ureq::Error::Timeout(_) => tr("连接超时，请检查网络（访问 GitHub 可能需要代理）").to_owned(),
+        ureq::Error::ConnectionFailed => tr("无法连接服务器，请检查网络和地址").to_owned(),
+        ureq::Error::ConnectProxyFailed(_) | ureq::Error::InvalidProxyUrl => tr("无法通过代理连接").to_owned(),
+        ureq::Error::BodyExceedsLimit(_) => tr("云端文件太大（超过 32 MB）").to_owned(),
+        ureq::Error::BadUri(_) => return SyncError::config(tr("地址格式不对")),
+        ureq::Error::Io(io) => trf("网络错误：{0}", &[format!("{}", io)]),
+        ureq::Error::NativeTls(t) => trf("安全连接失败：{0}", &[format!("{}", t)]),
+        ureq::Error::Tls(t) => trf("安全连接失败：{0}", &[format!("{}", t)]),
+        other => trf("网络错误：{0}", &[format!("{}", scrub(&other.to_string()))]),
     };
     SyncError::new(ErrKind::Network, msg)
 }

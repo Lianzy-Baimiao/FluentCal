@@ -166,6 +166,8 @@ fn main() {
     let doc = Doc::from_value(scenario.get("doc").unwrap_or(&Value::Null));
     let (today, _) = local_of_ms(num("now", 0.0) as i64, num("offset", 480.0) as i32);
     let s = &doc.settings;
+    let locale = s.general.language.clone();
+    fluentcal_core::i18n::set_language(fluentcal_core::i18n::resolve(&locale, &fluentcal_app::i18n::system_language()));
     let dark = scenario.get("dark").and_then(Value::as_bool).unwrap_or(s.theme.mode == "dark");
     let system_accent = scenario.get("systemAccent").and_then(Value::as_str).unwrap_or("#0078D4");
     let accent = if s.theme.accent == "system" { system_accent.to_owned() } else { s.theme.accent.clone() };
@@ -183,6 +185,7 @@ fn main() {
     if kind == "editor" {
         let p: fluentcal_core::editor::Payload = serde_json::from_value(scenario.get("payload").cloned().unwrap_or(Value::Null)).expect("payload");
         let e = fluentcal_app::windows::editor::Offline::new(doc, &p, &today, t.clone()).unwrap();
+        fluentcal_app::i18n::select(&locale);
         apply(&e.window, &look);
         let h = e.window.clone_strong();
         show = Box::new(move || h.show().unwrap());
@@ -190,6 +193,7 @@ fn main() {
         _gallery = None;
     } else if kind == "settings" {
         let w = SettingsWindow::new().unwrap();
+        fluentcal_app::i18n::select(&locale);
         apply(&w, &look);
         fluentcal_app::fluent::install(&w, &today, None);
         settings_view::setup_with(&w, scale);
@@ -216,6 +220,7 @@ fn main() {
         _gallery = Some(g);
     } else {
         let window = DeskWindow::new().unwrap();
+        fluentcal_app::i18n::select(&locale);
         apply(&window, &look);
         let mut d = Desk::new(window.clone_strong(), doc, today.clone(), t.clone());
         d.refresh();

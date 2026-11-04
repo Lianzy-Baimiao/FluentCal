@@ -1,3 +1,4 @@
+import { t as tr } from '@/i18n';
 import type { ISODate, RepeatRule, Task } from '@/types';
 import {
   addDays,
@@ -148,54 +149,54 @@ export function nextOccurrence(task: Task, from: ISODate): ISODate | undefined {
 
 /** Human readable rule, e.g. "每 2 周的周一、周三". */
 export function describeRule(rule: RepeatRule | undefined, start: ISODate): string {
-  if (!rule) return '不重复';
+  if (!rule) return tr("不重复");
   const i = Math.max(1, rule.interval ?? 1);
-  const every = (unit: string) => (i === 1 ? `每${unit}` : `每 ${i} ${unit}`);
+  const every = (unit: string) => (i === 1 ? tr("每{0}", unit) : tr("每 {0} {1}", i, unit));
   const [, m, d] = parts(start);
   let s: string;
   switch (rule.freq) {
     case 'daily':
-      s = i === 1 ? '每天' : `每 ${i} 天`;
+      s = i === 1 ? tr("每天") : tr("每 {0} 天", i);
       break;
     case 'weekly': {
       const days = (rule.weekdays?.length ? rule.weekdays : [weekday(start)])
         .slice()
         .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
-        .map((x) => `周${WEEKDAY_SHORT[x]}`)
+        .map((x) => tr("周{0}", tr(WEEKDAY_SHORT[x])))
         .join('、');
-      s = `${every('周')}的${days}`;
+      s = tr("{0}的{1}", every(tr("周")), days);
       break;
     }
     case 'monthly':
       if (rule.monthMode === 'nthWeekday') {
         const nth = Math.ceil(d / 7);
         const last = nth >= 5 || d + 7 > daysInMonth(+start.slice(0, 4), m);
-        s = `${every('个月')}的${last ? '最后一个' : `第 ${nth} 个`}周${WEEKDAY_SHORT[weekday(start)]}`;
+        s = tr("{0}的{1}周{2}", every(tr("个月")), last ? tr("最后一个") : tr("第 {0} 个", nth), tr(WEEKDAY_SHORT[weekday(start)]));
       } else {
-        s = `${every('个月')}的 ${d} 日`;
+        s = tr("{0}的 {1} 日", every(tr("个月")), d);
       }
       break;
     case 'yearly':
-      s = `${i === 1 ? '每年' : `每 ${i} 年`}的 ${m} 月 ${d} 日`;
+      s = tr("{0}的 {1} 月 {2} 日", i === 1 ? tr("每年") : tr("每 {0} 年", i), m, d);
       break;
     case 'workday':
-      s = '每个工作日（周一至周五）';
+      s = tr("每个工作日（周一至周五）");
       break;
     case 'legalWorkday':
-      s = '每个法定工作日（含调休）';
+      s = tr("每个法定工作日（含调休）");
       break;
     case 'lunarYearly': {
       const info = dayInfo(start);
-      s = `${i === 1 ? '每年' : `每 ${i} 年`}农历${lunarMonthName(info.lunarMonth)}${lunarDayName(info.lunarDay)}`;
+      s = tr("{0}农历{1}{2}", i === 1 ? tr("每年") : tr("每 {0} 年", i), lunarMonthName(info.lunarMonth), lunarDayName(info.lunarDay));
       break;
     }
     case 'monthLastDay':
-      s = `${every('个月')}的最后一天`;
+      s = tr("{0}的最后一天", every(tr("个月")));
       break;
     case 'ebbinghaus':
-      return '艾宾浩斯记忆曲线（第 1、2、3、5、8、16、31 天复习）';
+      return tr("艾宾浩斯记忆曲线（第 1、2、3、5、8、16、31 天复习）");
   }
-  if (rule.count) s += `，共 ${rule.count} 次`;
-  else if (rule.until) s += `，直到 ${rule.until}`;
+  if (rule.count) s += tr("，共 {0} 次", rule.count);
+  else if (rule.until) s += tr("，直到 {0}", rule.until);
   return s;
 }

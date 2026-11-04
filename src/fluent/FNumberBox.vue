@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { t as tr } from '@/i18n';
 import { ref, watch } from 'vue';
 import FIcon from './FIcon.vue';
 import { useFieldName, useSplitAttrs } from './field';
@@ -19,7 +20,7 @@ const props = withDefaults(
   { min: -Infinity, max: Infinity, step: 1, width: 120 },
 );
 const emit = defineEmits<{ 'update:modelValue': [number] }>();
-const name = useFieldName(() => props.label, () => '数值');
+const name = useFieldName(() => props.label, () => tr("数值"));
 const split = useSplitAttrs();
 
 const text = ref(String(props.modelValue));
@@ -72,10 +73,10 @@ function key(e: KeyboardEvent) {
       @keydown="key"
     />
     <span v-if="suffix" class="suffix">{{ suffix }}</span>
-    <button type="button" class="spin" tabindex="-1" aria-label="增加" :disabled="disabled || modelValue >= max" @click="stepBy(1)">
+    <button type="button" class="spin" tabindex="-1" :aria-label="tr('增加')" :disabled="disabled || modelValue >= max" @click="stepBy(1)">
       <FIcon name="chevronUp" :size="10" />
     </button>
-    <button type="button" class="spin" tabindex="-1" aria-label="减少" :disabled="disabled || modelValue <= min" @click="stepBy(-1)">
+    <button type="button" class="spin" tabindex="-1" :aria-label="tr('减少')" :disabled="disabled || modelValue <= min" @click="stepBy(-1)">
       <FIcon name="chevronDown" :size="10" />
     </button>
   </div>

@@ -1,5 +1,7 @@
 //! The pages' buttons (SetState.action / action-arg): data, backups, sync, web, holidays.
 
+use fluentcal_core::i18n::{tr, trf};
+
 use super::actions::job;
 use crate::app::{run, App, ORIGIN};
 use crate::Severity;
@@ -31,9 +33,9 @@ impl App {
                 }
             }
             "check-holidays" => self.settings_check_holidays(),
-            "notify-test" => match crate::platform::toast::show("FluentCal 提醒测试", "如果你看到这条通知，任务提醒可以正常工作。") {
-                Ok(()) => self.settings_say(Severity::Info, "已发送测试通知。如果没有看到，请检查 Windows 设置 › 系统 › 通知。"),
-                Err(e) => self.settings_say(ERROR, &format!("发送失败：{e}")),
+            "notify-test" => match crate::platform::toast::show(tr("FluentCal 提醒测试"), tr("如果你看到这条通知，任务提醒可以正常工作。")) {
+                Ok(()) => self.settings_say(Severity::Info, tr("已发送测试通知。如果没有看到，请检查 Windows 设置 › 系统 › 通知。")),
+                Err(e) => self.settings_say(ERROR, &trf("发送失败：{0}", &[format!("{}", e)])),
             },
             "add-offset" => {
                 let next = sp::add_offset(&self.doc.settings.reminders.default_offsets);
@@ -48,27 +50,27 @@ impl App {
             "clear-samples" => self.settings_clear_samples(),
             "export-json" => {
                 let text = serde_json::to_string_pretty(&self.settings_export_doc()).unwrap_or_default();
-                self.settings_save("FluentCal-备份", "FluentCal 备份", "json", text.into_bytes());
+                self.settings_save(tr("FluentCal-备份"), tr("FluentCal 备份"), "json", text.into_bytes());
             }
             "export-csv" => {
                 let list: Vec<_> = self.doc.tasks.values().cloned().collect();
                 let text = fluentcal_core::export::to_csv(&list, &self.doc.groups);
                 // Excel needs the BOM to read UTF-8.
-                self.settings_save("FluentCal-任务", "CSV（Excel 可打开）", "csv", [b"\xEF\xBB\xBF".as_slice(), text.as_bytes()].concat());
+                self.settings_save(tr("FluentCal-任务"), tr("CSV（Excel 可打开）"), "csv", [b"\xEF\xBB\xBF".as_slice(), text.as_bytes()].concat());
             }
             "export-ics" => {
                 let list: Vec<_> = self.doc.tasks.values().cloned().collect();
                 let text = fluentcal_core::export::to_ics(&list, &self.doc.groups, &self.today(), fluentcal_core::date::now_ms());
-                self.settings_save("FluentCal-日历", "iCalendar 日历", "ics", text.into_bytes());
+                self.settings_save(tr("FluentCal-日历"), tr("iCalendar 日历"), "ics", text.into_bytes());
             }
             "import-json" => self.settings_import(),
             "backup-now" => {
                 match self.store.backup_create() {
                     Ok(name) => {
                         self.settings_load_backups();
-                        self.settings_say(SUCCESS, &format!("已创建备份 {name}"));
+                        self.settings_say(SUCCESS, &trf("已创建备份 {0}", &[format!("{}", name)]));
                     }
-                    Err(e) => self.settings_say(ERROR, &format!("备份失败：{e}")),
+                    Err(e) => self.settings_say(ERROR, &trf("备份失败：{0}", &[format!("{}", e)])),
                 }
             }
             "restore" => self.settings_restore(arg),
@@ -78,7 +80,7 @@ impl App {
             "sync-now" => self.settings_sync_now(),
             "sync-disable" => {
                 self.patch_settings(json!({ "sync": { "enabled": false } }));
-                self.settings_say(Severity::Info, "已关闭同步。本机数据保留，云端文件也不会删除。");
+                self.settings_say(Severity::Info, tr("已关闭同步。本机数据保留，云端文件也不会删除。"));
             }
             "sync-test" => self.settings_probe(false),
             "sync-enable" => self.settings_probe(true),
@@ -87,22 +89,22 @@ impl App {
             "web-open-local" => {
                 self.open_in_browser();
                 if let Some(e) = self.web.error.clone() {
-                    self.settings_say(ERROR, &format!("无法在浏览器中查看：{e}"));
+                    self.settings_say(ERROR, &trf("无法在浏览器中查看：{0}", &[format!("{}", e)]));
                 }
             }
             "copy" => match crate::platform::clipboard::set_text(arg) {
-                Ok(()) => self.settings_say(SUCCESS, "已复制链接。链接里带访问码，只发给自己的设备。"),
-                Err(_) => self.settings_say(ERROR, "无法复制，请手动选择链接复制"),
+                Ok(()) => self.settings_say(SUCCESS, tr("已复制链接。链接里带访问码，只发给自己的设备。")),
+                Err(_) => self.settings_say(ERROR, tr("无法复制，请手动选择链接复制")),
             },
             "web-reset-token" => {
-                self.settings_confirm("更换访问码？", "已经发出的链接和已打开的网页会立即失效，需要重新扫码。", "更换", "", false, |app, r| {
+                self.settings_confirm(tr("更换访问码？"), tr("已经发出的链接和已打开的网页会立即失效，需要重新扫码。"), tr("更换"), "", false, |app, r| {
                     if r != "primary" {
                         return;
                     }
                     match app.web_reset_token() {
                         Ok(()) => {
                             app.settings_load_web();
-                            app.settings_say(Severity::Info, "已更换访问码，请用新的链接或二维码打开。");
+                            app.settings_say(Severity::Info, tr("已更换访问码，请用新的链接或二维码打开。"));
                         }
                         Err(e) => app.settings_say(ERROR, &e),
                     }
@@ -134,7 +136,7 @@ impl App {
     fn settings_delete_group(&mut self, id: &str) {
         let Some((title, content)) = delete_group_question(&self.doc, id) else { return };
         let id = id.to_owned();
-        self.settings_confirm(&title, &content, "删除", "", true, move |app, r| {
+        self.settings_confirm(&title, &content, tr("删除"), "", true, move |app, r| {
             if r == "primary" {
                 let edit = tasks::delete_group(&app.doc, &id, fluentcal_core::date::now_ms());
                 app.apply(edit, false);
@@ -143,15 +145,15 @@ impl App {
     }
 
     fn settings_clear_samples(&mut self) {
-        let text = "第一次启动时生成的示例任务和示例项目会被删除，你自己添加或改过名称的任务不受影响。";
-        self.settings_confirm("清除示例数据？", text, "清除", "", false, |app, r| {
+        let text = tr("第一次启动时生成的示例任务和示例项目会被删除，你自己添加或改过名称的任务不受影响。");
+        self.settings_confirm(tr("清除示例数据？"), text, tr("清除"), "", false, |app, r| {
             if r != "primary" {
                 return;
             }
             let (edit, n) = tasks::clear_sample_data(&app.doc, fluentcal_core::date::now_ms());
             app.apply(edit, false);
             app.patch_settings(json!({ "general": { "onboarded": true } }));
-            app.settings_say(SUCCESS, &format!("已删除 {n} 个示例任务。"));
+            app.settings_say(SUCCESS, &trf("已删除 {0} 个示例任务。", &[format!("{}", n)]));
         });
     }
 
@@ -184,8 +186,8 @@ impl App {
 
     fn settings_saved(&mut self, res: Result<String, String>) {
         match res {
-            Ok(p) => self.settings_say(SUCCESS, &format!("已导出到 {p}")),
-            Err(e) => self.settings_say(ERROR, &format!("导出失败：{e}")),
+            Ok(p) => self.settings_say(SUCCESS, &trf("已导出到 {0}", &[format!("{}", p)])),
+            Err(e) => self.settings_say(ERROR, &trf("导出失败：{0}", &[format!("{}", e)])),
         }
     }
 
@@ -196,7 +198,7 @@ impl App {
 
     fn settings_restore(&mut self, name: &str) {
         let name = name.to_owned();
-        self.settings_confirm("从备份恢复？", &format!("将用 {name} 替换当前全部数据。当前数据会先自动备份。"), "恢复", "", true, move |app, r| {
+        self.settings_confirm(tr("从备份恢复？"), &trf("将用 {0} 替换当前全部数据。当前数据会先自动备份。", &[format!("{}", name)]), tr("恢复"), "", true, move |app, r| {
             if r != "primary" {
                 return;
             }
@@ -204,9 +206,9 @@ impl App {
                 Ok(()) => {
                     app.reload();
                     app.settings_load_backups();
-                    app.settings_say(SUCCESS, "已恢复。");
+                    app.settings_say(SUCCESS, tr("已恢复。"));
                 }
-                Err(e) => app.settings_say(ERROR, &format!("恢复失败：{e}")),
+                Err(e) => app.settings_say(ERROR, &trf("恢复失败：{0}", &[format!("{}", e)])),
             }
         });
     }
@@ -216,8 +218,8 @@ impl App {
 pub fn delete_group_question(doc: &fluentcal_core::tasks::Doc, id: &str) -> Option<(String, String)> {
     let g = doc.groups.get(id)?;
     let n = doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(id)).count();
-    let content = if n > 0 { format!("组内 {n} 个任务会移到“未分组”，不会被删除。") } else { String::new() };
-    Some((format!("删除分组“{}”？", g.name), content))
+    let content = if n > 0 { trf("组内 {0} 个任务会移到“未分组”，不会被删除。", &[format!("{}", n)]) } else { String::new() };
+    Some((trf("删除分组“{0}”？", &[format!("{}", g.name)]), content))
 }
 
 /// The edit that writes a merge plan's items (0.2: put('groups' / 'tasks' / 'dayMarks')).

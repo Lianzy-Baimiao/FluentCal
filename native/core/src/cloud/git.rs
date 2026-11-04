@@ -1,6 +1,8 @@
 //! GitHub and Gitee (SYN-02, SYN-03): one file in a private repository through the contents
 //! API. The blob sha makes writes conditional; every upload is a commit.
 
+use crate::i18n::{tr, trf};
+
 use super::http::{enc, Http, Resp};
 use super::{ErrKind, Fetched, Remote, Rev, SyncError};
 use base64::Engine as _;
@@ -34,21 +36,21 @@ impl Git {
     pub fn new(http: Http, flavor: Flavor, api: &str, repo: &str, branch: &str, path: &str, token: &str) -> Result<Git, SyncError> {
         let repo = repo.trim().trim_end_matches(".git");
         let repo = repo.rsplit_once("github.com/").or_else(|| repo.rsplit_once("gitee.com/")).map_or(repo, |(_, r)| r);
-        let (owner, name) = repo.split_once('/').ok_or_else(|| SyncError::config("仓库要写成“用户名/仓库名”"))?;
+        let (owner, name) = repo.split_once('/').ok_or_else(|| SyncError::config(tr("仓库要写成“用户名/仓库名”")))?;
         if !valid_name(owner) || !valid_name(name) {
-            return Err(SyncError::config("仓库要写成“用户名/仓库名”"));
+            return Err(SyncError::config(tr("仓库要写成“用户名/仓库名”")));
         }
         let segs: Vec<&str> = path.split(['/', '\\']).map(str::trim).filter(|s| !s.is_empty()).collect();
         if segs.iter().any(|s| *s == "." || *s == "..") {
-            return Err(SyncError::config("文件路径不能包含 . 或 .."));
+            return Err(SyncError::config(tr("文件路径不能包含 . 或 ..")));
         }
         let path = if segs.is_empty() { super::FILE_NAME.to_owned() } else { segs.iter().map(|s| enc(s)).collect::<Vec<_>>().join("/") };
         let branch = branch.trim();
         if branch.chars().any(|c| c.is_whitespace() || c.is_control()) {
-            return Err(SyncError::config("分支名不能有空格"));
+            return Err(SyncError::config(tr("分支名不能有空格")));
         }
         if token.trim().is_empty() {
-            return Err(SyncError::auth("还没有填写 Token"));
+            return Err(SyncError::auth(tr("还没有填写 Token")));
         }
         let (owner, repo, branch) = (owner.to_owned(), name.to_owned(), branch.to_owned());
         Ok(Git { http, flavor, api: api.trim_end_matches('/').to_owned(), owner, repo, branch, path, token: token.trim().to_owned(), checked: false })
@@ -92,10 +94,10 @@ impl Git {
     fn fail(&self, r: &Resp) -> SyncError {
         let site = self.site();
         match r.status {
-            401 => SyncError::auth(format!("{site} Token 无效或已过期")),
-            403 if r.header("x-ratelimit-remaining") == Some("0") => SyncError::server(format!("{site} 接口调用次数已用完，稍后会自动重试")),
-            403 => SyncError::auth(format!("{site} Token 没有这个仓库的读写权限（需要 Contents 读写）")),
-            404 => SyncError::config(format!("找不到仓库 {}/{}，或者 Token 无权访问它", self.owner, self.repo)),
+            401 => SyncError::auth(trf("{0} Token 无效或已过期", &[format!("{}", site)])),
+            403 if r.header("x-ratelimit-remaining") == Some("0") => SyncError::server(trf("{0} 接口调用次数已用完，稍后会自动重试", &[format!("{}", site)])),
+            403 => SyncError::auth(trf("{0} Token 没有这个仓库的读写权限（需要 Contents 读写）", &[format!("{}", site)])),
+            404 => SyncError::config(trf("找不到仓库 {0}/{1}，或者 Token 无权访问它", &[format!("{}", self.owner), format!("{}", self.repo)])),
             s => {
                 let m = self.message(r);
                 if m.is_empty() { SyncError::status(s) } else { SyncError::server(format!("{site}：{m}（{s}）")) }
@@ -134,11 +136,11 @@ impl Remote for Git {
         let v = r.json().unwrap_or_default();
         let private = v.get("private").and_then(Value::as_bool).unwrap_or(false);
         if !private {
-            return Err(SyncError::config(format!("{}/{} 是公开仓库，日程会被所有人看到。请换成私有仓库", self.owner, self.repo)));
+            return Err(SyncError::config(trf("{0}/{1} 是公开仓库，日程会被所有人看到。请换成私有仓库", &[format!("{}", self.owner), format!("{}", self.repo)])));
         }
         let push = v.pointer("/permissions/push").or_else(|| v.pointer("/permission/push")).and_then(Value::as_bool);
         if push == Some(false) {
-            return Err(SyncError::auth(format!("这个 {} Token 只能读、不能写这个仓库", self.site())));
+            return Err(SyncError::auth(trf("这个 {0} Token 只能读、不能写这个仓库", &[format!("{}", self.site())])));
         }
         self.checked = true;
         Ok(())
@@ -157,10 +159,10 @@ impl Remote for Git {
             404 => return Ok(Fetched::Missing),
             _ => return Err(self.fail(&r)),
         }
-        let v = r.json().ok_or_else(|| SyncError::server(format!("{} 返回了无法解析的结果", self.site())))?;
+        let v = r.json().ok_or_else(|| SyncError::server(trf("{0} 返回了无法解析的结果", &[format!("{}", self.site())])))?;
         // Gitee answers [] for a missing file; a directory is an array too.
         if let Some(a) = v.as_array() {
-            return if a.is_empty() { Ok(Fetched::Missing) } else { Err(SyncError::config("文件路径指向的是一个文件夹，请填写文件路径")) };
+            return if a.is_empty() { Ok(Fetched::Missing) } else { Err(SyncError::config(tr("文件路径指向的是一个文件夹，请填写文件路径"))) };
         }
         let sha = v.get("sha").and_then(Value::as_str).map(str::to_owned);
         if sha.is_none() {
@@ -180,7 +182,7 @@ impl Remote for Git {
     fn put(&mut self, bytes: &[u8], base: Option<&Rev>) -> Result<Rev, SyncError> {
         let sha = base.and_then(|b| b.sha.clone());
         let mut body = json!({
-            "message": format!("FluentCal 同步（{}）", super::device_name()),
+            "message": trf("FluentCal 同步（{0}）", &[format!("{}", super::device_name())]),
             "content": base64::engine::general_purpose::STANDARD.encode(bytes),
         });
         if !self.branch.is_empty() {
@@ -211,8 +213,8 @@ impl Remote for Git {
             422 | 400 => {
                 let m = self.message(&r);
                 let lower = m.to_lowercase();
-                if lower.contains("sha") || m.contains("已存在") || lower.contains("exist") || lower.contains("match") {
-                    Err(SyncError::new(ErrKind::Conflict, format!("{} 上的文件刚被修改（{m}）", self.site())))
+                if lower.contains("sha") || m.contains(tr("已存在")) || lower.contains("exist") || lower.contains("match") {
+                    Err(SyncError::new(ErrKind::Conflict, trf("{0} 上的文件刚被修改（{1}）", &[format!("{}", self.site()), format!("{}", m)])))
                 } else {
                     Err(self.fail(&r))
                 }

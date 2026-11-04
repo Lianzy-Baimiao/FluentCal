@@ -3,6 +3,8 @@
 //! Manager. Runs only when used: loopback for this PC's browser, all interfaces only while
 //! the LAN switch is on.
 
+use fluentcal_core::i18n::{trf};
+
 use crate::app::App;
 use fluentcal_core::cloud::secrets;
 use fluentcal_core::web::{self, Asset, Ctx, Running};
@@ -107,7 +109,7 @@ impl App {
         self.web.local = true;
         self.web_apply();
         if let Some(e) = self.web.error.clone() {
-            self.notify(&format!("无法在浏览器中查看：{e}（端口在 设置 › 网页查看 中修改）"), false);
+            self.notify(&trf("无法在浏览器中查看：{0}（端口在 设置 › 网页查看 中修改）", &[format!("{}", e)]), false);
             return;
         }
         let Some(port) = self.web.running.as_ref().map(|r| r.addr.port()) else { return };
