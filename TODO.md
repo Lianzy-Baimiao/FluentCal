@@ -193,7 +193,8 @@
 - [x] 上架 Microsoft Store：2026-11-03 确认 0.3.1.0（Submission 1）已在商店发布。
 - [x] Microsoft Store 0.3.2.0 更新：2026-11-03 20:09 通过 Codex 内置浏览器提交 Submission 2，当天已发布。
 - [x] Microsoft Store 0.3.3.0 多语言更新：2026-11-03 21:32 提交 Submission 3；2026-11-05 查询商店目录确认已上架。
-- [~] 0.3.4 发布（一次删除多个分组）：GitHub v0.3.4 与商店 0.3.4.0；记录见 docs/STORE-LISTING.md“提交记录”。
+- [~] 0.3.4 发布（一次删除多个分组）：GitHub v0.3.4 已发布；商店 0.3.4.0 于 2026-11-05 04:05 提交 Submission 4，
+      正在认证，通过后自动发布。记录见 docs/STORE-LISTING.md“提交记录”。
 
 ## 显示一致（M10）
 做法：scripts/parity.mjs 用 README 截图的示例数据和固定时刻，在 0.2 浏览器版里截图，同时写出场景文件和单独的壁纸；

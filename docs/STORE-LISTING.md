@@ -215,7 +215,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 认证凭证：`release/store-proof/certification-0.3.3-2026-11-03.jpg`（本地忽略目录，UTC+8）。后续状态以 [产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview) 为准；公开商店链接为 https://apps.microsoft.com/detail/9NTT06453DG5 。
 - 2026-11-05 不登录查询商店目录（displaycatalog，market=CN）返回 `ice.FluentCal_0.3.3.0_x64__rz8m2sa64m4em`，确认 0.3.3.0 已上架。这次多语言改动当时没有提交到仓库，也没有 GitHub Release；2026-11-05 随 0.3.4 一起提交（cd01142）。
 
-### 0.3.4.0 一次删除多个分组（2026-11-05）
+### 0.3.4.0 一次删除多个分组（2026-11-05 04:05 送审，正在认证）
 
 - 用户要求“全部更新版本……然后推送发版，包括微软商城”。应用版本 **0.3.4**，商店包 **0.3.4.0**，高于已上架的 `0.3.3.0`。
 - 新增：甘特图分组行右键“删除分组…”和设置 › 甘特图的删除按钮打开同一个对话框，可勾选多个分组一次删除（aead4bc）；程序清单 `app.manifest` 的版本原来停在 0.3.2.0，这次改为 0.3.4.0。
@@ -226,3 +226,8 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
   - 简体中文：甘特图可以一次删除多个分组：在分组行右键选“删除分组…”，或在“设置 › 甘特图”点删除按钮，勾选要删除的分组后确认一次即可，组内任务移到“未分组”。在日历里删除后按 Ctrl+Z 可一步恢复。删除“只显示分组”筛选里的分组时，甘特图不再变成空白。
   - English: Delete several Gantt groups at once: right-click a group row and choose Delete group…, or use a delete button in Settings > Gantt chart, tick the groups, and confirm once. Their tasks move to Ungrouped. Ctrl+Z in the calendar restores them in one step. Deleting a group used by the Show groups only filter no longer leaves the Gantt chart empty.
   - 繁體中文：甘特圖可以一次刪除多個分組：在分組列按右鍵選“刪除分組…”，或在“設定 › 甘特圖”點刪除按鈕，勾選要刪除的分組後確認一次即可，組內任務移到“未分組”。在行事曆中刪除後按 Ctrl+Z 可一步復原。刪除“只顯示分組”篩選中的分組時，甘特圖不再變成空白。
+- GitHub **v0.3.4** 已发布（目标提交 `b1f21a2`），附安装包；下载回来的安装包 SHA-256 与上文一致。
+- 送审方式：仿照 LiteView 的做法，用临时配置目录的 Edge 开在隐藏桌面上（屏幕上不出现窗口），CDP 端口 127.0.0.1:9441，Windows 账号自动登录合作伙伴中心；脚本在忽略的 `release/store-0.3.4/`（`launch-edge-hidden.ps1`、`pc.py`、`cleanup-edge.ps1`）。送审后已结束这个 Edge 并删除其配置目录。
+- 创建 **Submission 4 / 1152921505702317319**。上传 `FluentCal_0.3.4.0_x64.msix` 后只有预期的 runFullTrust 受限能力警告；设备系列仍只勾选 Windows 10/11 桌面，新包排第一。保存后旧包 `0.3.3.0` 被自动移除，概述页只列出 `FluentCal_0.3.4.0_x64.msix / Validated`。
+- 三种语言的“此版本的新增功能”已按上文填写并保存，重新载入后逐字一致；描述、截图、关键词、定价、属性、年龄分级未改。提交选项仍是“在此提交通过认证后立即予以发布”，runFullTrust 用途说明 453 字符未变。
+- 2026-11-05 04:05 点击“提交进行认证”。后台显示 **正在认证更新**，认证进度在 **预处理**，并显示 **产品在通过认证后立即开始发布**；弹出的满意度调查未作答。截图：`release/store-proof/certification-0.3.4-2026-11-05.png`（本地忽略目录）。此记录表示已送审，尚未确认 0.3.4.0 上架；可用上文的商店目录查询确认。
