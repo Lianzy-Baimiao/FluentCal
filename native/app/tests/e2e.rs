@@ -579,24 +579,100 @@ fn search_finds_and_jumps() {
     assert_eq!(with(|a| a.desk.ui.cursor.clone()).unwrap(), fluentcal_core::date::start_of_month(&later));
 }
 
-/// A Fluent confirmation (deleting a group): 取消 keeps it, 删除 removes it.
+/// 删除分组 (the Gantt group menu): every group is listed, the clicked one is ticked; ticking
+/// more deletes them together in one undo step. 取消 keeps them.
 #[test]
-fn confirm_dialog_for_deleting_a_group() {
+fn delete_several_groups_at_once() {
     use fluentcal_app::desk::menus::Target;
+    use i_slint_backend_testing::AccessibleRole;
     let today = fluentcal_core::date::today();
-    let mut doc = doc_with(&[json!({ "id": "a", "title": "设计", "start": today, "groupId": "g" })], json!({ "calendar": { "view": "gantt" } }));
-    doc["groups"] = json!({ "g": { "id": "g", "name": "项目", "color": "blue", "order": 1 } });
-    let t = start("confirm", Some(doc));
-    with(|a| a.menu_act(&Target::Group("g".into()), "deleteGroup")).unwrap();
+    let tasks = [
+        json!({ "id": "a", "title": "设计", "start": today, "groupId": "g1" }),
+        json!({ "id": "b", "title": "开发", "start": today, "groupId": "g2" }),
+        json!({ "id": "c", "title": "测试", "start": today, "groupId": "g3" }),
+    ];
+    // The chart shows only 项目一: deleting it must not leave the chart empty.
+    let mut doc = doc_with(&tasks, json!({ "calendar": { "view": "gantt" }, "gantt": { "groupFilter": ["g1"] } }));
+    doc["groups"] = json!({
+        "g1": { "id": "g1", "name": "项目一", "color": "blue", "order": 1 },
+        "g2": { "id": "g2", "name": "项目二", "color": "green", "order": 2 },
+        "g3": { "id": "g3", "name": "项目三", "color": "red", "order": 3 },
+    });
+    let t = start("delgroups", Some(doc));
+    // The dialog's boxes carry the task count (the table's check circles don't).
+    let boxes = || {
+        let is_pick = |e: &ElementHandle| e.accessible_role() == Some(AccessibleRole::Checkbox) && e.accessible_description().is_some_and(|d| !d.is_empty());
+        t.w.root_element().query_descendants().match_predicate(is_pick).find_all()
+    };
+    let ticked = || boxes().iter().filter(|b| b.accessible_checked() == Some(true)).filter_map(|b| b.accessible_label()).map(|l| l.to_string()).collect::<Vec<_>>();
+    let pick = |name: &str| boxes().into_iter().find(|b| b.accessible_label().as_deref() == Some(name)).unwrap_or_else(|| panic!("no box {name}"));
+    // On the box, or on the row's name (the whole row ticks).
+    let tick = |name: &str| {
+        let b = pick(name);
+        let s = b.size();
+        t.click_at(t.at(&b, s.width / 2.0, s.height / 2.0));
+    };
+    let tick_row = |name: &str| {
+        let b = pick(name);
+        t.click_at(t.at(&b, b.size().width + 60.0, b.size().height / 2.0));
+    };
+    with(|a| a.menu_act(&Target::Group("g1".into()), "deleteGroup")).unwrap();
     settle();
-    assert!(t.has("组内 1 个任务会移到“未分组”，不会被删除。"));
-    t.click("取消");
-    assert!(with(|a| a.doc.groups.contains_key("g")).unwrap());
-    with(|a| a.menu_act(&Target::Group("g".into()), "deleteGroup")).unwrap();
-    settle();
+    assert!(t.has("删除分组“项目一”？"));
+    assert!(t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
+    let labels: Vec<_> = boxes().iter().filter_map(|b| b.accessible_label()).map(|l| l.to_string()).collect();
+    assert_eq!(labels, ["项目一", "项目二", "项目三"], "all groups, in the chart's order");
+    assert_eq!(ticked(), ["项目一"]);
+    assert_eq!(boxes()[0].accessible_description().as_deref(), Some("1 个任务"));
+    // Ticking a second one: the title counts them; unticking all disables 删除.
+    tick("项目二");
+    assert!(t.has("删除 2 个分组？"));
+    assert_eq!(ticked(), ["项目一", "项目二"]);
+    tick_row("项目一");
+    assert_eq!(ticked(), ["项目二"], "a click on the row's name unticks it");
+    assert!(t.has("删除分组“项目二”？"));
+    tick("项目二");
+    assert!(ticked().is_empty());
+    assert!(t.has("删除分组"));
+    assert!(!t.w.global::<fluentcal_app::GroupDelete>().get_can_delete());
     t.click("删除");
-    assert!(!with(|a| a.doc.groups.contains_key("g")).unwrap());
-    assert!(t.task("设计").get("groupId").is_none_or(Value::is_null));
+    assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3, "删除 is disabled with nothing ticked");
+    assert_eq!(boxes().len(), 3, "and the dialog stays open");
+    t.click("取消");
+    assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3);
+    assert!(boxes().is_empty(), "closed");
+    // Two at once.
+    with(|a| a.menu_act(&Target::Group("g1".into()), "deleteGroup")).unwrap();
+    settle();
+    assert_eq!(ticked(), ["项目一"], "a new dialog starts with the clicked group only");
+    tick("项目二");
+    t.click("删除");
+    let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
+    assert_eq!(groups, ["g3"]);
+    assert!(t.task("设计").get("groupId").is_none_or(Value::is_null), "tasks move to 未分组");
+    assert!(t.task("开发").get("groupId").is_none_or(Value::is_null));
+    assert_eq!(t.task("测试")["groupId"], "g3");
+    assert!(with(|a| a.doc.settings.gantt.group_filter.is_empty()).unwrap(), "the filter forgets deleted groups");
+    // One undo step brings both back.
+    t.ctrl("z");
+    let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
+    assert_eq!(groups, ["g1", "g2", "g3"]);
+    assert_eq!(t.task("设计")["groupId"], "g1");
+    assert_eq!(t.task("开发")["groupId"], "g2");
+    // The keyboard: Tab to a box, Space ticks it, Esc cancels; Enter deletes what is ticked.
+    with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();
+    settle();
+    t.key(&slint::SharedString::from(Key::Tab));
+    t.key(" ");
+    assert_eq!(ticked(), ["项目一", "项目三"]);
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert!(boxes().is_empty(), "Esc closes");
+    assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3);
+    with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();
+    settle();
+    t.key("\n");
+    let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
+    assert_eq!(groups, ["g1", "g2"], "Enter deletes the ticked group");
 }
 
 /// The welcome bar (sample tasks, not onboarded) and the adjust-mode bar.

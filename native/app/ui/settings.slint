@@ -14,6 +14,7 @@ import { CalendarPage, GanttPage } from "settings_calendar.slint";
 import { RemindersPage, DataPage } from "settings_data.slint";
 import { SyncPage } from "settings_sync.slint";
 import { WebPage, AboutPage } from "settings_web.slint";
+import { GroupDeleteDialog } from "group_delete.slint";
 
 export component SettingsWindow inherits Window {
     title: @tr("FluentCal 设置");
@@ -38,6 +39,10 @@ export component SettingsWindow inherits Window {
     changed dark => { Palette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
     public function open-confirm() {
         confirm.open();
+    }
+    // 删除分组 (the GroupDelete global has the list and the ticks).
+    public function open-group-delete() {
+        group-delete.open();
     }
     public function scroll-top() {
         nav.scroll-top();
@@ -99,6 +104,7 @@ export component SettingsWindow inherits Window {
             }
             closed => { SetState.confirm-answer("close"); }
         }
+        group-delete := GroupDeleteDialog { }
         TipLayer { }
     }
 }

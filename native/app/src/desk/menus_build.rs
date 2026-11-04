@@ -90,7 +90,7 @@ pub fn group(app: &App, id: &str) -> Vec<Entry> {
             item("up", tr("上移"), "chevronUp"),
             item("down", tr("下移"), "chevronDown"),
             sep(),
-            Entry { danger: true, ..item("deleteGroup", tr("删除分组"), "delete") },
+            Entry { danger: true, ..item("deleteGroup", tr("删除分组…"), "delete") },
         ]);
     }
     v

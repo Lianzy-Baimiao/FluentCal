@@ -31,6 +31,8 @@ pub struct Popups {
     pub menu_target: Option<Target>,
     /// Runs on the confirmation's primary button.
     pub confirm: Option<Box<dyn FnOnce(&mut App)>>,
+    /// 删除分组 is open: the ticked groups (crate::group_delete).
+    pub group_delete: Option<Vec<String>>,
     /// The day the "+N" list shows.
     pub day_list: Option<String>,
     pub search_open: bool,

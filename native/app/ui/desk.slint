@@ -11,6 +11,7 @@ import { Menu, MenuEntry } from "menu.slint";
 import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
 import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData } from "desk_overlays.slint";
+import { GroupDeleteDialog } from "group_delete.slint";
 import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData }
 export { ChipData }
@@ -921,6 +922,8 @@ export component DeskWindow inherits Window {
     callback confirm-result(string);
     public function open-confirm() { confirm.open(); }
     public function close-confirm() { confirm.close(); }
+    // 删除分组 (the GroupDelete global has the list and the ticks).
+    public function open-group-delete() { group-delete.open(); }
     // Info bars under the title bar (adjust mode comes from `locked`).
     in property <bool> welcome;
     in property <string> notice;
@@ -1229,6 +1232,7 @@ export component DeskWindow inherits Window {
                 close => { root.confirm-result("close"); }
             }
         }
+        group-delete := GroupDeleteDialog { }
         TipLayer { }
     }
     }

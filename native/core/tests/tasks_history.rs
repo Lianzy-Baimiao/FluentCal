@@ -47,6 +47,28 @@ fn clears_sample_data_but_keeps_what_the_user_renamed() {
 }
 
 #[test]
+fn deletes_several_groups_at_once_and_their_tasks_become_ungrouped() {
+    let g = |id: &str| Group { id: id.into(), name: id.into(), order: 1.0, ..Default::default() };
+    let a = Task { group_id: Some("g1".into()), ..mk("a", "2026-10-01") };
+    let b = Task { group_id: Some("g2".into()), ..mk("b", "2026-10-02") };
+    let c = Task { group_id: Some("g3".into()), ..mk("c", "2026-10-03") };
+    let mut doc = doc_with(vec![a, b, c, mk("free", "2026-10-04")], vec![g("g1"), g("g2"), g("g3")]);
+    // "gone" was deleted meanwhile (sync); a repeated id counts once.
+    let ids = ["g1", "gone", "g2", "g1"].map(String::from);
+    let e = delete_groups(&doc, &ids, 7);
+    let groups: Vec<&str> = e.items.iter().filter(|(c, _, _)| c == "groups").map(|(_, id, _)| id.as_str()).collect();
+    assert_eq!(groups, ["g1", "g2"], "one delete per existing group");
+    assert_eq!(e.items.len(), 4, "two tasks ungrouped, two groups deleted");
+    apply(&mut doc, &e);
+    assert_eq!(doc.groups.keys().collect::<Vec<_>>(), ["g3"]);
+    assert_eq!((doc.tasks["a"].group_id.as_deref(), doc.tasks["a"].updated_at), (None, 7));
+    assert_eq!(doc.tasks["b"].group_id, None);
+    assert_eq!(doc.tasks["c"].group_id.as_deref(), Some("g3"), "other groups keep their tasks");
+    assert_eq!(doc.tasks["free"].updated_at, 0, "untouched");
+    assert!(delete_groups(&doc, &["gone".into()], 8).is_empty());
+}
+
+#[test]
 fn moving_an_occurrence_detaches_it_and_deleting_cleans_up() {
     let weekly = Task { repeat: Some(RepeatRule { freq: Some(Freq::Weekly), ..Default::default() }), color: Some("teal".into()), ..mk("w", "2026-10-05") };
     let after = Task { deps: Some(vec!["w".into()]), ..mk("after", "2026-10-20") };

@@ -51,6 +51,7 @@ fn wire(w: &SettingsWindow) {
     g.on_add_group(|name| run(move |a| a.settings_add_group(&name)));
     g.on_save_secret(|k, v| run(move |a| a.settings_save_secret(&k, &v)));
     g.on_navigate(|k| run(move |a| a.settings_navigate(&k)));
+    crate::group_delete::wire(w, crate::group_delete::Host::Settings);
     g.on_confirm_answer(|r| {
         // On the next turn: the dialog finishes closing before an answer may open another.
         slint::Timer::single_shot(std::time::Duration::ZERO, move || run(move |a| a.settings_answer(&r)));
@@ -89,6 +90,7 @@ impl App {
         if let Some(s) = &self.settings_win {
             view::push(&s.window, &self.doc, &info, &s.local);
         }
+        self.group_delete_refresh(crate::group_delete::Host::Settings);
     }
 
     /// The theme changed: colours, the title bar, the thumbnails' shadow.

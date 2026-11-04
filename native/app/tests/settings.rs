@@ -131,14 +131,33 @@ fn groups_reminders_and_sample_data() {
     t.g().invoke_set_group_color(id.as_str().into(), "red".into());
     assert_eq!(t.saved()["groups"][&id]["name"], "改名");
     assert_eq!(t.saved()["groups"][&id]["color"], "red");
-    // delete: asked first; 取消 keeps it
+    // delete: 删除分组 lists every group with this one ticked; 取消 keeps it
+    let gd = || t.w.global::<fluentcal_app::GroupDelete>();
     t.g().invoke_action_arg("delete-group".into(), id.as_str().into());
-    assert_eq!(t.w.get_confirm_title(), "删除分组“改名”？");
-    t.answer("close");
+    settle();
+    assert_eq!(gd().get_title(), "删除分组“改名”？");
+    let items: Vec<_> = gd().get_items().iter().collect();
+    assert_eq!(items.len(), n0 + 1, "every group is listed");
+    assert_eq!(items.iter().filter(|p| p.checked).map(|p| p.id.to_string()).collect::<Vec<_>>(), [id.clone()]);
+    gd().invoke_answer("close".into());
+    settle();
     assert!(t.saved()["groups"].get(&id).is_some_and(|g| !g.is_null()));
+    // tick a sample group too: both go at once, its tasks become ungrouped
     t.g().invoke_action_arg("delete-group".into(), id.as_str().into());
-    t.answer("primary");
-    assert!(t.saved()["groups"].get(&id).is_none_or(Value::is_null));
+    settle();
+    let other = gd().get_items().iter().find(|p| p.id != id.as_str()).expect("a sample group").id.to_string();
+    gd().invoke_toggled(other.as_str().into(), true);
+    settle();
+    assert_eq!(gd().get_title(), "删除 2 个分组？");
+    assert!(gd().get_can_delete());
+    let had_tasks = t.saved()["tasks"].as_object().unwrap().values().any(|x| x["groupId"] == other.as_str());
+    gd().invoke_answer("primary".into());
+    settle();
+    let saved = t.saved();
+    assert!(saved["groups"].get(&id).is_none_or(Value::is_null));
+    assert!(saved["groups"].get(&other).is_none_or(Value::is_null));
+    assert!(!saved["tasks"].as_object().unwrap().values().any(|x| x["groupId"] == other.as_str()), "its tasks are ungrouped (had some: {had_tasks})");
+    assert_eq!(t.g().get_groups().row_count(), n0 - 1, "the page follows");
     // default reminders
     t.g().invoke_action("add-offset".into());
     t.g().invoke_action("add-offset".into());

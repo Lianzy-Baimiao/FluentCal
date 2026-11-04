@@ -126,6 +126,13 @@ impl Desk {
                 w.set_confirm_danger(true);
                 w.invoke_open_confirm();
             }
+            // 删除分组 with the groups `checked` (ids) ticked.
+            "groupDelete" => {
+                let ids = spec.get("checked").and_then(serde_json::Value::as_array);
+                let mut checked: Vec<String> = ids.map_or(Vec::new(), |v| v.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect());
+                crate::group_delete::push(w, &self.doc, &mut checked, &self.tokens);
+                w.invoke_open_group_delete();
+            }
             other => eprintln!("unknown overlay {other}"),
         }
     }

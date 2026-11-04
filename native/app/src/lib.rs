@@ -8,6 +8,7 @@ pub mod desk;
 pub mod fluent;
 pub mod fonts;
 pub mod gallery;
+pub mod group_delete;
 pub mod i18n;
 pub mod platform;
 pub mod reminders;

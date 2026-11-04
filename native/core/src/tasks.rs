@@ -359,16 +359,20 @@ pub fn clear_sample_data(doc: &Doc, now_ms: i64) -> (Edit, usize) {
     (e, gone.len())
 }
 
-/// Deletes a group; its tasks become ungrouped.
-pub fn delete_group(doc: &Doc, id: &str, now_ms: i64) -> Edit {
+/// Deletes the groups (one undo step); their tasks become ungrouped. Ids that are not groups
+/// (deleted meanwhile, e.g. by sync) are skipped.
+pub fn delete_groups(doc: &Doc, ids: &[String], now_ms: i64) -> Edit {
+    let gone: BTreeSet<&str> = ids.iter().map(String::as_str).filter(|id| doc.groups.contains_key(*id)).collect();
     let mut e = Edit::default();
-    for t in doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(id)) {
+    for t in doc.tasks.values().filter(|t| t.group_id.as_deref().is_some_and(|g| gone.contains(g))) {
         let mut t = t.clone();
         t.group_id = None;
         t.updated_at = now_ms;
         e.put_task(&t);
     }
-    e.delete("groups", id);
+    for id in gone {
+        e.delete("groups", id);
+    }
     e
 }
 

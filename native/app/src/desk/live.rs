@@ -68,6 +68,7 @@ impl App {
         self.desk_refresh_day_list();
         self.desk_search_refresh();
         self.desk_refresh_bars();
+        self.group_delete_refresh(crate::group_delete::Host::Desk);
     }
 
     /// Title, paging and selection (after paging or a view switch).

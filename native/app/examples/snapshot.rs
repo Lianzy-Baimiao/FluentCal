@@ -200,12 +200,12 @@ fn main() {
         let (info, local) = settings_scene(&scenario, &doc, scale);
         w.global::<SetState>().set_page(local.page.clone().into());
         settings_view::push(&w, &doc, &info, &local);
-        let (weak, d2) = (w.as_weak(), doc.clone());
+        let (weak, d2, t2) = (w.as_weak(), doc.clone(), t.clone());
         w.global::<SetState>().on_action_arg(move |k, v| {
             let (Some(w), true) = (weak.upgrade(), k == "delete-group") else { return };
-            if let Some((t, c)) = fluentcal_app::windows::settings::commands::delete_group_question(&d2, &v) {
-                fluentcal_app::windows::settings::show_confirm(&w, &t, &c, "删除", "", true);
-            }
+            // 删除分组 with the clicked group ticked (as App::open_group_delete).
+            fluentcal_app::group_delete::push(&w, &d2, &mut vec![v.to_string()], &t2);
+            w.invoke_open_group_delete();
         });
         let h = w.clone_strong();
         show = Box::new(move || h.show().unwrap());

@@ -46,7 +46,7 @@ impl App {
                     self.patch_settings(p);
                 }
             }
-            "delete-group" => self.settings_delete_group(arg),
+            "delete-group" => self.open_group_delete(crate::group_delete::Host::Settings, arg),
             "clear-samples" => self.settings_clear_samples(),
             "export-json" => {
                 let text = serde_json::to_string_pretty(&self.settings_export_doc()).unwrap_or_default();
@@ -133,17 +133,6 @@ impl App {
         );
     }
 
-    fn settings_delete_group(&mut self, id: &str) {
-        let Some((title, content)) = delete_group_question(&self.doc, id) else { return };
-        let id = id.to_owned();
-        self.settings_confirm(&title, &content, tr("删除"), "", true, move |app, r| {
-            if r == "primary" {
-                let edit = tasks::delete_group(&app.doc, &id, fluentcal_core::date::now_ms());
-                app.apply(edit, false);
-            }
-        });
-    }
-
     fn settings_clear_samples(&mut self) {
         let text = tr("第一次启动时生成的示例任务和示例项目会被删除，你自己添加或改过名称的任务不受影响。");
         self.settings_confirm(tr("清除示例数据？"), text, tr("清除"), "", false, |app, r| {
@@ -212,14 +201,6 @@ impl App {
             }
         });
     }
-}
-
-/// GanttPage remove(): the question before deleting a group (title, content).
-pub fn delete_group_question(doc: &fluentcal_core::tasks::Doc, id: &str) -> Option<(String, String)> {
-    let g = doc.groups.get(id)?;
-    let n = doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(id)).count();
-    let content = if n > 0 { trf("组内 {0} 个任务会移到“未分组”，不会被删除。", &[format!("{}", n)]) } else { String::new() };
-    Some((trf("删除分组“{0}”？", &[format!("{}", g.name)]), content))
 }
 
 /// The edit that writes a merge plan's items (0.2: put('groups' / 'tasks' / 'dayMarks')).

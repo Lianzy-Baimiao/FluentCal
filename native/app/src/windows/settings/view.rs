@@ -44,6 +44,8 @@ pub struct Local {
     /// Data folder changed: a restart was asked for (tests check it; the app restarts).
     pub restart_asked: bool,
     pub web_timer: slint::Timer,
+    /// 删除分组 is open: the ticked groups (crate::group_delete).
+    pub group_delete: Option<Vec<String>>,
 }
 
 /// The app's state the pages show.
