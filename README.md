@@ -6,7 +6,9 @@
 
 使用 Rust + [Slint](https://slint.dev) 构建的原生桌面程序，无需 WebView2。数据保存在本机，可离线使用，无需账号，没有广告。
 
-[从微软商店安装](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [下载安装包](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest)
+另提供 **Android 客户端**，支持手机编辑日程、月历和甘特图，扫码连接电脑并自动云同步。
+
+[从微软商店安装](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [下载 Windows 安装包](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) · [下载 Android APK](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)
 
 ![FluentCal 月视图：农历、节气、法定节假日“休/班”、多日任务横条和倒数日](docs/store/month-light.png)
 
@@ -53,15 +55,23 @@
 - 独立安装包没有代码签名，首次安装可能出现 Windows SmartScreen 提示；微软商店版由商店安装和更新。
 - 升级保留已有数据。独立安装包卸载时不会删除数据（`%APPDATA%\com.fluentcal.desktop`）。
 
-## Android 客户端（开发版）
+## Android 客户端
 
 同一仓库提供 Android 客户端：日程、农历月历、触屏甘特图、任务编辑、重复任务、系统提醒及 **WebDAV / GitHub / Gitee 自动云同步**。密码与令牌用 Android Keystore 加密保存。
 
-[下载安卓客户端（GitHub）](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。在桌面 0.3.7+ 的「设置 → 同步」生成配对二维码，手机进入「设置 → 扫码连接电脑」即可接入同一云端日历，无需重新填写账号配置。首次配对时两端需在同一局域网，配对后手机独立进行云同步。
+[下载安卓客户端（GitHub）](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安装 `FluentCal-Android-0.3.1.apk`。要求 Android 7.0 及以上，Android System WebView 120 及以上；当前手机界面为简体中文。
 
-安卓「设置 → 移动端更新」检查 GitHub 新版本；桌面「设置 → 关于」检查 Microsoft Store 更新。开发预览运行 `npm run android:dev`，APK 打包运行 `npm run android:apk`。完整说明见 [Android 文档](docs/ANDROID.md)。
+1. 在桌面 0.3.7+ 的「设置 → 同步」配置并开启云同步，然后点击「生成二维码」。
+2. 手机与电脑连接同一局域网，手机进入「设置 → 自动云同步 → 扫码连接电脑」，竖屏扫描配对码。
+3. 选择合并数据或使用云端日历。配对后手机独立连接云端，电脑无需一直运行。
 
-功能说明、环境要求和安装包输出位置见 [Android 客户端文档](docs/ANDROID.md)。
+二维码有效 5 分钟，使用一次即失效。手机支持离线编辑，启动、恢复前台、联网和编辑后自动同步；系统挂起或结束应用后，下次打开再补同步。
+
+**更新与旧版迁移**：正式版可以覆盖安装并保留数据。已安装 0.1.0 / 0.2.0 测试包、遇到「签名不匹配」的 Android 9+ 用户，先安装发布页的 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，它使用签名轮换保留数据迁移；之后直接安装普通正式版即可。Android 7/8 不支持该签名轮换，需要先导出 JSON，再卸载旧测试包、安装正式版并导入。已安装 0.3.0 正式版的用户直接下载普通 APK。
+
+安卓「设置 → 移动端更新」检查 GitHub 新版本；桌面「设置 → 关于」检查 Microsoft Store 更新。非商店安装会提示前往商店查看；商店版本以商店实际发布进度为准。
+
+开发预览运行 `npm run android:dev`，测试 APK 打包运行 `npm run android:apk`，正式签名与完整使用说明见 [Android 客户端文档](docs/ANDROID.md)。
 
 ## 常用操作
 
@@ -73,6 +83,7 @@
 | 调整位置和大小 | 标题栏 🔒 按钮解锁 → 按住日历任意位置拖动、拖四边或四角调整大小 → 点“完成” |
 | 切换语言 | 设置 › 常规 › 显示语言：跟随系统、简体中文、繁体中文或 English；网页查看使用顶部语言下拉框 |
 | 多台电脑同步 | 设置 › 同步：选同步方式、填写账号 →“测试连接”→“开启同步”。另一台电脑用同样的设置开启，两边都有数据时可选合并或用云端数据 |
+| 安卓客户端同步 | 桌面 设置 › 同步 › 生成二维码；安卓 设置 › 自动云同步 › 扫码连接电脑，首次配对需同一局域网 |
 | 在浏览器中查看 | 日期格子上右键（甘特图里用标题栏“更多”菜单）›“在浏览器中查看”，或托盘菜单里的同名项。只读，只有这台电脑能访问 |
 | 在手机上查看 | 设置 › 网页查看：打开“允许局域网内的设备查看”，用手机扫二维码（手机和电脑连同一个 Wi-Fi）。第一次开启时 Windows 防火墙会询问，勾选“专用网络”并允许 |
 | 换一块屏幕显示 | 托盘菜单“显示在”，或设置 › 常规 ›“显示在”（有多块屏幕时出现）；调整模式下也可以直接拖过去 |

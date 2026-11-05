@@ -6,7 +6,9 @@
 
 使用 Rust + [Slint](https://slint.dev) 建置的原生桌面程式，不需要 WebView2。資料儲存在本機，可離線使用，不需要帳號，沒有廣告。
 
-[從微軟商店安裝](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [下載安裝包](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest)
+另提供 **Android 用戶端**，可在手機編輯日程、月曆與甘特圖，掃碼連接電腦並自動雲端同步。
+
+[從微軟商店安裝](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [下載 Windows 安裝包](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) · [下載 Android APK](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)
 
 ![FluentCal 月檢視：農曆、節氣、法定節假日“休/班”、多日任務橫條和倒數日](docs/store/month-light.png)
 
@@ -55,6 +57,24 @@
 - 獨立安裝包沒有程式碼簽章，首次安裝可能出現 Windows SmartScreen 提示；微軟商店版由商店安裝和更新。
 - 升級保留已有資料。獨立安裝包解除安裝時不會刪除資料（`%APPDATA%\com.fluentcal.desktop`）。
 
+## Android 用戶端
+
+[從 GitHub 下載](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安裝 `FluentCal-Android-0.3.1.apk`。需要 Android 7.0 及以上、Android System WebView 120 及以上；目前手機介面為簡體中文。
+
+支援日程、農曆月曆、觸控甘特圖、任務編輯、重複任務、系統提醒、離線儲存，以及 WebDAV / GitHub / Gitee 自動雲端同步。密碼與權杖以 Android Keystore 加密儲存。
+
+1. 在桌面 0.3.7+ 的「設定 → 同步」設定並啟用雲端同步，然後產生配對二維碼。
+2. 手機與電腦連接同一區域網路，在手機「設定 → 自動雲端同步 → 掃碼連接電腦」（介面文字為「扫码连接电脑」）直向掃描。
+3. 選擇合併資料或使用雲端日曆。配對後手機獨立連接雲端，電腦無需一直執行。
+
+二維碼有效 5 分鐘，使用一次即失效。手機會在啟動、恢復前景、連網、編輯後及執行期間定時同步；系統暫停或結束應用程式後，下次開啟再補同步。
+
+**更新與舊版遷移**：正式版可以直接覆蓋安裝並保留資料。已安裝 0.1.0 / 0.2.0 測試包、遇到簽章不符的 Android 9+ 使用者，先安裝發布頁的 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，透過簽章輪換保留資料遷移，之後使用一般正式版即可。Android 7/8 不支援該輪換，需先匯出 JSON，再解除安裝測試包、安裝正式版並匯入。已安裝 0.3.0 正式版的使用者直接下載一般 APK。
+
+手機「設定 → 行動端更新」檢查 GitHub 新版本；桌面「設定 → 關於」檢查 Microsoft Store 更新。非商店安裝會提示前往商店查看；商店版本以實際發布進度為準。
+
+開發預覽使用 `npm run android:dev`，測試 APK 使用 `npm run android:apk`。正式簽章及詳細說明見 [Android 用戶端文件（簡體中文）](docs/ANDROID.md)。
+
 ## 常用操作
 
 | 操作 | 方式 |
@@ -65,6 +85,7 @@
 | 調整位置和大小 | 標題列 🔒 按鈕解鎖 → 按住日曆任意位置拖動、拖四邊或四角調整大小 → 點“完成” |
 | 切換語言 | 設定 › 常規 › 顯示語言：跟隨系統、簡體中文、繁體中文或 English；網頁檢視使用頂部語言下拉框 |
 | 多臺電腦同步 | 設定 › 同步：選同步方式、填寫帳號 →“測試連線”→“開啟同步”。另一臺電腦用同樣的設定開啟，兩邊都有資料時可選合併或用雲端資料 |
+| Android 用戶端同步 | 桌面 設定 › 同步 › 產生二維碼；手機掃碼連接電腦，首次配對需同一區域網路 |
 | 在瀏覽器中檢視 | 日期格子上右鍵（甘特圖裡用標題列“更多”選單）›“在瀏覽器中檢視”，或托盤選單裡的同名項。唯讀，只有這臺電腦能存取 |
 | 在手機上檢視 | 設定 › 網頁檢視：開啟“允許區域網內的裝置檢視”，用手機掃二維碼（手機和電腦連同一個 Wi-Fi）。第一次開啟時 Windows 防火牆會詢問，勾選“私人網路”並允許 |
 | 換一塊螢幕顯示 | 托盤選單“顯示在”，或 設定 › 常規 ›“顯示在”（有多塊螢幕時出現）；調整模式下也可以直接拖過去 |

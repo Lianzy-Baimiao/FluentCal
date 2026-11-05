@@ -6,7 +6,9 @@ A calendar and Gantt chart pinned to the Windows desktop, in the Windows 11 Flue
 
 A native desktop app built with Rust and [Slint](https://slint.dev); no WebView2 needed. Your data is kept on your PC, it works offline, needs no account and has no ads.
 
-[Get it from the Microsoft Store](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [Download the installer](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest)
+An **Android client** is also available, with editable agendas, a calendar and a touch-friendly Gantt chart, QR pairing and automatic cloud sync.
+
+[Get it from the Microsoft Store](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [Download for Windows](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) · [Download Android APK](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)
 
 ![FluentCal month view: lunar dates, solar terms, Chinese public holidays with off and work days, multi-day task bars and countdowns](docs/store/month-light.png)
 
@@ -55,6 +57,24 @@ You can also download `FluentCal_<version>_x64-setup.exe` from [GitHub Releases]
 - The standalone installer is not code-signed, so Windows SmartScreen may warn the first time; the Microsoft Store version is installed and updated by the Store.
 - Upgrading keeps your data. Uninstalling the standalone version doesn't delete your data (`%APPDATA%\com.fluentcal.desktop`).
 
+## Android client
+
+[Download from GitHub](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest) and install `FluentCal-Android-0.3.1.apk`. Requires Android 7.0+ and Android System WebView 120+. The mobile interface is currently in Simplified Chinese.
+
+The app supports task editing, repeating tasks, the lunar calendar, a touch-friendly Gantt chart, reminders, offline storage and automatic WebDAV / private GitHub or Gitee repository sync. Credentials are encrypted with Android Keystore.
+
+1. Enable cloud sync on desktop version 0.3.7+ under Settings › Sync, then generate a pairing QR code.
+2. Connect the phone and PC to the same local network. On the phone, open Settings › Automatic cloud sync › Scan to connect to PC (`扫码连接电脑`). The scanner opens in portrait orientation.
+3. Choose to merge your data or use the cloud calendar. After pairing, the phone connects to the cloud independently; the PC can be offline.
+
+Pairing codes expire after five minutes or one use. Sync runs on startup, resume, reconnection and edits, and periodically while the app is running. If Android suspends or stops the process, it catches up when reopened.
+
+**Upgrading:** regular release APKs install over previous releases and keep data. If a 0.1.0 / 0.2.0 debug installation reports a signature mismatch, Android 9+ users can install `FluentCal-Android-0.3.1-legacy-upgrade.apk` once to migrate using signing-key rotation, then use normal release APKs. Android 7/8 users must export JSON, uninstall the old debug app, install the release and import the backup. Existing 0.3.0 release installations can use the normal APK directly.
+
+The phone checks GitHub under Settings › Mobile updates. The desktop checks Microsoft Store under Settings › About; standalone installations are directed to the Store page. Store availability follows Microsoft's publication process.
+
+Run `npm run android:dev` for a preview or `npm run android:apk` for a debug APK. See the [Android guide (Chinese)](docs/ANDROID.md) for signing and detailed setup.
+
 ## Common tasks
 
 | Task | How |
@@ -65,6 +85,7 @@ You can also download `FluentCal_<version>_x64-setup.exe` from [GitHub Releases]
 | Move and resize | Click 🔒 in the title bar to unlock → drag anywhere on the calendar, or drag an edge or corner → click "Done" |
 | Switch language | Settings › General › Display language: System default, Simplified Chinese, Traditional Chinese or English; the web view uses the language menu at the top |
 | Sync several PCs | Settings › Sync: choose a sync method and fill in the account → "Test connection" → "Enable sync". Turn it on with the same settings on the other PC; if both have data, choose to merge or to use the cloud data |
+| Sync the Android app | Desktop Settings › Sync › Generate QR code; phone Settings › Automatic cloud sync › Scan to connect to PC. Use the same local network for pairing |
 | View in browser | Right-click a date (in the Gantt chart, use the "More" menu in the title bar) › "View in browser", or the tray menu item of the same name. View-only; only this PC can open it |
 | View on a phone | Settings › Web view: turn on "Allow local network access" and scan the QR code with your phone (on the same Wi-Fi as the PC). The first time, Windows Firewall asks: tick "Private networks" and allow |
 | Show on another screen | "Display on" in the tray menu, or Settings › General › "Display on" (shown when there are several screens); in adjust mode you can also drag it there |

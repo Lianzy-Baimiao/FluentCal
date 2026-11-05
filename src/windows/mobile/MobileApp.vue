@@ -706,12 +706,17 @@ onBeforeUnmount(() => {
           :key="item[0]"
           type="button"
           :class="{ active: tab === item[0] }"
+          :aria-current="tab === item[0] ? 'page' : undefined"
+          :aria-label="item[1] + (item[0] === 'agenda' && taskCount ? `，${taskCount} 个未完成任务` : '')"
           @click="tab = item[0]"
         >
-          <FIcon :name="item[2]" :size="21" /><span>{{ item[1] }}</span
-          ><em v-if="item[0] === 'agenda' && taskCount">{{
-            taskCount > 99 ? "99+" : taskCount
-          }}</em>
+          <span class="nav-icon" aria-hidden="true">
+            <FIcon :name="item[2]" :size="21" />
+            <em v-if="item[0] === 'agenda' && taskCount">{{
+              taskCount > 99 ? "99+" : taskCount
+            }}</em>
+          </span>
+          <span>{{ item[1] }}</span>
         </button>
       </nav>
     </div>
@@ -1338,23 +1343,45 @@ h1 span {
   background: transparent;
   color: var(--text-secondary);
   font-size: 10px;
+  line-height: 16px;
+  padding: 6px 0 3px;
 }
 .bottom-nav button.active {
   background: color-mix(in srgb, var(--accent-fill) 12%, transparent);
   color: var(--accent-text);
   font-weight: 600;
 }
-.bottom-nav em {
+.nav-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.nav-icon em {
   position: absolute;
-  top: 0;
-  right: calc(50% - 20px);
-  min-width: 15px;
-  padding: 1px 3px;
-  border-radius: 8px;
-  background: var(--critical);
+  top: -5px;
+  left: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--solid-base);
+  border-radius: 999px;
+  background: #b42318;
   color: #fff;
-  font-size: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
   font-style: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .toast {
   position: fixed;
@@ -1448,9 +1475,6 @@ h1 span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.bottom-nav button {
-  padding-top: 6px;
 }
 .bottom-nav button .f-icon {
   min-height: 21px;

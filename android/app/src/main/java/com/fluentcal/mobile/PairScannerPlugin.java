@@ -18,7 +18,7 @@ public class PairScannerPlugin extends Plugin {
         options.setPrompt("扫描电脑 FluentCal「同步」页的配对二维码");
         options.setBeepEnabled(false);
         options.setBarcodeImageEnabled(false);
-        options.setOrientationLocked(false);
+        options.setOrientationLocked(true);
         startActivityForResult(call, options.createScanIntent(getContext()), "scanned");
     }
     @ActivityCallback private void scanned(PluginCall call, ActivityResult result) {

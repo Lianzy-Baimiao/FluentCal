@@ -1,8 +1,12 @@
 # FluentCal Android 客户端
 
-Android 客户端（0.3.0）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
+Android 客户端（0.3.1）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
 
-下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。安装 `FluentCal-Android-0.3.0.apk`。这是正式发布签名的安装包；以后从同一发布通道下载即可覆盖升级。曾安装本机 debug 测试包的用户需要先导出 JSON，再卸载 debug 包安装正式版并导入，因为两者签名不同。
+下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.1.apk`，可直接覆盖升级并保留数据。
+
+**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
+
+0.3.1 同时修复扫码页面横屏问题（手机锁定竖屏），以及底部日程数字角标被按钮行高拉长的问题；角标固定高度，个位数为圆形、多位数为胶囊形，超过 99 显示 `99+`。
 
 ## 功能与使用
 
@@ -66,13 +70,15 @@ $env:ANDROID_HOME = 'C:\path\to\Android\Sdk'
 npm run android:apk      # Windows 一键生成可安装的 debug APK
 ```
 
-输出：`release/FluentCal-Android-0.3.0-debug.apk`（versionCode 3）。使用 `scripts/build-android.ps1 -Release` 构建正式签名包 `release/FluentCal-Android-0.3.0.apk`。
+输出：`release/FluentCal-Android-0.3.1-debug.apk`（versionCode 4）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.0.apk` 构建正式签名包 `release/FluentCal-Android-0.3.1.apk` 并检查与上一正式版的签名兼容性。
 
 构建脚本提供 `.apk.sha256` 校验和，并会自动识别装在 `%USERPROFILE%\tools\fluentcal-android` 下的工具链；在其他机器上按上例设置环境变量。如果 Gradle 需要代理，可通过当前终端的 `JAVA_OPTS` 设置 `-Dhttps.proxyHost=地址 -Dhttps.proxyPort=端口`，不需要改项目配置。Windows 中文路径下 Gradle worker 使用 `file.encoding=COMPAT` 生成与 Java 启动器一致的参数文件，Java 源码编译显式使用 UTF-8。
 
 其他平台可在 `npm run android:sync` 后进入 `android` 运行 `./gradlew :app:assembleDebug`。正式发布需设置 `FLUENTCAL_ANDROID_KEYSTORE`、`FLUENTCAL_ANDROID_STORE_PASSWORD`（alias 为 `fluentcal`），或使用本机工具目录 `signing/` 中的发布密钥与 DPAPI 密码文件。构建脚本自动读取本机凭据、验证签名并清除子进程密码环境变量。发布密钥不进入仓库，应妥善备份；后续更新必须继续使用同一签名。
 
 GitHub 使用稳定标签 `android-latest`，发布名称必须为 `FluentCal Android vX.Y.Z`，APK 资产名称必须为 `FluentCal-Android-X.Y.Z.apk`。这个标签专用于移动端，发布时不设为仓库 latest，Windows 的 `/releases/latest` 下载入口继续指向桌面版。更新脚本只接受该仓库、该标签、已上传 APK 以及递增的三段版本号。
+
+迁移包在普通正式包构建完成后运行 `scripts/build-android-migration.ps1 -PreviousApk release/FluentCal-Android-0.1.0-debug.apk` 生成。必须保留原始 `.android/debug.keystore` 和正式发布密钥；脚本在仓库外保存签名轮换证明，开启旧证书的 installed-data 能力、禁止 rollback，并验证 Android 9/12L/13/16 上「旧测试包 → 迁移包 → 普通正式包」的证书关系。迁移包复用正式包内容，不启用调试；Android 9+ 使用正式签名，Android 7/8 只能识别它的旧 v2 签名，所以迁移入口明确限定 Android 9+。仅在迁移路径上提供此包，自动更新仍检查普通正式包。
 
 桌面版「设置 → 关于 → 检查更新」通过 WinRT `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` 检查微软商店，找到更新后从「打开 Microsoft Store」交给商店安装。非 MSIX 安装会提示前往商店查看；请求失败不会显示“已是最新”。新增代码不代表已提交或发布新的微软商店版本，商店上架仍走现有提交流程。
 
@@ -84,6 +90,8 @@ GitHub 使用稳定标签 `android-latest`，发布名称必须为 `FluentCal An
 npm test                 # 包括备份校验、并发持久化、写入失败恢复、通知清理测试
 npm run android:e2e       # Edge 无头模式，运行手机交互测试并在 shots/android/ 生成截图
 npm run android:sync-e2e  # 两个隔离客户端连接模拟 WebDAV，测试真实界面与自动调度
+node scripts/android-navigation-e2e.mjs  # 角标 0/1/12/99+，320/390/768px，深浅主题
+powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.1.apk
 npm run build            # 同时检查桌面网页资源可构建
 cd android
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain

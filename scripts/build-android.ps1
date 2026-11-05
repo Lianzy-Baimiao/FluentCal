@@ -1,4 +1,4 @@
-param([switch]$Release)
+param([switch]$Release, [string]$PreviousApk)
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location $repoRoot
@@ -49,5 +49,9 @@ try {
     if ($Release) {
         & (Join-Path $env:ANDROID_HOME 'build-tools\36.0.0\apksigner.bat') verify --verbose $output
         if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
+        if ($PreviousApk) {
+            & (Join-Path $env:JAVA_HOME 'bin\java.exe') -cp (Join-Path $env:ANDROID_HOME 'build-tools\36.0.0\lib\apksigner.jar') (Join-Path $PSScriptRoot 'VerifyAndroidUpgrade.java') $PreviousApk $output 24
+            if ($LASTEXITCODE -ne 0) { throw 'Update signing compatibility verification failed.' }
+        }
     }
 } finally { $env:FLUENTCAL_ANDROID_STORE_PASSWORD = $null; Pop-Location }
