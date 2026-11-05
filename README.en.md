@@ -59,7 +59,7 @@ You can also download `FluentCal_<version>_x64-setup.exe` from [GitHub Releases]
 
 ## Android client
 
-[Download from GitHub](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest) and install `FluentCal-Android-0.3.1.apk`. Requires Android 7.0+ and Android System WebView 120+. The mobile interface is currently in Simplified Chinese.
+[Download from GitHub](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest) and install `FluentCal-Android-0.3.2.apk`. Requires Android 7.0+ and Android System WebView 120+. The mobile interface is currently in Simplified Chinese.
 
 The app supports task editing, repeating tasks, the lunar calendar, a touch-friendly Gantt chart, reminders, offline storage and automatic WebDAV / private GitHub or Gitee repository sync. Credentials are encrypted with Android Keystore.
 
@@ -69,7 +69,7 @@ The app supports task editing, repeating tasks, the lunar calendar, a touch-frie
 
 Pairing codes expire after five minutes or one use. Sync runs on startup, resume, reconnection and edits, and periodically while the app is running. If Android suspends or stops the process, it catches up when reopened.
 
-**Upgrading:** regular release APKs install over previous releases and keep data. If a 0.1.0 / 0.2.0 debug installation reports a signature mismatch, Android 9+ users can install `FluentCal-Android-0.3.1-legacy-upgrade.apk` once to migrate using signing-key rotation, then use normal release APKs. Android 7/8 users must export JSON, uninstall the old debug app, install the release and import the backup. Existing 0.3.0 release installations can use the normal APK directly.
+**Upgrading:** regular release APKs install over previous releases and keep data. If a 0.1.0 / 0.2.0 debug installation reports a signature mismatch, Android 9+ users can install `FluentCal-Android-0.3.2-legacy-upgrade.apk` once to migrate using signing-key rotation, then use normal release APKs. Android 7/8 users must export JSON, uninstall the old debug app, install the release and import the backup. Existing 0.3.0 release installations can use the normal APK directly.
 
 The phone checks GitHub under Settings › Mobile updates. The desktop checks Microsoft Store under Settings › About; standalone installations are directed to the Store page. Store availability follows Microsoft's publication process.
 

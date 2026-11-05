@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -182,6 +182,11 @@ function nextMonth(delta: number) {
 function goToday() {
   cursor.value = startOfMonth(now.value);
   selected.value = now.value;
+  tab.value = "calendar";
+  search.value = "";
+  showSearch.value = false;
+  notify("已回到今天");
+  void nextTick(() => window.scrollTo({ top: 0, behavior: "instant" }));
 }
 function pickDay(d: ISODate) {
   selected.value = d;
@@ -401,11 +406,12 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="bar-btn"
-            aria-label="今天"
+            class="bar-btn bar-today"
+            aria-label="回到今天"
+            title="回到今天"
             @click="goToday"
           >
-            <FIcon name="today" :size="19" />
+            <FIcon name="today" :size="19" /><span>今天</span>
           </button>
         </div>
       </header>
@@ -841,6 +847,17 @@ onBeforeUnmount(() => {
   width: 38px;
   height: 38px;
   border-radius: 12px;
+}
+.bar-today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: auto;
+  min-width: 58px;
+  padding: 0 7px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .bar-btn:active,
 .nav-btn:active {

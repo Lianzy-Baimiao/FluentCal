@@ -59,7 +59,7 @@
 
 同一仓库提供 Android 客户端：日程、农历月历、触屏甘特图、任务编辑、重复任务、系统提醒及 **WebDAV / GitHub / Gitee 自动云同步**。密码与令牌用 Android Keystore 加密保存。
 
-[下载安卓客户端（GitHub）](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安装 `FluentCal-Android-0.3.1.apk`。要求 Android 7.0 及以上，Android System WebView 120 及以上；当前手机界面为简体中文。
+[下载安卓客户端（GitHub）](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安装 `FluentCal-Android-0.3.2.apk`。要求 Android 7.0 及以上，Android System WebView 120 及以上；当前手机界面为简体中文。
 
 1. 在桌面 0.3.7+ 的「设置 → 同步」配置并开启云同步，然后点击「生成二维码」。
 2. 手机与电脑连接同一局域网，手机进入「设置 → 自动云同步 → 扫码连接电脑」，竖屏扫描配对码。
@@ -67,7 +67,7 @@
 
 二维码有效 5 分钟，使用一次即失效。手机支持离线编辑，启动、恢复前台、联网和编辑后自动同步；系统挂起或结束应用后，下次打开再补同步。
 
-**更新与旧版迁移**：正式版可以覆盖安装并保留数据。已安装 0.1.0 / 0.2.0 测试包、遇到「签名不匹配」的 Android 9+ 用户，先安装发布页的 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，它使用签名轮换保留数据迁移；之后直接安装普通正式版即可。Android 7/8 不支持该签名轮换，需要先导出 JSON，再卸载旧测试包、安装正式版并导入。已安装 0.3.0 正式版的用户直接下载普通 APK。
+**更新与旧版迁移**：正式版可以覆盖安装并保留数据。已安装 0.1.0 / 0.2.0 测试包、遇到「签名不匹配」的 Android 9+ 用户，先安装发布页的 `FluentCal-Android-0.3.2-legacy-upgrade.apk`，它使用签名轮换保留数据迁移；之后直接安装普通正式版即可。Android 7/8 不支持该签名轮换，需要先导出 JSON，再卸载旧测试包、安装正式版并导入。已安装 0.3.0 正式版的用户直接下载普通 APK。
 
 安卓「设置 → 移动端更新」检查 GitHub 新版本；桌面「设置 → 关于」检查 Microsoft Store 更新。非商店安装会提示前往商店查看；商店版本以商店实际发布进度为准。
 

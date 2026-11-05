@@ -51,6 +51,25 @@ try {
       );
     },
   );
+  await check("Today opens the current calendar from every tab and clears search", async () => {
+    for (const name of ["日程", "甘特", "设置", "月历"]) {
+      await nav(name).click();
+      if (name !== "设置") {
+        await page.locator(".app-bar").getByRole("button", { name: "搜索", exact: true }).click();
+        await page.getByPlaceholder("搜索任务、备注…").fill("不应继续过滤今天的任务");
+      }
+      if (name === "月历") {
+        await page.locator(".calendar-toolbar").getByRole("button", { name: "›", exact: true }).click();
+      }
+      await page.locator(".app-bar").getByRole("button", { name: /今天/ }).click();
+      await page.locator(".calendar-page").waitFor({ state: "visible", timeout: 3000 });
+      assert.equal(await page.locator(".month-day.today.selected").count(), 1);
+      assert((await page.locator(".month-day.today.selected").getAttribute("aria-label")).startsWith(today));
+      assert.equal(await page.locator(".search-row").count(), 0);
+      assert.equal(await page.locator(".toast").innerText(), "已回到今天");
+    }
+    await nav("日程").click();
+  });
   await check("creates, reloads and completes a task", async () => {
     await page.locator(".primary-round").click();
     await dialog().getByLabel("任务名称").fill("安卓离线任务");

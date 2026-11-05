@@ -1,12 +1,14 @@
 # FluentCal Android 客户端
 
-Android 客户端（0.3.1）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
+Android 客户端（0.3.2）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
 
-下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.1.apk`，可直接覆盖升级并保留数据。
+下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.2.apk`，可直接覆盖升级并保留数据。
 
-**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
+**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.2-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
 
-0.3.1 同时修复扫码页面横屏问题（手机锁定竖屏），以及底部日程数字角标被按钮行高拉长的问题；角标固定高度，个位数为圆形、多位数为胶囊形，超过 99 显示 `99+`。
+0.3.1 修复扫码页面横屏问题（手机锁定竖屏），以及底部日程数字角标被按钮行高拉长的问题；角标固定高度，个位数为圆形、多位数为胶囊形，超过 99 显示 `99+`。
+
+0.3.2 修复顶部「回到今天」按钮：从日程、甘特或设置页点击会打开当月月历并选中今天，同时清除搜索、回到页面顶部并显示提示。按钮增加「今天」文字。
 
 ## 功能与使用
 
@@ -70,7 +72,7 @@ $env:ANDROID_HOME = 'C:\path\to\Android\Sdk'
 npm run android:apk      # Windows 一键生成可安装的 debug APK
 ```
 
-输出：`release/FluentCal-Android-0.3.1-debug.apk`（versionCode 4）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.0.apk` 构建正式签名包 `release/FluentCal-Android-0.3.1.apk` 并检查与上一正式版的签名兼容性。
+输出：`release/FluentCal-Android-0.3.2-debug.apk`（versionCode 5）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.1.apk` 构建正式签名包 `release/FluentCal-Android-0.3.2.apk` 并检查与上一正式版的签名兼容性。
 
 构建脚本提供 `.apk.sha256` 校验和，并会自动识别装在 `%USERPROFILE%\tools\fluentcal-android` 下的工具链；在其他机器上按上例设置环境变量。如果 Gradle 需要代理，可通过当前终端的 `JAVA_OPTS` 设置 `-Dhttps.proxyHost=地址 -Dhttps.proxyPort=端口`，不需要改项目配置。Windows 中文路径下 Gradle worker 使用 `file.encoding=COMPAT` 生成与 Java 启动器一致的参数文件，Java 源码编译显式使用 UTF-8。
 
@@ -91,7 +93,7 @@ npm test                 # 包括备份校验、并发持久化、写入失败�
 npm run android:e2e       # Edge 无头模式，运行手机交互测试并在 shots/android/ 生成截图
 npm run android:sync-e2e  # 两个隔离客户端连接模拟 WebDAV，测试真实界面与自动调度
 node scripts/android-navigation-e2e.mjs  # 角标 0/1/12/99+，320/390/768px，深浅主题
-powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.1.apk
+powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.2.apk
 npm run build            # 同时检查桌面网页资源可构建
 cd android
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain

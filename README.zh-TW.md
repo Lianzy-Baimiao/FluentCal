@@ -59,7 +59,7 @@
 
 ## Android 用戶端
 
-[從 GitHub 下載](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安裝 `FluentCal-Android-0.3.1.apk`。需要 Android 7.0 及以上、Android System WebView 120 及以上；目前手機介面為簡體中文。
+[從 GitHub 下載](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，安裝 `FluentCal-Android-0.3.2.apk`。需要 Android 7.0 及以上、Android System WebView 120 及以上；目前手機介面為簡體中文。
 
 支援日程、農曆月曆、觸控甘特圖、任務編輯、重複任務、系統提醒、離線儲存，以及 WebDAV / GitHub / Gitee 自動雲端同步。密碼與權杖以 Android Keystore 加密儲存。
 
@@ -69,7 +69,7 @@
 
 二維碼有效 5 分鐘，使用一次即失效。手機會在啟動、恢復前景、連網、編輯後及執行期間定時同步；系統暫停或結束應用程式後，下次開啟再補同步。
 
-**更新與舊版遷移**：正式版可以直接覆蓋安裝並保留資料。已安裝 0.1.0 / 0.2.0 測試包、遇到簽章不符的 Android 9+ 使用者，先安裝發布頁的 `FluentCal-Android-0.3.1-legacy-upgrade.apk`，透過簽章輪換保留資料遷移，之後使用一般正式版即可。Android 7/8 不支援該輪換，需先匯出 JSON，再解除安裝測試包、安裝正式版並匯入。已安裝 0.3.0 正式版的使用者直接下載一般 APK。
+**更新與舊版遷移**：正式版可以直接覆蓋安裝並保留資料。已安裝 0.1.0 / 0.2.0 測試包、遇到簽章不符的 Android 9+ 使用者，先安裝發布頁的 `FluentCal-Android-0.3.2-legacy-upgrade.apk`，透過簽章輪換保留資料遷移，之後使用一般正式版即可。Android 7/8 不支援該輪換，需先匯出 JSON，再解除安裝測試包、安裝正式版並匯入。已安裝 0.3.0 正式版的使用者直接下載一般 APK。
 
 手機「設定 → 行動端更新」檢查 GitHub 新版本；桌面「設定 → 關於」檢查 Microsoft Store 更新。非商店安裝會提示前往商店查看；商店版本以實際發布進度為準。
 
