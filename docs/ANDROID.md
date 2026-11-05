@@ -82,7 +82,7 @@ GitHub 使用稳定标签 `android-latest`，发布名称必须为 `FluentCal An
 
 迁移包在普通正式包构建完成后运行 `scripts/build-android-migration.ps1 -PreviousApk release/FluentCal-Android-0.1.0-debug.apk` 生成。必须保留原始 `.android/debug.keystore` 和正式发布密钥；脚本在仓库外保存签名轮换证明，开启旧证书的 installed-data 能力、禁止 rollback，并验证 Android 9/12L/13/16 上「旧测试包 → 迁移包 → 普通正式包」的证书关系。迁移包复用正式包内容，不启用调试；Android 9+ 使用正式签名，Android 7/8 只能识别它的旧 v2 签名，所以迁移入口明确限定 Android 9+。仅在迁移路径上提供此包，自动更新仍检查普通正式包。
 
-桌面版「设置 → 关于 → 检查更新」通过 WinRT `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` 检查微软商店，找到更新后从「打开 Microsoft Store」交给商店安装。非 MSIX 安装会提示前往商店查看；请求失败不会显示“已是最新”。新增代码不代表已提交或发布新的微软商店版本，商店上架仍走现有提交流程。
+桌面版「设置 → 关于 → 检查更新」通过 WinRT `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` 检查微软商店，找到更新后从「打开 Microsoft Store」交给商店安装。非 MSIX 安装会提示前往商店查看；请求失败不会显示“已是最新”。桌面 0.3.7.0 已于 2026-11-06 提交商店审核，设置为通过后自动发布；以商店审核及分发进度为准。
 
 `npm run build` 的桌面网页资源仍输出到 `dist/`，移动端输出为 `dist-android/`。原生桌面 Rust/Slint 工程不受移动端构建影响。
 

@@ -251,7 +251,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 2026-11-05 12:17 点击“提交进行认证”。后台显示 **正在认证更新**、**预处理**、**产品在通过认证后立即开始发布**。截图：`release/store-proof/certification-0.3.5-2026-11-05.png`（本地忽略目录）。此记录表示已送审，尚未确认 0.3.5.0 上架。
 - 2026-11-05 15:43 不登录查询商店目录，CN 和 US 都返回 `ice.FluentCal_0.3.5.0_x64__rz8m2sa64m4em`，确认已上架（送审后不到 3.5 小时）。
 
-### 0.3.6.0 跨屏拖动时日历大小失控（2026-11-05 19:03 送审，正在认证）
+### 0.3.6.0 跨屏拖动时日历大小失控（2026-11-05 19:03 送审，已上架）
 
 - 用户反馈“跨屏幕拖动存在恶性Bug，大小会混乱无序的变化，且无法控制”。修复后先把 0.3.6 安装包交给用户在另一台电脑上测试，用户确认“测试过没问题了”后发布。应用版本 **0.3.6**，商店包 **0.3.6.0**，高于已上架的 `0.3.5.0`。
 - 修复：native/vendor/winit 是 winit 0.30.13 加上上游 PR #4341 的移植，Windows 11 上跨屏拖动时采用系统建议的窗口位置（f34959f）。
@@ -267,3 +267,17 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 创建 **Submission 6 / 1152921505702322530**。上传 `FluentCal_0.3.6.0_x64.msix` 后只有预期的 runFullTrust 受限能力警告；设备系列仍只勾选 Windows 10/11 桌面。保存后旧包 `0.3.5.0` 被自动移除，概述页只列出 `FluentCal_0.3.6.0_x64.msix / Validated`。
 - 三种语言的“此版本的新增功能”已按上文填写并保存，重新载入后逐字一致；其他资料未改。提交选项仍是“在此提交通过认证后立即予以发布”，runFullTrust 用途说明 453 字符未变。
 - 2026-11-05 19:03 点击“提交进行认证”。后台显示 **正在认证更新**、**预处理**、**产品在通过认证后立即开始发布**。截图：`release/store-proof/certification-0.3.6-2026-11-05.png`（本地忽略目录）。此记录表示已送审，尚未确认 0.3.6.0 上架。
+- 2026-11-05 提交下一版前，合作伙伴中心确认 Submission 6 已上架，显示“恭喜!你的产品现已更新”“你的最新产品现已在 Microsoft Store 上架”。
+
+### 0.3.7.0 安卓扫码配对与商店更新检查（2026-11-06 00:02 送审，正在认证）
+
+- 用户要求“提交上架吧先”，通过 Codex 内置浏览器创建 **Submission 7 / 1152921505702324667**，产品为 **FluentCal 桌面日历 / 9NTT06453DG5**。
+- 应用版本 **0.3.7**，包版本 **0.3.7.0**。沿用身份 `ice.FluentCal`、发布者 `CN=56079E3F-5861-4D9C-B9C3-93F76224C42E`、发布者显示名“白描ice”，仅 x64 桌面、最低 Windows 10 1809，声明 `zh-CN` / `zh-TW` / `en-US`。
+- 包：`release/FluentCal_0.3.7.0_x64.msix`，10,415,409 字节，SHA-256 `ee1b877961e350bd750c7ec8de0c85394899f59137a3e809630816f16fe6e2eb`。MakeAppx 校验通过；包内 EXE 与已验证的 GitHub Windows 0.3.7 EXE 一致，SHA-256 `0568eb1381487fc14dea3ec4dcb285ab2092d8ddaff946c43faf6f6f9e05b0ca`。
+- 上传后 Partner Center 显示 **Validated**，仅出现既有 `runFullTrust` 能力提醒；保存时自动替换 0.3.6.0，概述页仅列出新包。
+- 三种语言的“此版本的新增功能”均保存并重新打开逐字核对：
+  - 简体中文：新增安卓客户端扫码连接：在「设置 → 同步」下载手机端并生成一次性配对二维码，手机扫描后即可接入同一份云端日历，无需重复填写账号。支持 WebDAV、GitHub、Gitee 自动云同步，配对后手机独立连接云端。桌面「设置 → 关于」新增 Microsoft Store 更新检查。
+  - English: Added QR pairing with the Android companion app. In Settings > Sync, download the mobile app and generate a one-time code to share your cloud sync configuration without re-entering credentials. Supports automatic sync through WebDAV and private GitHub/Gitee repositories; the phone connects to the cloud independently after pairing. Added Microsoft Store update checks in Settings > About.
+  - 繁體中文：新增 Android 用戶端掃碼連接：在「設定 → 同步」下載手機端並產生一次性配對二維碼，手機掃描後即可接入同一份雲端日曆，無需重複填寫帳號。支援 WebDAV、GitHub、Gitee 自動雲端同步，配對後手機獨立連接雲端。桌面「設定 → 關於」新增 Microsoft Store 更新檢查。
+- 隐私政策补充扫码凭据交接、Android 本地存储/相机与更新检查的数据处理说明，送审前已推送。其他商店描述、截图、定价、年龄分级及受限能力用途说明保持不变。
+- 已点击“提交进行认证”，后台确认 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**。此记录只确认送审成功，不代表 0.3.7.0 已上架。凭证：`release/store-proof/certification-0.3.7-2026-11-06.png`（本地忽略目录；满意度调查未作答）。
