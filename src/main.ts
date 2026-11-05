@@ -1,6 +1,7 @@
 import './fluent/tokens.css';
 import './fluent/base.css';
 import { createApp, type Component } from 'vue';
+import { Capacitor } from '@capacitor/core';
 
 // Each Tauri window loads the same page; the window label picks the root component.
 // In a plain browser (dev, screenshots) use ?w=desk|settings|editor|gallery.
@@ -8,7 +9,7 @@ const label: string =
   (window as { __TAURI_INTERNALS__?: { metadata?: { currentWebview?: { label?: string } } } })
     .__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
   new URLSearchParams(location.search).get('w') ??
-  'desk';
+  (Capacitor.isNativePlatform() || import.meta.env.MODE === 'android' ? 'mobile' : 'desk');
 
 document.documentElement.dataset.window = label;
 // No Mica or desktop behind the page in a plain browser: window-shell.css paints stand-ins.

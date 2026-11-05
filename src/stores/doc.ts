@@ -37,6 +37,7 @@ function deepMergeInto(target: Json, patch: Json) {
 }
 
 function applyDoc(d: Partial<Doc>) {
+  doc.meta = d.meta;
   doc.tasks = (d.tasks ?? {}) as Record<string, Task>;
   doc.groups = (d.groups ?? {}) as Record<string, Group>;
   doc.dayMarks = (d.dayMarks ?? {}) as Record<string, DayMark>;

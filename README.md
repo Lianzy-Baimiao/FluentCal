@@ -53,6 +53,16 @@
 - 独立安装包没有代码签名，首次安装可能出现 Windows SmartScreen 提示；微软商店版由商店安装和更新。
 - 升级保留已有数据。独立安装包卸载时不会删除数据（`%APPDATA%\com.fluentcal.desktop`）。
 
+## Android 客户端（开发版）
+
+同一仓库提供 Android 客户端：日程、农历月历、触屏甘特图、任务编辑、重复任务、系统提醒及 **WebDAV / GitHub / Gitee 自动云同步**。密码与令牌用 Android Keystore 加密保存。
+
+[下载安卓客户端（GitHub）](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。在桌面 0.3.7+ 的「设置 → 同步」生成配对二维码，手机进入「设置 → 扫码连接电脑」即可接入同一云端日历，无需重新填写账号配置。首次配对时两端需在同一局域网，配对后手机独立进行云同步。
+
+安卓「设置 → 移动端更新」检查 GitHub 新版本；桌面「设置 → 关于」检查 Microsoft Store 更新。开发预览运行 `npm run android:dev`，APK 打包运行 `npm run android:apk`。完整说明见 [Android 文档](docs/ANDROID.md)。
+
+功能说明、环境要求和安装包输出位置见 [Android 客户端文档](docs/ANDROID.md)。
+
 ## 常用操作
 
 | 操作 | 方式 |

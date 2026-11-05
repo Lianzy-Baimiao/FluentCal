@@ -184,6 +184,8 @@ export type SyncProvider = '' | 'webdav' | 'github' | 'gitee' | 'folder';
 
 export interface Doc {
   version: number;
+  /** Per-item edit timestamps, including deleted items, shared with desktop cloud sync. */
+  meta?: Partial<Record<Collection, Record<string, number>>>;
   tasks: Record<string, Task>;
   groups: Record<string, Group>;
   dayMarks: Record<ISODate, DayMark>;

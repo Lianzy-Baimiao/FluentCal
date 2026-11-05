@@ -47,6 +47,36 @@ export component SyncPage inherits VerticalLayout {
     property <bool> help-open;
     spacing: 4px;
     SettingsGroup {
+        title: @tr("连接安卓手机");
+        SettingsCard {
+            icon: Glyph.link;
+            title: @tr("扫码连接 FluentCal 移动端");
+            description: @tr("先从 GitHub 下载并安装安卓客户端，再用手机「设置 → 扫码连接电脑」扫描下方二维码。手机和电脑需连接同一局域网。");
+            Button { text: @tr("去 GitHub 下载移动端"); clicked => { SetState.action("mobile-download"); } }
+        }
+        SettingsCard {
+            title: @tr("配对二维码");
+            description: SetState.sync.enabled && SetState.sync.cloud ? @tr("二维码会授权手机使用当前云同步账号，仅给自己的手机扫描。5 分钟有效，成功获取一次即失效。"): @tr("请先在下方开启 WebDAV、GitHub 或 Gitee 云同步，然后生成配对码。");
+            Button { text: SetState.pair-active ? @tr("刷新二维码") : @tr("生成二维码"); enabled: SetState.sync.enabled && SetState.sync.cloud; variant: ButtonVariant.accent; clicked => { SetState.action("pair-start"); } }
+        }
+        if SetState.pair-active: HorizontalLayout {
+            spacing: 20px; padding: 16px;
+            Rectangle { width: 240px; height: 240px; background: white; Image { width: 240px; height: 240px; source: SetState.pair-qr; image-fit: contain; } }
+            VerticalLayout {
+                width: max(100px, root.width - 292px); spacing: 12px; alignment: center;
+                Text { text: SetState.pair-status; color: Theme.c.text-primary; font-size: 14px; wrap: word-wrap; }
+                Text { text: @tr("如果连接失败，请选择手机能访问的网卡，并允许 FluentCal 通过 Windows 专用网络防火墙。"); color: Theme.c.text-secondary; font-size: 12px; wrap: word-wrap; }
+                Select { horizontal-stretch: 1; value: SetState.pair-ip; options: SetState.pair-addresses; selected(v) => { SetState.action-arg("pair-address", v); } }
+                HorizontalLayout {
+                    Button { text: @tr("取消配对"); clicked => { SetState.action("pair-cancel"); } }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+            }
+        }
+        if !SetState.pair-active && SetState.pair-status != "": InfoBar { text: SetState.pair-status; }
+    }
+    SettingsGroup {
+        first: false;
         title: @tr("云同步");
         SettingsCard {
             icon: Glyph.cloud;

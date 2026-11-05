@@ -1,7 +1,7 @@
 {
   "name": "fluentcal",
   "private": true,
-  "version": "0.3.6",
+  "version": "0.3.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,15 +18,31 @@
     "e2e": "vite build && node scripts/e2e.mjs",
     "e2e:i18n": "vite build && node scripts/i18n-e2e.mjs",
     "a11y": "vite build && node scripts/a11y.mjs",
-    "parity": "vite build && node scripts/parity.mjs"
+    "parity": "vite build && node scripts/parity.mjs",
+    "android:dev": "vite --mode android",
+    "android:build": "vue-tsc --noEmit && vite build --mode android",
+    "android:sync": "npm run android:build && cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android.ps1",
+    "android:e2e": "npm run android:build && node scripts/android-e2e.mjs",
+    "android:sync-e2e": "npm run android:build && node scripts/android-sync-e2e.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/app-launcher": "^8.0.1",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
     "@tauri-apps/api": "2.12.4",
     "tyme4ts": "1.5.4",
     "uqr": "0.1.3",
     "vue": "3.5.44"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@tauri-apps/cli": "2.12.4",
     "@vitejs/plugin-vue": "6.0.10",
     "axe-core": "^4.14.0",

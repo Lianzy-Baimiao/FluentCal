@@ -50,7 +50,7 @@ export struct SSync {
 
 export struct SWeb { enabled: bool, running: bool, port: float, error: string, has-addresses: bool, qr: image }
 
-export struct SAbout { version: string, build: string }
+export struct SAbout { version: string, build: string, update-checking: bool, update-message: string }
 
 export struct SGroup { id: string, name: string, color: string, desc: string }
 export struct SBackup { name: string, desc: string }
@@ -68,6 +68,11 @@ export global SetState {
     in property <SSync> sync;
     in property <SWeb> web;
     in property <SAbout> about;
+    in property <bool> pair-active;
+    in property <image> pair-qr;
+    in property <string> pair-status;
+    in property <string> pair-ip;
+    in property <[SelectOption]> pair-addresses;
     // The page's message bar (0.2: each page's `msg`; cleared when the page changes).
     in-out property <SMsg> msg;
     // Lists

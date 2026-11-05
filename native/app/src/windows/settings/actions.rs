@@ -96,6 +96,7 @@ impl App {
 
     /// A switch, select, slider or box changed `path` (0.2's useSetting).
     pub fn settings_set(&mut self, path: &str, value: Value) {
+        if path.starts_with("sync.") { self.settings_pair_cancel(); }
         let patch = match path {
             // 跟随 Windows 强调色: off = the system's colour as a fixed one
             "follow-accent" => {
@@ -170,6 +171,7 @@ impl App {
         }
         match secrets::set(key, value) {
             Ok(()) => {
+                self.settings_pair_cancel();
                 self.cloud.secrets_changed();
                 self.settings_load_secrets();
                 self.settings_say(Severity::Success, tr("已保存到 Windows 凭据管理器"));

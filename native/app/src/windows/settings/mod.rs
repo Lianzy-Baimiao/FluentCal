@@ -6,6 +6,7 @@ pub mod actions;
 pub mod commands;
 pub mod io;
 pub mod view;
+pub mod mobile;
 
 use crate::app::{run, App};
 use crate::windows::framed::{self, Spec};
@@ -86,6 +87,9 @@ impl App {
         if self.settings_win.is_none() {
             return;
         }
+        if let Some(s) = &mut self.settings_win {
+            if s.local.pairing.as_ref().is_some_and(|p| !p.active()) { s.local.pair_timer.stop(); }
+        }
         let info = self.settings_info();
         if let Some(s) = &self.settings_win {
             view::push(&s.window, &self.doc, &info, &s.local);
@@ -134,6 +138,9 @@ impl App {
             return;
         }
         if s.local.page != page {
+            s.local.pairing = None;
+            s.local.pair_qr = None;
+            s.local.pair_timer.stop();
             s.local.msg = None;
             s.window.invoke_scroll_top();
         }

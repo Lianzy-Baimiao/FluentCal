@@ -8,6 +8,29 @@ use windows::core::HSTRING;
 /// The startup task's id in package/AppxManifest.xml.
 const STARTUP_TASK: &str = "FluentCalStartup";
 
+/// Runs on a worker thread; only a successful Store API response means no update.
+pub fn check_store_update(hwnd: isize) -> windows::core::Result<Option<u32>> {
+    if !is_packaged() { return Ok(None); }
+    use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
+    unsafe { RoInitialize(RO_INIT_MULTITHREADED)?; }
+    let result = (|| {
+        let store = windows::Services::Store::StoreContext::GetDefault()?;
+        if hwnd != 0 {
+            use windows::core::Interface;
+            let init: windows::Win32::UI::Shell::IInitializeWithWindow = store.cast()?;
+            unsafe { init.Initialize(windows::Win32::Foundation::HWND(hwnd as *mut _))?; }
+        }
+        let updates = store.GetAppAndOptionalStorePackageUpdatesAsync()?.join()?;
+        Ok(Some(updates.Size()?))
+    })();
+    unsafe { RoUninitialize(); }
+    result
+}
+pub fn open_store() {
+    use windows::{core::w, Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL}};
+    unsafe { ShellExecuteW(None, w!("open"), w!("ms-windows-store://pdp/?ProductId=9NTT06453DG5"), None, None, SW_SHOWNORMAL); }
+}
+
 pub fn is_packaged() -> bool {
     use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
     let mut len = 0u32;

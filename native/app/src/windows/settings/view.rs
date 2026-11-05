@@ -44,6 +44,13 @@ pub struct Local {
     /// Data folder changed: a restart was asked for (tests check it; the app restarts).
     pub restart_asked: bool,
     pub web_timer: slint::Timer,
+    pub pairing: Option<fluentcal_core::pairing::Session>,
+    pub pair_qr: Option<Image>,
+    pub pair_timer: slint::Timer,
+    pub pair_ip: String,
+    pub pair_addresses: Vec<(String, String)>,
+    pub update_checking: bool,
+    pub update_message: String,
     /// 删除分组 is open: the ticked groups (crate::group_delete).
     pub group_delete: Option<crate::group_delete::Picks>,
 }
@@ -111,7 +118,7 @@ fn icon() -> Image {
     Image::from_rgba8(buf)
 }
 
-/// A QR code (0.2's QrCode.vue: uqr, ECC M, 2-module border, dark on white) as an image of
+/// A QR code (ECC M, standard 4-module quiet zone, dark on white) as an image of
 /// `px` × `px` device pixels.
 pub fn qr_image(text: &str, px: u32) -> Image {
     use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
@@ -119,14 +126,14 @@ pub fn qr_image(text: &str, px: u32) -> Image {
     let Ok(code) = QrCode::encode_segments_advanced(&segs, QrCodeEcc::Medium, Version::MIN, Version::MAX, None, false) else {
         return Image::default();
     };
-    let n = code.size() + 4;
+    let n = code.size() + 8;
     let px = px.max(n as u32);
     let mut buf = slint::SharedPixelBuffer::<slint::Rgb8Pixel>::new(px, px);
     let data = buf.make_mut_slice();
     for y in 0..px {
-        let my = ((y as f64 + 0.5) * n as f64 / px as f64) as i32 - 2;
+        let my = ((y as f64 + 0.5) * n as f64 / px as f64) as i32 - 4;
         for x in 0..px {
-            let mx = ((x as f64 + 0.5) * n as f64 / px as f64) as i32 - 2;
+            let mx = ((x as f64 + 0.5) * n as f64 / px as f64) as i32 - 4;
             let v = if code.get_module(mx, my) { 0 } else { 255 };
             data[(y * px + x) as usize] = slint::Rgb8Pixel { r: v, g: v, b: v };
         }
@@ -376,7 +383,18 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         })
         .collect();
     update(g.get_addresses(), addrs, |m| g.set_addresses(m));
-    g.set_about(SAbout { version: s(&info.version), build: s(&info.build.to_string()) });
+    let active = local.pairing.as_ref().is_some_and(|p| p.active());
+    g.set_pair_active(active);
+    g.set_pair_qr(if active { local.pair_qr.clone().unwrap_or_default() } else { Image::default() });
+    g.set_pair_status(local.pairing.as_ref().map(|p| {
+        if p.used() { tr("配对信息已传给手机，请在手机上完成连接").to_owned() }
+        else if p.active() { trf("二维码剩余 {0} 秒有效", &[p.seconds_left().to_string()]) }
+        else { tr("二维码已过期，请重新生成").to_owned() }
+    }).unwrap_or_default().into());
+    g.set_pair_ip(local.pair_ip.clone().into());
+    update(g.get_pair_addresses(), local.pair_addresses.iter().map(|(ip, label)| SelectOption { value: ip.clone().into(), label: format!("{label} · {ip}").into(), ..Default::default() }).collect(), |m| g.set_pair_addresses(m));
+    g.set_about(SAbout { version: s(&info.version), build: s(&info.build.to_string()), update_checking: local.update_checking,
+        update_message: s(&local.update_message) });
 
     let mut groups: Vec<&fluentcal_core::model::Group> = doc.groups.values().collect();
     groups.sort_by(|a, b| a.order.total_cmp(&b.order));

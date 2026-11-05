@@ -336,3 +336,31 @@ fn sync_test_and_enable_against_webdav() {
     assert_eq!(t.saved()["settings"]["sync"]["enabled"], false);
     fluentcal_core::cloud::secrets::delete("webdav");
 }
+
+#[test]
+fn mobile_download_and_store_update_controls() {
+    let t = start("mobile-update", None, "sync");
+    fluentcal_app::webcmd::captured_urls();
+    t.g().invoke_action("mobile-download".into());
+    assert!(fluentcal_app::webcmd::captured_urls().iter().any(|u| u == fluentcal_core::pairing::MOBILE_DOWNLOAD));
+    t.g().invoke_navigate("about".into());
+    t.g().invoke_action("store-check-update".into());
+    assert!(t.g().get_about().update_checking);
+    settle();
+    assert!(!t.g().get_about().update_checking);
+    assert!(t.g().get_about().update_message.contains("不是 Microsoft Store"));
+}
+
+#[test]
+fn leaving_pair_page_cancels_session() {
+    let t = start("pair-cancel", None, "sync");
+    with(|a| {
+        let session = fluentcal_core::pairing::start(&json!({}), "127.0.0.1:0", std::time::Duration::from_secs(3)).unwrap();
+        a.settings_win.as_mut().unwrap().local.pairing = Some(session);
+        a.settings_refresh();
+    }).unwrap();
+    assert!(t.g().get_pair_active());
+    t.g().invoke_navigate("general".into());
+    assert!(!t.g().get_pair_active());
+    assert!(with(|a| a.settings_win.as_ref().unwrap().local.pairing.is_none()).unwrap());
+}

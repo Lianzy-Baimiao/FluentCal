@@ -40,6 +40,8 @@ tauri-winrt-notification = "0.8.1"
 windows = { version = "0.62.2", features = [
     "ApplicationModel",
     "Foundation",
+    "Services_Store",
+    "Win32_System_WinRT",
     "UI_ViewManagement",
     "Win32_Foundation",
     "Win32_Globalization",

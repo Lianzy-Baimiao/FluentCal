@@ -17,6 +17,7 @@ pub mod layout;
 pub mod lunar;
 pub mod merge;
 pub mod model;
+pub mod pairing;
 pub mod recur;
 pub mod reminders;
 pub mod search;

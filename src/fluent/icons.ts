@@ -113,6 +113,9 @@ export const SVG_ICONS = {
 /** The web view (?w=web on a phone) has no Segoe Fluent Icons font: outlines for the glyphs it
  * uses, same 16×16 box as SVG_ICONS. */
 export const WEB_SVG: Partial<Record<GlyphName, readonly string[]>> = {
+  undo: ['M5 3 1.5 6.5 5 10', 'M2 6.5h7a4 4 0 0 1 0 8H6'],
+  chart: ['M2 2v12h12', 'M5 10V6', 'M8.5 10V3', 'M12 10V5'],
+  settings: ['M6.5 1.5h3l.5 2 2 .8 1.8-.6 1.5 2.6-1.4 1.6v2.2l1.4 1.6-1.5 2.6-1.8-.6-2 .8-.5 2h-3l-.5-2-2-.8-1.8.6L.7 11.7l1.4-1.6V7.9L.7 6.3l1.5-2.6L4 4.3l2-.8z', 'M8 6a2.5 2.5 0 1 0 0 5 2.5 2.5 0 1 0 0-5z'],
   chevronLeft: ['M10 3 5 8l5 5'],
   chevronRight: ['M6 3l5 5-5 5'],
   chevronDown: ['M3 6l5 5 5-5'],

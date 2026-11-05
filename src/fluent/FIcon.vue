@@ -7,7 +7,7 @@ const props = withDefaults(defineProps<{ name: IconName | string; size?: number;
 });
 
 /** The web view (phones) has no icon font. */
-const web = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window) && new URLSearchParams(location.search).get('w') === 'web';
+const web = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window) && (['web', 'mobile'].includes(new URLSearchParams(location.search).get('w') ?? '') || document.documentElement.dataset.window === 'mobile');
 const svg = computed(() => (SVG_ICONS as Record<string, readonly string[]>)[props.name] ?? (web ? (WEB_SVG as Record<string, readonly string[]>)[props.name] : undefined));
 const glyph = computed(() => (GLYPHS as Record<string, string>)[props.name] ?? '');
 </script>

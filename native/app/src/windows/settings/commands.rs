@@ -16,6 +16,12 @@ const ERROR: Severity = Severity::Error;
 impl App {
     pub fn settings_action(&mut self, key: &str, arg: &str) {
         match key {
+            "pair-start" => self.settings_pair_start(),
+            "pair-cancel" => self.settings_pair_cancel(),
+            "pair-address" => self.settings_pair_address(arg),
+            "mobile-download" => crate::webcmd::open_url(fluentcal_core::pairing::MOBILE_DOWNLOAD),
+            "store-check-update" => self.settings_check_store_update(),
+            "store-open" => crate::platform::package::open_store(),
             "msg-close" => {
                 if let Some(s) = &mut self.settings_win {
                     s.local.msg = None;
@@ -79,6 +85,7 @@ impl App {
             "reset-dir" => self.settings_change_dir(true),
             "sync-now" => self.settings_sync_now(),
             "sync-disable" => {
+                self.settings_pair_cancel();
                 self.patch_settings(json!({ "sync": { "enabled": false } }));
                 self.settings_say(Severity::Info, tr("已关闭同步。本机数据保留，云端文件也不会删除。"));
             }

@@ -142,6 +142,17 @@ export component AboutPage inherits VerticalLayout {
         }
     }
     SettingsGroup {
+        title: @tr("应用更新");
+        SettingsCard {
+            icon: Glyph.download;
+            title: @tr("Microsoft Store 更新");
+            description: SetState.about.update-message != "" ? SetState.about.update-message : @tr("通过微软商店检查和安装桌面端更新");
+            Button { text: SetState.about.update-checking ? @tr("正在检查…") : @tr("检查更新"); enabled: !SetState.about.update-checking; clicked => { SetState.action("store-check-update"); } }
+            Button { text: @tr("打开 Microsoft Store"); variant: ButtonVariant.subtle; clicked => { SetState.action("store-open"); } }
+        }
+    }
+    SettingsGroup {
+        first: false;
         title: @tr("使用技巧");
         SettingsCard { icon: Glyph.help; title: @tr("双击日期空白处快速添加任务"); description: @tr("回车保存后可继续输入下一条，Esc 结束"); has-content: false; }
         SettingsCard { icon: Glyph.mouse; title: @tr("拖动任务改期"); description: @tr("在月视图中拖到其他日期；在甘特图中拖动任务条、两端或底部圆点调整日期和进度"); has-content: false; }

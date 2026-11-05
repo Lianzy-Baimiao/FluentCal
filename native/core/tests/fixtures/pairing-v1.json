@@ -1,0 +1,9 @@
+{
+  "now": 1793880240000,
+  "qr": "fluentcal://pair?v=1&host=192.168.1.2&port=18766&id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&key=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc&expires=1793880300000",
+  "envelope": {
+    "v": 1,
+    "iv": "AwMDAwMDAwMDAwMD",
+    "data": "XtzCcyoKZGA8LDY5hSO8bYEezM3S-uYdTqqli9LJYt3J1xRQ_oiHev-_cja19td2FxQj9LmuHxNJXkfAWw6ySqOmaCyC9jczZcTE4rfloUffkOsBbxA6AIM_uK5ebk526KMd1ckCTGYMrFV6HYxvwLi5SxwG-qQrk-DF6B8jaInf0J_kGzWWQudlcpFBJrkLvQr1o7b3mjtqkBWGvGjn9glF838sDe9SZfyIkhzvlFIInpToW_9Vodi1zeWsJdoUFWnviHkGO33kbXEkq8AW-ys8f7L3kkdNlkPQO0AbtsSCLrLbVrjZ5qybRNNvXLh5on2bgBX0uZKrZejiAxlo1v5iEG_1eR4K4TFkwn25uZ2UgxxGwoovYEi7"
+  }
+}

@@ -5,12 +5,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import * as web from './webApi';
+import { Capacitor } from '@capacitor/core';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 const query = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 
-export const windowLabel: string = isTauri ? getCurrentWebviewWindow().label : (query.get('w') ?? 'desk');
+export const windowLabel: string = isTauri ? getCurrentWebviewWindow().label : (query.get('w') ?? (Capacitor.isNativePlatform() || import.meta.env.MODE === 'android' ? 'mobile' : 'desk'));
+export const isMobile = !isTauri && windowLabel === 'mobile';
 
 /** Identifies this window in change events (unique per browser tab in mock mode). */
 export const origin: string = isTauri ? windowLabel : `${windowLabel}:${Math.random().toString(36).slice(2, 8)}`;
@@ -20,11 +22,18 @@ export const isWeb = !isTauri && windowLabel === 'web';
 
 export function call<T = void>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri) return invoke<T>(cmd, args);
+  if (isMobile) return import('./mobile/backend').then(m => m.call<T>(cmd, args ?? {}));
   return isWeb ? web.call<T>(cmd, args ?? {}) : mock.call<T>(cmd, args ?? {});
 }
 
 /** Subscribes to a backend event; returns an unsubscribe function. */
 export function on<T>(event: string, cb: (payload: T) => void): () => void {
+  if (isMobile) {
+    let disposed = false;
+    let un: (() => void) | undefined;
+    void import('./mobile/backend').then(m => { if (!disposed) un = m.on(event, cb as (p: unknown) => void); });
+    return () => { disposed = true; un?.(); };
+  }
   if (isWeb) return web.on(event, cb as (p: unknown) => void);
   if (!isTauri) return mock.on(event, cb as (p: unknown) => void);
   const p = listen<T>(event, (e) => cb(e.payload));

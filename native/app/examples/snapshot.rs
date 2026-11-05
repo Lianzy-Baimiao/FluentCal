@@ -200,6 +200,14 @@ fn main() {
         let (info, local) = settings_scene(&scenario, &doc, scale);
         w.global::<SetState>().set_page(local.page.clone().into());
         settings_view::push(&w, &doc, &info, &local);
+        if let Some(code) = scenario["settingsInfo"]["pairQr"].as_str() {
+            let g = w.global::<SetState>();
+            g.set_pair_active(true);
+            g.set_pair_qr(settings_view::qr_image(code, (240.0 * scale).round() as u32));
+            g.set_pair_status("二维码剩余 300 秒有效".into());
+            g.set_pair_ip("192.168.1.2".into());
+            g.set_pair_addresses(slint::ModelRc::new(slint::VecModel::from(vec![fluentcal_app::SelectOption { value: "192.168.1.2".into(), label: "Wi-Fi · 192.168.1.2".into(), ..Default::default() }])));
+        }
         let (weak, d2, t2) = (w.as_weak(), doc.clone(), t.clone());
         w.global::<SetState>().on_action_arg(move |k, v| {
             let (Some(w), true) = (weak.upgrade(), k == "delete-group") else { return };
