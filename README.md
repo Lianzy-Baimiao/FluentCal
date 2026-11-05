@@ -1,5 +1,7 @@
 # FluentCal 桌面日历
 
+简体中文 · [繁體中文](README.zh-TW.md) · [English](README.en.md)
+
 钉在 Windows 桌面上的日历与甘特图，采用 Windows 11 Fluent 风格，支持农历、任务提醒、云同步，以及简体中文、繁体中文和英文。
 
 使用 Rust + [Slint](https://slint.dev) 构建的原生桌面程序，无需 WebView2。数据保存在本机，可离线使用，无需账号，没有广告。
@@ -10,10 +12,10 @@
 
 ## 功能
 
-- **钉在桌面**：位于所有窗口之下、不占任务栏，按 Win+D 显示桌面时仍可见；也可切换为“始终置顶”或“普通窗口”。可锁定位置、开启鼠标穿透。
+- **钉在桌面**：位于所有窗口之下、不占任务栏，按 Win+D 显示桌面时仍可见；也可切换为“始终置顶”或“普通窗口”。可锁定位置、开启鼠标穿透。有多块屏幕时可以放到任意一块上，缩放比例不同的屏幕之间也能直接拖过去。
 - **日历**：月视图、多周滚动视图；农历、二十四节气、传统节日，法定节假日“休/班”（含调休，联网自动更新）。
 - **任务**：双击日期快速添加，勾选完成，拖动改期，右键改颜色/删除；多日任务显示为横条；重复任务（每天/每周/每月/每年/工作日/法定工作日/农历/月末/艾宾浩斯）；提醒通知；搜索。
-- **甘特图**：与日历同一份数据；日/周/月刻度；拖动任务条改日期、拖两端改起止、拖底部圆点改进度；从任务条右端拖到另一条创建依赖；分组汇总、里程碑、依赖箭头；导出 PNG/SVG。
+- **甘特图**：与日历同一份数据；日/周/月刻度；拖动任务条改日期、拖两端改起止、拖底部圆点改进度；从任务条右端拖到另一条创建依赖；分组汇总、里程碑、依赖箭头；导出 PNG/SVG。分组行右键可删除分组，可一次勾选多个，组内任务默认一起删除，可以撤销。
 - **外观**：浅色/深色/跟随系统，跟随 Windows 强调色或自选；背景色、透明度、亚克力毛玻璃、圆角、字号、间距；5 套预设方案。
 - **语言**：默认跟随 Windows 显示语言，可在设置 › 常规切换简体中文、繁体中文、English，立即生效并记住选择。网页查看默认跟随浏览器语言，可在顶部下拉框单独切换；未支持的语言回退到英文。语言偏好仅保存在当前设备，任务名称、备注和分组名称保留原文。
 - **数据**：默认保存在本机 `%APPDATA%\com.fluentcal.desktop\data.json`，每天自动备份；导出 JSON / CSV（Excel）/ ICS（Outlook、Google 日历）。数据文件夹可以改到 OneDrive 等同步盘，多台电脑共用：按每个任务的最后修改时间合并，不会互相覆盖；外观和窗口位置等设置留在每台电脑上。
@@ -47,7 +49,7 @@
 
 也可以在 [GitHub Releases](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) 下载 `FluentCal_<版本号>_x64-setup.exe`，双击安装。独立安装包安装到当前用户目录，不需要管理员权限。
 
-- 系统要求：Windows 10 1809 及以上或 Windows 11，x64；主要在 Windows 11 24H2 上开发和测试，Windows 10 未实机验证。
+- 系统要求：Windows 10 1809 及以上或 Windows 11，x64；主要在 Windows 11 24H2 及以上开发和测试，Windows 10 未实机验证。
 - 独立安装包没有代码签名，首次安装可能出现 Windows SmartScreen 提示；微软商店版由商店安装和更新。
 - 升级保留已有数据。独立安装包卸载时不会删除数据（`%APPDATA%\com.fluentcal.desktop`）。
 
@@ -64,6 +66,7 @@
 | 在浏览器中查看 | 日期格子上右键（甘特图里用标题栏“更多”菜单）›“在浏览器中查看”，或托盘菜单里的同名项。只读，只有这台电脑能访问 |
 | 在手机上查看 | 设置 › 网页查看：打开“允许局域网内的设备查看”，用手机扫二维码（手机和电脑连同一个 Wi-Fi）。第一次开启时 Windows 防火墙会询问，勾选“专用网络”并允许 |
 | 换一块屏幕显示 | 托盘菜单“显示在”，或设置 › 常规 ›“显示在”（有多块屏幕时出现）；调整模式下也可以直接拖过去 |
+| 删除分组 | 甘特图分组行右键 ›“删除分组…”，或 设置 › 甘特图 里的删除按钮。可勾选多个分组一次删除；组内任务默认一起删除，取消勾选“同时删除分组里的任务”则移到“未分组”。删除后可以撤销 |
 | 翻页 / 回到今天 | 滚轮或 `PageUp`/`PageDown`；`Home` |
 | 甘特图缩放 | `Ctrl` + 滚轮 |
 | 搜索 | `Ctrl+F` |
@@ -95,6 +98,8 @@ bash scripts/build-msix.sh            # 测试 MSIX 包；正式商店身份参�
 
 Windows 焦点回归测试需要真实窗口，在 `native/` 下单独运行 `cargo test -p fluentcal-native --test native_focus -- --ignored`。它使用临时数据，验证调整位置、完成调整后，未激活的日历仍能在双击日期时取得键盘焦点、输入并保存任务；默认测试集会跳过它。
 
+`cargo run --example dpi_probe`（在 `native/app` 下）检查日历在缩放比例不同的屏幕之间拖动，只用窗口消息、不动鼠标；需要两块缩放不同、左右相邻的屏幕。
+
 ### 工具链
 
 Windows 上 Rust 默认用 MSVC 工具链，需要 Visual Studio Build Tools（勾选“使用 C++ 的桌面开发”）。
@@ -125,7 +130,7 @@ native/app
   src/shell/           托盘菜单、全局快捷键和单实例消息的处理
   installer/, package/ 独立安装包（NSIS）和 Microsoft Store 包（MSIX）的清单
   tests/               端到端测试
-native/vendor          打了补丁的 Slint 软件渲染器
+native/vendor          打了补丁的依赖：Slint 软件渲染器（字形 hinting），winit（跨屏拖动修复），说明见其中的 README.md
 src/windows/web        网页查看入口：日历、列表、甘特图和任务详情
 src/fluent, src/lib    网页 Fluent 组件和共享逻辑
 scripts               构建、打包、测试和截图脚本
@@ -138,6 +143,7 @@ scripts               构建、打包、测试和截图脚本
 - 法定节假日数据：[NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)
 - 农历、节气、宜忌：[tyme4rs](https://github.com/6tail/tyme4rs)（原生版，MIT）、[tyme4ts](https://github.com/6tail/tyme4ts)（Vue 前端，MIT）
 - 界面：[Slint](https://slint.dev)（免版税许可证，需在“关于”中注明）
+- 窗口与输入：[winit](https://github.com/rust-windowing/winit)（Apache-2.0；随附的副本打了上游的跨屏拖动修复）
 - 甘特图导出 PNG：[resvg](https://github.com/linebender/resvg)（Apache-2.0 / MIT）
 - 二维码：[qrcodegen](https://www.nayuki.io/page/qr-code-generator-library)（原生版，MIT）、[uqr](https://github.com/unjs/uqr)（Vue 前端，MIT）
 - 网页界面：[Vue](https://vuejs.org)（MIT）
@@ -146,6 +152,7 @@ scripts               构建、打包、测试和截图脚本
 ## 常见问题
 
 - **按 Win+D 后日历消失了？** 确认设置 › 常规 › 窗口层级为“嵌入桌面”。
+- **在缩放比例不同的屏幕之间拖动，日历大小乱变？** 0.3.6 已修复，请更新到最新版本。
 - **点不到桌面图标？** 日历盖住的区域点不到下面的图标；可以缩小日历、移到空白处，或开启“鼠标穿透”（在托盘菜单关闭）。
 - **节假日不是最新的？** 设置 › 常规 › 节假日 › 立即检查。国务院通常在每年 11 月公布下一年安排。
 - **两台电脑改了同一个任务？** 取最后修改的一方；不同任务的修改都保留，删除也会同步。开启同步前、用云端数据替换前都会自动备份本机数据（设置 › 数据 › 备份文件）。
