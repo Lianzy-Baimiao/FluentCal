@@ -15,6 +15,8 @@ lto = true
 opt-level = "s"
 strip = true
 
-# The software renderer with glyph contrast/hinting closer to DirectWrite (see vendor/README.md).
+# The software renderer with glyph contrast/hinting closer to DirectWrite, and winit 0.30.13 with
+# the mixed-DPI drag fix from 0.31 (see vendor/README.md).
 [patch.crates-io]
 i-slint-renderer-software = { path = "vendor/i-slint-renderer-software" }
+winit = { path = "vendor/winit" }
