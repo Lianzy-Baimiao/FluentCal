@@ -359,16 +359,36 @@ pub fn clear_sample_data(doc: &Doc, now_ms: i64) -> (Edit, usize) {
     (e, gone.len())
 }
 
-/// Deletes the groups (one undo step); their tasks become ungrouped. Ids that are not groups
-/// (deleted meanwhile, e.g. by sync) are skipped.
-pub fn delete_groups(doc: &Doc, ids: &[String], now_ms: i64) -> Edit {
+/// The tasks of these groups.
+pub fn tasks_in_groups(doc: &Doc, ids: &[String]) -> usize {
+    doc.tasks.values().filter(|t| t.group_id.as_ref().is_some_and(|g| ids.contains(g))).count()
+}
+
+/// Deletes the groups (one undo step). With `with_tasks` their tasks are deleted too (other
+/// tasks drop them as predecessors); otherwise the tasks become ungrouped. Ids that are not
+/// groups (deleted meanwhile, e.g. by sync) are skipped.
+pub fn delete_groups(doc: &Doc, ids: &[String], with_tasks: bool, now_ms: i64) -> Edit {
     let gone: BTreeSet<&str> = ids.iter().map(String::as_str).filter(|id| doc.groups.contains_key(*id)).collect();
+    let in_gone = |t: &Task| t.group_id.as_deref().is_some_and(|g| gone.contains(g));
     let mut e = Edit::default();
-    for t in doc.tasks.values().filter(|t| t.group_id.as_deref().is_some_and(|g| gone.contains(g))) {
-        let mut t = t.clone();
-        t.group_id = None;
-        t.updated_at = now_ms;
-        e.put_task(&t);
+    if with_tasks {
+        let dropped: BTreeSet<&str> = doc.tasks.values().filter(|t| in_gone(t)).map(|t| t.id.as_str()).collect();
+        for id in &dropped {
+            e.delete("tasks", id);
+        }
+        for t in doc.tasks.values().filter(|t| !in_gone(t) && t.deps().iter().any(|d| dropped.contains(d.as_str()))) {
+            let mut t = t.clone();
+            t.deps = Some(t.deps().iter().filter(|d| !dropped.contains(d.as_str())).cloned().collect());
+            t.updated_at = now_ms;
+            e.put_task(&t);
+        }
+    } else {
+        for t in doc.tasks.values().filter(|t| in_gone(t)) {
+            let mut t = t.clone();
+            t.group_id = None;
+            t.updated_at = now_ms;
+            e.put_task(&t);
+        }
     }
     for id in gone {
         e.delete("groups", id);

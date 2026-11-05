@@ -204,7 +204,7 @@ fn main() {
         w.global::<SetState>().on_action_arg(move |k, v| {
             let (Some(w), true) = (weak.upgrade(), k == "delete-group") else { return };
             // 删除分组 with the clicked group ticked (as App::open_group_delete).
-            fluentcal_app::group_delete::push(&w, &d2, &mut vec![v.to_string()], &t2);
+            fluentcal_app::group_delete::push(&w, &d2, &mut fluentcal_app::group_delete::Picks::new(&v), &t2);
             w.invoke_open_group_delete();
         });
         let h = w.clone_strong();

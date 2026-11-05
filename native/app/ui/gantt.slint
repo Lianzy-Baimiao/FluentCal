@@ -99,6 +99,16 @@ export component GanttView inherits Rectangle {
                             }
                             moved => { GanttData.zone-move(self.mouse-x); }
                         }
+                        // A group's row (its summary bar): a right click opens the group menu, as
+                        // in the table; a left press still clears the selection.
+                        if r.kind == "group": TouchArea {
+                            pointer-event(e) => {
+                                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { GanttData.chart-down(); }
+                                if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                                    GanttData.row-menu(r, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                                }
+                            }
+                        }
                     }
                     for r[i] in GanttData.rows: Rectangle { y: i * rh + rh - 1px; height: 1px; background: rowline; }
                     for l in GanttData.links: GLinkItem { l: l; }

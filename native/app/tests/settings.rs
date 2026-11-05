@@ -142,22 +142,36 @@ fn groups_reminders_and_sample_data() {
     gd().invoke_answer("close".into());
     settle();
     assert!(t.saved()["groups"].get(&id).is_some_and(|g| !g.is_null()));
-    // tick a sample group too: both go at once, its tasks become ungrouped
+    // tick a sample group that has tasks too: both go at once, with its tasks
     t.g().invoke_action_arg("delete-group".into(), id.as_str().into());
     settle();
-    let other = gd().get_items().iter().find(|p| p.id != id.as_str()).expect("a sample group").id.to_string();
+    assert!(gd().get_with_tasks(), "同时删除 is ticked by default");
+    let other = gd().get_items().iter().find(|p| p.id != id.as_str() && p.desc != "0 个任务").expect("a sample group with tasks").id.to_string();
+    let theirs = |v: &Value| v["tasks"].as_object().unwrap().values().filter(|x| x["groupId"] == other.as_str()).count();
+    let n = theirs(&t.saved());
+    assert!(n > 0);
+    let total = t.saved()["tasks"].as_object().unwrap().len();
     gd().invoke_toggled(other.as_str().into(), true);
     settle();
     assert_eq!(gd().get_title(), "删除 2 个分组？");
+    assert_eq!(gd().get_with_tasks_label(), format!("同时删除分组里的任务（{n} 个）"));
     assert!(gd().get_can_delete());
-    let had_tasks = t.saved()["tasks"].as_object().unwrap().values().any(|x| x["groupId"] == other.as_str());
     gd().invoke_answer("primary".into());
     settle();
     let saved = t.saved();
     assert!(saved["groups"].get(&id).is_none_or(Value::is_null));
     assert!(saved["groups"].get(&other).is_none_or(Value::is_null));
-    assert!(!saved["tasks"].as_object().unwrap().values().any(|x| x["groupId"] == other.as_str()), "its tasks are ungrouped (had some: {had_tasks})");
+    assert_eq!(saved["tasks"].as_object().unwrap().len(), total - n, "its tasks are deleted");
+    assert_eq!(t.msg(), (Severity::Success, format!("已删除 2 个分组和其中的任务（{n} 个）")));
     assert_eq!(t.g().get_groups().row_count(), n0 - 1, "the page follows");
+    // the desk can undo it (one step), as a deletion made there
+    with(|a| a.desk_undo(true)).unwrap();
+    settle();
+    assert!(t.saved()["groups"].get(&other).is_some_and(|g| !g.is_null()));
+    assert_eq!(theirs(&t.saved()), n);
+    with(|a| a.desk_redo()).unwrap();
+    settle();
+    assert_eq!(theirs(&t.saved()), 0);
     // default reminders
     t.g().invoke_action("add-offset".into());
     t.g().invoke_action("add-offset".into());

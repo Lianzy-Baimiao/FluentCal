@@ -579,8 +579,59 @@ fn search_finds_and_jumps() {
     assert_eq!(with(|a| a.desk.ui.cursor.clone()).unwrap(), fluentcal_core::date::start_of_month(&later));
 }
 
+/// A right click anywhere on a Gantt row opens its menu (0.2: contextmenu on the whole row):
+/// on a group's name and chevron, on its row in the chart (the summary bar), on a task's name.
+/// It never collapses the group or acts like a left click.
+#[test]
+fn right_click_anywhere_on_a_gantt_row() {
+    use i_slint_backend_testing::AccessibleRole;
+    let today = fluentcal_core::date::today();
+    let tasks = [
+        json!({ "id": "a", "title": "设计", "start": today, "end": fluentcal_core::date::add_days(&today, 3), "groupId": "g" }),
+        json!({ "id": "b", "title": "开发", "start": today, "end": fluentcal_core::date::add_days(&today, 5), "groupId": "g" }),
+    ];
+    let mut doc = doc_with(&tasks, json!({ "calendar": { "view": "gantt" } }));
+    doc["groups"] = json!({ "g": { "id": "g", "name": "项目", "color": "blue", "order": 1 } });
+    let t = start("rowmenu", Some(doc));
+    let row = |label: &'static str| {
+        let is_row = move |e: &ElementHandle| e.accessible_role() == Some(AccessibleRole::ListItem) && e.accessible_label().as_deref() == Some(label);
+        t.w.root_element().query_descendants().match_predicate(is_row).find_first().unwrap_or_else(|| panic!("no row {label}"))
+    };
+    let group_menu_open = || t.w.get_any_popup() && t.has("删除分组…");
+    let close = || {
+        t.key(&slint::SharedString::from(Key::Escape));
+        assert!(!t.w.get_any_popup());
+    };
+    let g = row("项目");
+    let h = g.size().height / 2.0;
+    // the name (it takes left clicks for collapsing)
+    t.right_click_at(t.at(&g, 70.0, h));
+    assert!(group_menu_open(), "right click on the group's name");
+    close();
+    // the chevron
+    t.right_click_at(t.at(&g, 16.0, h));
+    assert!(group_menu_open(), "right click on the chevron");
+    close();
+    assert!(!with(|a| a.doc.groups["g"].collapsed == Some(true)).unwrap(), "a right click doesn't collapse");
+    // the group's row in the chart, right of the table
+    t.right_click_at(t.at(&g, g.size().width + 150.0, h));
+    assert!(group_menu_open(), "right click on the group's row in the chart");
+    close();
+    // a left press there still clears the selection
+    with(|a| a.gantt_select("a")).unwrap();
+    t.click_at(t.at(&g, g.size().width + 150.0, h));
+    assert_eq!(with(|a| a.desk.gantt.selected.clone()).unwrap(), "");
+    // a task's name: its menu, and the row is selected
+    let task = row("设计");
+    t.right_click_at(t.at(&task, 70.0, task.size().height / 2.0));
+    assert!(t.w.get_any_popup() && t.has("复制一份"), "the task menu");
+    assert_eq!(with(|a| a.desk.gantt.selected.clone()).unwrap(), "a");
+    close();
+}
+
 /// 删除分组 (the Gantt group menu): every group is listed, the clicked one is ticked; ticking
-/// more deletes them together in one undo step. 取消 keeps them.
+/// more deletes them together, with their tasks unless 同时删除分组里的任务 is unticked (then
+/// the tasks move to 未分组), in one undo step. 取消 keeps them.
 #[test]
 fn delete_several_groups_at_once() {
     use fluentcal_app::desk::menus::Target;
@@ -589,7 +640,7 @@ fn delete_several_groups_at_once() {
     let tasks = [
         json!({ "id": "a", "title": "设计", "start": today, "groupId": "g1" }),
         json!({ "id": "b", "title": "开发", "start": today, "groupId": "g2" }),
-        json!({ "id": "c", "title": "测试", "start": today, "groupId": "g3" }),
+        json!({ "id": "c", "title": "测试", "start": today, "groupId": "g3", "deps": ["b"] }),
     ];
     // The chart shows only 项目一: deleting it must not leave the chart empty.
     let mut doc = doc_with(&tasks, json!({ "calendar": { "view": "gantt" }, "gantt": { "groupFilter": ["g1"] } }));
@@ -599,7 +650,8 @@ fn delete_several_groups_at_once() {
         "g3": { "id": "g3", "name": "项目三", "color": "red", "order": 3 },
     });
     let t = start("delgroups", Some(doc));
-    // The dialog's boxes carry the task count (the table's check circles don't).
+    let gd = || t.w.global::<fluentcal_app::GroupDelete>();
+    // The dialog's group boxes carry the task count (the table's check circles and 同时删除 don't).
     let boxes = || {
         let is_pick = |e: &ElementHandle| e.accessible_role() == Some(AccessibleRole::Checkbox) && e.accessible_description().is_some_and(|d| !d.is_empty());
         t.w.root_element().query_descendants().match_predicate(is_pick).find_all()
@@ -616,17 +668,35 @@ fn delete_several_groups_at_once() {
         let b = pick(name);
         t.click_at(t.at(&b, b.size().width + 60.0, b.size().height / 2.0));
     };
+    // 同时删除分组里的任务（N 个）
+    let with_tasks_box = || {
+        let is_box = |e: &ElementHandle| e.accessible_role() == Some(AccessibleRole::Checkbox) && e.accessible_label().is_some_and(|l| l.starts_with("同时删除分组里的任务"));
+        t.w.root_element().query_descendants().match_predicate(is_box).find_first()
+    };
+    let tick_with_tasks = || {
+        let b = with_tasks_box().expect("同时删除 box");
+        t.click_at(t.at(&b, 10.0, b.size().height / 2.0));
+    };
     with(|a| a.menu_act(&Target::Group("g1".into()), "deleteGroup")).unwrap();
     settle();
     assert!(t.has("删除分组“项目一”？"));
-    assert!(t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
     let labels: Vec<_> = boxes().iter().filter_map(|b| b.accessible_label()).map(|l| l.to_string()).collect();
     assert_eq!(labels, ["项目一", "项目二", "项目三"], "all groups, in the chart's order");
     assert_eq!(ticked(), ["项目一"]);
     assert_eq!(boxes()[0].accessible_description().as_deref(), Some("1 个任务"));
-    // Ticking a second one: the title counts them; unticking all disables 删除.
+    // The tasks go too by default; unticking says where they go instead.
+    let wb = with_tasks_box().expect("同时删除 box");
+    assert_eq!((wb.accessible_label().as_deref(), wb.accessible_checked()), (Some("同时删除分组里的任务（1 个）"), Some(true)));
+    assert!(!t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
+    tick_with_tasks();
+    assert!(!gd().get_with_tasks());
+    assert!(t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
+    tick_with_tasks();
+    assert!(gd().get_with_tasks());
+    // Ticking a second one: the title and the task count follow; unticking all disables 删除.
     tick("项目二");
     assert!(t.has("删除 2 个分组？"));
+    assert!(t.has("同时删除分组里的任务（2 个）"));
     assert_eq!(ticked(), ["项目一", "项目二"]);
     tick_row("项目一");
     assert_eq!(ticked(), ["项目二"], "a click on the row's name unticks it");
@@ -634,32 +704,36 @@ fn delete_several_groups_at_once() {
     tick("项目二");
     assert!(ticked().is_empty());
     assert!(t.has("删除分组"));
-    assert!(!t.w.global::<fluentcal_app::GroupDelete>().get_can_delete());
+    assert!(with_tasks_box().is_none(), "no tasks ticked, no 同时删除");
+    assert!(!gd().get_can_delete());
     t.click("删除");
     assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3, "删除 is disabled with nothing ticked");
     assert_eq!(boxes().len(), 3, "and the dialog stays open");
     t.click("取消");
     assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3);
     assert!(boxes().is_empty(), "closed");
-    // Two at once.
+    // Two at once, with their tasks.
     with(|a| a.menu_act(&Target::Group("g1".into()), "deleteGroup")).unwrap();
     settle();
     assert_eq!(ticked(), ["项目一"], "a new dialog starts with the clicked group only");
+    assert!(gd().get_with_tasks(), "and with 同时删除 ticked again");
     tick("项目二");
     t.click("删除");
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
     assert_eq!(groups, ["g3"]);
-    assert!(t.task("设计").get("groupId").is_none_or(Value::is_null), "tasks move to 未分组");
-    assert!(t.task("开发").get("groupId").is_none_or(Value::is_null));
-    assert_eq!(t.task("测试")["groupId"], "g3");
+    let titles: Vec<String> = t.tasks().iter().map(|x| x["title"].as_str().unwrap().to_owned()).collect();
+    assert_eq!(titles, ["测试"], "the groups' tasks are deleted");
+    assert!(t.task("测试")["deps"].as_array().is_none_or(|d| d.is_empty()), "the deleted predecessor is dropped");
     assert!(with(|a| a.doc.settings.gantt.group_filter.is_empty()).unwrap(), "the filter forgets deleted groups");
-    // One undo step brings both back.
+    assert_eq!(t.w.get_toast_text(), "已删除 2 个分组和其中的任务（2 个）");
+    // One undo step brings it all back.
     t.ctrl("z");
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
     assert_eq!(groups, ["g1", "g2", "g3"]);
     assert_eq!(t.task("设计")["groupId"], "g1");
     assert_eq!(t.task("开发")["groupId"], "g2");
-    // The keyboard: Tab to a box, Space ticks it, Esc cancels; Enter deletes what is ticked.
+    assert_eq!(t.task("测试")["deps"], json!(["b"]));
+    // The keyboard: Tab to a box, Space ticks it, Esc cancels.
     with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();
     settle();
     t.key(&slint::SharedString::from(Key::Tab));
@@ -668,11 +742,14 @@ fn delete_several_groups_at_once() {
     t.key(&slint::SharedString::from(Key::Escape));
     assert!(boxes().is_empty(), "Esc closes");
     assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3);
+    // Keeping the tasks: untick 同时删除, Enter deletes the group only.
     with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();
     settle();
+    tick_with_tasks();
     t.key("\n");
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
     assert_eq!(groups, ["g1", "g2"], "Enter deletes the ticked group");
+    assert!(t.task("测试").get("groupId").is_none_or(Value::is_null), "its task moves to 未分组");
 }
 
 /// The welcome bar (sample tasks, not onboarded) and the adjust-mode bar.

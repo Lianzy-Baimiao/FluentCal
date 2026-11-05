@@ -1,9 +1,10 @@
 // 删除分组: one dialog for deleting one or several groups at once. Every group is listed with a
 // check box; the group the dialog was opened from (Gantt group menu, 设置 › 甘特图) is ticked.
+// Their tasks are deleted too unless 同时删除分组里的任务 is unticked (then they move to 未分组).
 // Both the desk and the settings window have one; Rust keeps the ticks (src/group_delete.rs).
 
 import { Theme } from "theme.slint";
-import { DialogHost, DialogBody } from "overlay.slint";
+import { Overlay, DialogHost, DialogBody } from "overlay.slint";
 import { DialogFooter } from "dialog.slint";
 import { Checkbox } from "forms.slint";
 
@@ -13,7 +14,13 @@ export global GroupDelete {
     in property <[GroupPick]> items;
     in property <string> title;
     in property <bool> can-delete;
+    // 同时删除分组里的任务 (on by default); its label has the count, empty when there are none.
+    in property <bool> with-tasks;
+    in property <string> with-tasks-label;
+    // Under it when the tasks stay (they move to 未分组); empty otherwise.
+    in property <string> note;
     callback toggled(string, bool);
+    callback with-tasks-toggled(bool);
     // "primary" (删除) or "close"
     callback answer(string);
 }
@@ -72,17 +79,14 @@ export component GroupDeleteDialog {
     }
     host := DialogHost {
         title: GroupDelete.title;
+        // A fixed width: the note under the check box doesn't widen the dialog when it appears.
+        dialog-width: min(440px, Overlay.win-w - 32px);
         primary => { root.confirm(); }
         closed => { GroupDelete.answer("close"); }
         DialogBody {
             title: GroupDelete.title;
             VerticalLayout {
                 spacing: 12px;
-                Text {
-                    text: @tr("所选分组里的任务会移到“未分组”，不会被删除。");
-                    wrap: word-wrap;
-                    color: Theme.c.text-primary;
-                }
                 Flickable {
                     // Seven and a half rows show: a cut row says the list scrolls.
                     property <length> list-h: GroupDelete.items.length * 36px;
@@ -95,6 +99,26 @@ export component GroupDeleteDialog {
                         y: i * 36px;
                         width: parent.width;
                         pick: p;
+                    }
+                }
+                // In line with the rows' boxes (8px in); the note under the box's label.
+                if GroupDelete.with-tasks-label != "": VerticalLayout {
+                    padding-left: 8px;
+                    Checkbox {
+                        text: GroupDelete.with-tasks-label;
+                        checked: GroupDelete.with-tasks;
+                        toggled(v) => { GroupDelete.with-tasks-toggled(v); }
+                    }
+                }
+                // Not in a short window (the desk can be 280px tall): under the list and the check
+                // box it would push the buttons out; the unticked box already says the tasks stay.
+                if GroupDelete.note != "" && Overlay.win-h >= 360px: VerticalLayout {
+                    padding-left: 36px;
+                    Text {
+                        text: GroupDelete.note;
+                        wrap: word-wrap;
+                        font-size: 12px;
+                        color: Theme.c.text-secondary;
                     }
                 }
             }

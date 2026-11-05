@@ -45,7 +45,7 @@ pub struct Local {
     pub restart_asked: bool,
     pub web_timer: slint::Timer,
     /// 删除分组 is open: the ticked groups (crate::group_delete).
-    pub group_delete: Option<Vec<String>>,
+    pub group_delete: Option<crate::group_delete::Picks>,
 }
 
 /// The app's state the pages show.

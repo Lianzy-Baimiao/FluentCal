@@ -12,6 +12,13 @@ export component GTableRow inherits Rectangle {
     property <bool> add: r.kind == "add";
     property <bool> sel: task && GanttData.selected == r.id;
     property <bool> editing: GanttData.renaming == r.key;
+    // A right click anywhere on the row (0.2: contextmenu on the whole row). The chevron, check
+    // and name areas take presses before the row does, so they pass right clicks on here.
+    function menu-at(e: PointerEvent, x: length, y: length) {
+        if e.button == PointerEventButton.right && e.kind == PointerEventKind.up && !add {
+            GanttData.row-menu(r, x, y);
+        }
+    }
     height: 32px;
     // Cascade of gantt.css: hover < group < selected; the add row never shows hover.
     background: sel ? Theme.c.accent-fill.transparentize(0.86)
@@ -25,11 +32,7 @@ export component GTableRow inherits Rectangle {
     ta := TouchArea {
         clicked => { if group { GanttData.row-chevron(r); } else if task { GanttData.row-click(r); } }
         double-clicked => { if task { GanttData.row-dbl(r); } }
-        pointer-event(e) => {
-            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up && !add {
-                GanttData.row-menu(r, root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
-            }
-        }
+        pointer-event(e) => { root.menu-at(e, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y); }
     }
     Rectangle { y: parent.height - 1px; height: 1px; background: Theme.c.text-primary.transparentize(0.95); }
     if !add: HorizontalLayout {
@@ -43,7 +46,10 @@ export component GTableRow inherits Rectangle {
             border-radius: 4px;
             background: cta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             Icon { glyph: r.collapsed ? Glyph.chevron-right : Glyph.chevron-down; size: 10px; color: Theme.c.text-secondary; }
-            cta := TouchArea { clicked => { GanttData.row-chevron(r); } }
+            cta := TouchArea {
+                clicked => { GanttData.row-chevron(r); }
+                pointer-event(e) => { root.menu-at(e, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y); }
+            }
             accessible-role: button;
             accessible-label: (r.collapsed ? @tr("展开分组 ") : @tr("折叠分组 ")) + r.name;
         }
@@ -56,7 +62,11 @@ export component GTableRow inherits Rectangle {
             border-color: r.checked ? r.color : r.check-ring;
             background: r.checked ? r.color : transparent;
             if r.checked: Icon { glyph: Glyph.check-mark; size: 9px; color: white; }
-            TouchArea { clicked => { if !GanttData.read-only { GanttData.row-check(r); } } double-clicked => { } }
+            TouchArea {
+                clicked => { if !GanttData.read-only { GanttData.row-check(r); } }
+                double-clicked => { }
+                pointer-event(e) => { root.menu-at(e, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y); }
+            }
             accessible-role: checkbox;
             accessible-checked: r.checked;
             accessible-label: @tr("完成 ") + r.name;
@@ -97,6 +107,7 @@ export component GTableRow inherits Rectangle {
             if !editing: TouchArea {
                 clicked => { if group { GanttData.row-chevron(r); } else { GanttData.row-click(r); } }
                 double-clicked => { if task || r.real { GanttData.row-rename(r); } }
+                pointer-event(e) => { root.menu-at(e, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y); }
             }
             if editing: Rectangle {
                 y: 4px;
