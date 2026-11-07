@@ -213,12 +213,52 @@ fn checkbox_toggles_done_and_drag_moves() {
     let cell_w = t.w.get_cell_w() + t.w.get_cell_gap();
     let from = t.at(&chip, 40.0, chip.size().height / 2.0);
     let next = fluentcal_core::date::add_days(&today, 1);
-    // Saturday → Sunday may wrap to the next row in a Monday-first month: drag down instead.
+    // Sunday → Monday wraps to the next row in a Monday-first month: drag down instead.
     let to = if fluentcal_core::date::weekday(&today) == 0 { LogicalPosition::new(from.x - 6.0 * cell_w, from.y + t.w.get_cell_h() + t.w.get_cell_gap()) } else { LogicalPosition::new(from.x + cell_w, from.y) };
     t.drag(from, to);
     assert_eq!(t.task("交房租")["start"], json!(next));
     t.ctrl("z");
     assert_eq!(t.task("交房租")["start"], json!(today));
+}
+
+/// Fixed dates keep cross-week dragging covered on every day the suite runs.
+fn check_drag_shortcuts(name: &str, source: &str, target: &str, week_start: i32) {
+    let t = start(name, Some(doc_with(&[json!({ "title": "拖动撤销", "start": source })], json!({ "calendar": { "weekStart": week_start } }))));
+    t.w.invoke_jump(source.into());
+    settle();
+    let chip = t.find("拖动撤销");
+    let from = t.at(&chip, 40.0, chip.size().height / 2.0);
+    let (_, month, day) = fluentcal_core::date::parts(target);
+    let cell = t.find_prefix(&format!("{month}月{day}日 "));
+    let to = t.at(&cell, 40.0, 50.0);
+    assert_eq!(with(|a| a.desk_date_at(to.x, to.y)).flatten().as_deref(), Some(target));
+    t.drag(from, to);
+    assert_eq!(t.task("拖动撤销")["start"], json!(target));
+    assert!(with(|a| a.history.can_undo()).unwrap());
+    t.ctrl("z");
+    assert_eq!(t.task("拖动撤销")["start"], json!(source), "Ctrl+Z must reach the calendar after dropping a chip");
+    t.ctrl("y");
+    assert_eq!(t.task("拖动撤销")["start"], json!(target), "Ctrl+Y must still reach the calendar after undo");
+}
+
+#[test]
+fn drag_across_week_rows_keeps_undo_and_redo_shortcuts() {
+    check_drag_shortcuts("drag-next-week", "2026-11-08", "2026-11-09", 1);
+}
+
+#[test]
+fn drag_to_previous_week_keeps_undo_and_redo_shortcuts() {
+    check_drag_shortcuts("drag-prev-week", "2026-11-09", "2026-11-08", 1);
+}
+
+#[test]
+fn drag_with_sunday_week_start_keeps_undo_and_redo_shortcuts() {
+    check_drag_shortcuts("drag-sunday-week", "2026-11-07", "2026-11-08", 0);
+}
+
+#[test]
+fn drag_within_week_keeps_undo_and_redo_shortcuts() {
+    check_drag_shortcuts("drag-same-week", "2026-11-09", "2026-11-10", 1);
 }
 
 #[test]

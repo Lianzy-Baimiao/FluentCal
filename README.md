@@ -119,6 +119,10 @@ bash scripts/build-msix.sh            # 测试 MSIX 包；正式商店身份参�
 
 Windows 焦点回归测试需要真实窗口，在 `native/` 下单独运行 `cargo test -p fluentcal-native --test native_focus -- --ignored`。它使用临时数据，验证调整位置、完成调整后，未激活的日历仍能在双击日期时取得键盘焦点、输入并保存任务；默认测试集会跳过它。
 
+提醒窗口回归测试：`cargo test -p fluentcal-native --test reminder` 检查关闭、完成、稍后提醒与多张卡片；`cargo test -p fluentcal-native --test native_reminder -- --ignored` 使用临时数据和真实 Windows 窗口，确认按钮操作后原生窗口确实消失。真实窗口测试单独运行，不发送全局鼠标或键盘输入。
+
+跨周拖动后的快捷键回归：`cargo test -p fluentcal-native --test native_drag -- --ignored` 使用真实 Windows 窗口和原生键盘消息，检查拖动后的 Ctrl+Z、Ctrl+Y、Ctrl+F。测试使用临时数据，短暂取得窗口焦点后恢复，不发送全局输入。
+
 `cargo run --example dpi_probe`（在 `native/app` 下）检查日历在缩放比例不同的屏幕之间拖动，只用窗口消息、不动鼠标；需要两块缩放不同、左右相邻的屏幕。
 
 ### 工具链

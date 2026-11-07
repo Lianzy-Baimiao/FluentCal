@@ -46,7 +46,11 @@ impl App {
         let list = self.reminders.popup_list();
         if list.is_empty() {
             crate::platform::outside::watch("reminder", None);
-            self.reminder_win = None; // dropping the window closes it
+            if let Some(w) = self.reminder_win.take() {
+                // Slint keeps shown components alive. Dropping our handle alone leaves
+                // an orphaned card on screen, so explicitly hide it before releasing it.
+                let _ = w.hide();
+            }
             return;
         }
         let cards: Vec<ReminderCard> = list.iter().rev().map(|r| ReminderCard { key: r.key.clone().into(), title: r.title.clone().into(), body: r.body.clone().into() }).collect();

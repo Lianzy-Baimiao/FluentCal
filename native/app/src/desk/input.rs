@@ -140,6 +140,9 @@ impl App {
         let Some(occ) = occurrence_on(t, &d.date) else { return };
         self.history.boundary();
         let edit = tasks::move_occurrence(&self.doc, &occ, &add_days(&target, -d.offset), now_ms());
+        // Moving to another week removes the focused chip. Keep the keyboard on a
+        // stable item before refreshing the models so undo/redo and search still work.
+        self.desk.window.invoke_focus_root();
         self.apply(edit, true);
     }
 
