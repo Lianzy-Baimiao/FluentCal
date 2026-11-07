@@ -269,7 +269,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 2026-11-05 19:03 点击“提交进行认证”。后台显示 **正在认证更新**、**预处理**、**产品在通过认证后立即开始发布**。截图：`release/store-proof/certification-0.3.6-2026-11-05.png`（本地忽略目录）。此记录表示已送审，尚未确认 0.3.6.0 上架。
 - 2026-11-05 提交下一版前，合作伙伴中心确认 Submission 6 已上架，显示“恭喜!你的产品现已更新”“你的最新产品现已在 Microsoft Store 上架”。
 
-### 0.3.7.0 安卓扫码配对与商店更新检查（2026-11-06 00:02 送审，正在认证）
+### 0.3.7.0 安卓扫码配对与商店更新检查（2026-11-06 00:02 送审，已上架）
 
 - 用户要求“提交上架吧先”，通过 Codex 内置浏览器创建 **Submission 7 / 1152921505702324667**，产品为 **FluentCal 桌面日历 / 9NTT06453DG5**。
 - 应用版本 **0.3.7**，包版本 **0.3.7.0**。沿用身份 `ice.FluentCal`、发布者 `CN=56079E3F-5861-4D9C-B9C3-93F76224C42E`、发布者显示名“白描ice”，仅 x64 桌面、最低 Windows 10 1809，声明 `zh-CN` / `zh-TW` / `en-US`。
@@ -281,3 +281,19 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
   - 繁體中文：新增 Android 用戶端掃碼連接：在「設定 → 同步」下載手機端並產生一次性配對二維碼，手機掃描後即可接入同一份雲端日曆，無需重複填寫帳號。支援 WebDAV、GitHub、Gitee 自動雲端同步，配對後手機獨立連接雲端。桌面「設定 → 關於」新增 Microsoft Store 更新檢查。
 - 隐私政策补充扫码凭据交接、Android 本地存储/相机与更新检查的数据处理说明，送审前已推送。其他商店描述、截图、定价、年龄分级及受限能力用途说明保持不变。
 - 已点击“提交进行认证”，后台确认 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**。此记录只确认送审成功，不代表 0.3.7.0 已上架。凭证：`release/store-proof/certification-0.3.7-2026-11-06.png`（本地忽略目录；满意度调查未作答）。
+- 2026-11-08 创建下一次更新前，合作伙伴中心确认 Submission 7 已发布，显示“恭喜!你的产品现已更新”“你的最新产品现已在 Microsoft Store 上架”。
+
+### 0.3.9.0 提醒关闭与跨周拖动快捷键修复（2026-11-08 03:13 送审，正在认证）
+
+- 用户要求“推送github更新，还有微软商店更新”，据此发布 GitHub **v0.3.9**，并通过内置浏览器创建、提交 **Submission 8 / 1152921505702342788**。产品为 **FluentCal 桌面日历 / 9NTT06453DG5**，时间为 UTC+8。
+- 修复提醒卡片点 X、完成、稍后提醒后窗口残留的问题；修复任务跨周拖动后 Ctrl+Z、Ctrl+Y、Ctrl+F 无响应的问题。两个问题均在修复前复现、修复后通过回归；完整原生工作区 **164 项测试全部通过**，真实 Windows 窗口三项回归、网页构建和类型检查通过。
+- GitHub 目标提交 **`7ce958d`**，已推送至 `main`；[v0.3.9 Release](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.9) 为正式最新版，含 Windows 安装包、独立 EXE 与各自 SHA-256 文件。GitHub 返回的文件摘要与本地逐项一致，下载回来的安装包也通过校验。
+- 安装包：`release/FluentCal_0.3.9_x64-setup.exe`，7,281,522 字节，SHA-256 `a72aad1b9c2be56ce5a88fae9065928f3e4d382fc72bd87779c275a2e20f8de5`。独立 EXE：`release/FluentCal-Desktop-0.3.9.exe`，22,762,496 字节，SHA-256 `0f2f4dca160a9e4e7a6bbc8bc9c45ec782e5cc637945b42fd551829a2f0adff5`。
+- 商店包：`release/FluentCal_0.3.9.0_x64.msix`，10,414,448 字节，SHA-256 `4b9750e2b766ed1f38d41c068d5a4633944fa82764a09a83a5519c2fb1e77bca`。MakeAppx 验证通过，包内 EXE 与上述独立 EXE 哈希一致；沿用身份 `ice.FluentCal`、发布者 `CN=56079E3F-5861-4D9C-B9C3-93F76224C42E`、显示名“白描ice”，仅 x64 Windows 桌面，最低 Windows 10 1809。
+- 上传后仅出现既有 `runFullTrust` 受限能力提醒；保存时后台自动替换旧包 0.3.7.0，送审前概述页仅列出 **FluentCal_0.3.9.0_x64.msix / Validated**。
+- 三种语言“此版本的新增功能”均保存并重新打开逐字核对：
+  - 简体中文：修复提醒卡片无法关闭的问题：点击右上角 X、完成或稍后提醒后，卡片会正常移除，处理最后一张卡片后窗口会关闭。修复任务拖到上一周或下一周后快捷键失效的问题，现在可继续使用 Ctrl+Z 撤销、Ctrl+Y 重做和 Ctrl+F 搜索。
+  - English: Fixed reminder cards that stayed on screen after clicking X, Done, or Snooze. Cards now disappear correctly, and the window closes after the last card is handled. Fixed keyboard shortcuts after dragging a task to the previous or next week: Ctrl+Z (Undo), Ctrl+Y (Redo), and Ctrl+F (Search) continue to work.
+  - 繁體中文：修復提醒卡片無法關閉的問題：點擊右上角 X、完成或稍後提醒後，卡片會正常移除，處理最後一張卡片後視窗會關閉。修復工作拖曳到上一週或下一週後快捷鍵失效的問題，現在可繼續使用 Ctrl+Z 復原、Ctrl+Y 重做和 Ctrl+F 搜尋。
+- 沿用定价、属性、年龄分级、商店描述与截图；已核对发布选项为 **在此提交通过认证后立即予以发布**，`runFullTrust` 用途说明保留。
+- 点击“提交进行认证”后，后台明确显示 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**，产品更新状态为 **正在认证（Submission 8）**。此记录确认已送审，尚未确认 0.3.9.0 上架；后续以[产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview)为准。
