@@ -31,10 +31,8 @@ pub type Answer = Box<dyn FnOnce(&mut App, &str)>;
 pub struct SettingsWin {
     pub window: SettingsWindow,
     pub local: Local,
-    /// The open confirmation's continuation and its number (a late "close" from a previous
-    /// dialog must not answer a new one).
-    pending: Option<(u32, Answer)>,
-    asked: u32,
+    /// The open confirmation's continuation.
+    pending: Option<Answer>,
 }
 
 /// Wires the pages' callbacks to the app.
@@ -53,10 +51,10 @@ fn wire(w: &SettingsWindow) {
     g.on_save_secret(|k, v| run(move |a| a.settings_save_secret(&k, &v)));
     g.on_navigate(|k| run(move |a| a.settings_navigate(&k)));
     crate::group_delete::wire(w, crate::group_delete::Host::Settings);
-    g.on_confirm_answer(|r| {
-        // On the next turn: the dialog finishes closing before an answer may open another.
-        slint::Timer::single_shot(std::time::Duration::ZERO, move || run(move |a| a.settings_answer(&r)));
-    });
+    // Taken as it comes, not on a timer: the dialog answers, then says "close" as it closes,
+    // and zero-delay timers started in the same millisecond run newest first, so "close" used
+    // to win and the buttons did nothing (GitHub #2).
+    g.on_confirm_answer(|r| run(move |a| a.settings_answer(&r)));
 }
 
 impl App {
@@ -72,7 +70,7 @@ impl App {
             let Some(window) = framed::open(self, &Spec { width: 980.0, height: 700.0 }, make, |app| app.settings_win = None) else { return };
             window.set_mica(self.has_mica());
             view::setup(&window, self);
-            self.settings_win = Some(SettingsWin { window, local: Local::default(), pending: None, asked: 0 });
+            self.settings_win = Some(SettingsWin { window, local: Local::default(), pending: None });
             self.settings_navigate(page.unwrap_or("general"));
         } else if let Some(s) = &self.settings_win {
             framed::raise(&s.window);
@@ -116,19 +114,17 @@ impl App {
     /// 0.2's confirm(): asks in the window's dialog; `then` gets the answer.
     pub fn settings_confirm(&mut self, title: &str, content: &str, primary: &str, secondary: &str, danger: bool, then: impl FnOnce(&mut App, &str) + 'static) {
         let Some(s) = &mut self.settings_win else { return };
-        s.asked += 1;
-        s.pending = Some((s.asked, Box::new(then)));
+        s.pending = Some(Box::new(then));
         show_confirm(&s.window, title, content, primary, secondary, danger);
     }
 
     fn settings_answer(&mut self, r: &str) {
         let Some(s) = &mut self.settings_win else { return };
         // The dialog sends its answer, then "close" as it closes: only the first counts.
-        let Some((n, then)) = s.pending.take() else { return };
-        if n != s.asked {
-            return;
-        }
-        then(self, r);
+        let Some(then) = s.pending.take() else { return };
+        // On the next turn: the dialog finishes closing before the answer may open another.
+        let r = r.to_owned();
+        slint::Timer::single_shot(std::time::Duration::ZERO, move || run(move |a| then(a, &r)));
     }
 
     pub fn settings_navigate(&mut self, page: &str) {

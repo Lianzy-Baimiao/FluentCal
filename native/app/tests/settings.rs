@@ -69,6 +69,20 @@ impl T {
         let p = path.display().to_string();
         with(move |a| a.settings_win.as_mut().unwrap().local.test_pick = Some(p)).unwrap();
     }
+    /// A real click (pointer events) on the button labelled `label`, e.g. in the confirmation.
+    fn click_button(&self, label: &str) {
+        use i_slint_backend_testing::{AccessibleRole, ElementHandle};
+        use slint::platform::{PointerEventButton, WindowEvent};
+        let b = ElementHandle::find_by_accessible_label(&self.w, label).find(|e| e.accessible_role() == Some(AccessibleRole::Button)).unwrap_or_else(|| panic!("no button {label:?}"));
+        let (p, s) = (b.absolute_position(), b.size());
+        let position = slint::LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+        let button = PointerEventButton::Left;
+        self.w.window().dispatch_event(WindowEvent::PointerMoved { position });
+        self.w.window().dispatch_event(WindowEvent::PointerPressed { position, button });
+        wait(30);
+        self.w.window().dispatch_event(WindowEvent::PointerReleased { position, button });
+        settle();
+    }
 }
 
 impl Drop for T {
@@ -274,6 +288,39 @@ fn data_folder_change_moves_the_data_and_restarts() {
     assert!(moved.get("settings").is_none(), "settings stay on this PC");
     let pointer = std::fs::read_to_string(t.dir.join("datadir.txt")).unwrap();
     assert_eq!(pointer.trim(), target.display().to_string());
+}
+
+/// GitHub #2: clicking 更改并重启 did nothing. The dialog answers "primary" and then "close" as
+/// it closes; both went through zero-delay timers, which Slint runs newest first within the
+/// same millisecond, so "close" used up the confirmation. Real clicks, as the user does it.
+#[test]
+fn confirmation_buttons_work_when_clicked() {
+    let t = start("dir-click", Some(doc_with(json!({ "a": task("a", "要搬走的") }))), "data");
+    let target = t.dir.join("shared");
+    std::fs::create_dir_all(&target).unwrap();
+    t.pick(&target);
+    t.g().invoke_action("change-dir".into());
+    settle();
+    t.click_button("更改并重启");
+    assert!(with(|a| a.settings_win.as_ref().unwrap().local.restart_asked).unwrap(), "the program restarts");
+    let pointer = std::fs::read_to_string(t.dir.join("datadir.txt")).expect("the pointer file is written");
+    assert_eq!(pointer.trim(), target.display().to_string());
+    let moved: Value = serde_json::from_str(&std::fs::read_to_string(target.join("data.json")).unwrap()).unwrap();
+    assert_eq!(moved["tasks"]["a"]["title"], "要搬走的");
+
+    // the second button (导入 › 替换) and 取消
+    let only = doc_with(json!({ "z": task("z", "只有这个") }));
+    let path = t.dir.join("in.json");
+    std::fs::write(&path, only.to_string()).unwrap();
+    t.pick(&path);
+    t.g().invoke_action("import-json".into());
+    settle();
+    t.click_button("取消");
+    assert!(t.saved()["tasks"].get("a").is_some(), "取消 changes nothing");
+    t.g().invoke_action("import-json".into());
+    settle();
+    t.click_button("替换");
+    assert_eq!(t.saved()["tasks"].as_object().unwrap().keys().collect::<Vec<_>>(), vec!["z"]);
 }
 
 /// An in-memory WebDAV folder (user u, password pw).
