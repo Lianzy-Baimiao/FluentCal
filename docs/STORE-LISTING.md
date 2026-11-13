@@ -299,12 +299,15 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 点击“提交进行认证”后，后台明确显示 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**，产品更新状态为 **正在认证（Submission 8）**。此记录确认已送审，尚未确认 0.3.9.0 上架；后续以[产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview)为准。
 - 2026-11-13 查询商店目录（CN）返回 `ice.FluentCal_0.3.9.0_x64__rz8m2sa64m4em`，确认 0.3.9.0 已上架。
 
-### 0.3.10.0 列表视图、每隔 N 天、行高随任务调整（包已就绪，尚未送审）
+### 0.3.10.0 列表视图、每隔 N 天、行高随任务调整（2026-11-13 21:10 送审，正在认证）
 
-- 对应 GitHub [v0.3.10](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.10)（提交 `2d2826a`）。用户的授权是“可以推送、发版、回复/关闭 Iss”。
+- 对应 GitHub [v0.3.10](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.10)（提交 `2d2826a`）。用户的授权是“可以推送、发版、回复/关闭 Iss”；问到商店怎么处理时，用户答“打开后会自动登录的”，据此创建并提交 **Submission 9 / 1152921505702397269**。时间为 UTC+8。
 - 商店包：`release/FluentCal_0.3.10.0_x64.msix`，10,530,035 字节，SHA-256 `2c689ce2a3e41b3e481f2c011f926a11187e08debb6c9d54730effef4fbf2a44`。包内 EXE 与独立 EXE `FluentCal-Desktop-0.3.10.exe` 哈希一致（`7fbb9213…2074`）；清单与 0.3.9.0 相比只有版本号不同。
-- 2026-11-13 用 `release/store-0.3.10/` 的临时 Edge（隐藏桌面、CDP 9441）打开 Partner Center 时停在输入邮箱的登录页，之前那种用 Windows 帐户自动登录这次没有发生，所以未送审；临时浏览器已关闭、配置文件已删除。需要用户登录后再按上面的步骤上传、填写、送审。
-- 准备好的“此版本的新增功能”（`release/store-0.3.10/whats-new-*.txt`）：
+- 登录：`release/store-0.3.10/` 的临时 Edge（CDP 9441）在隐藏桌面上两次停在输入邮箱的登录页。改用 `launch-edge-visible.ps1` 在可见桌面打开同一个临时配置文件，点“登录选项”后重新打开产品页，登录页转到通行密钥（FIDO）验证并完成登录，没有输入任何帐户信息。这个配置文件登录后先打开的是 LiteView 的产品页，`pc.py` 因此只操作 9NTT06453DG5 的页面。
+- 上传后只出现既有的 `runFullTrust` 受限能力提醒，设备系列只勾选 Windows 10/11 Desktop；保存后旧包 0.3.9.0 被移除，概述页只列出 **FluentCal_0.3.10.0_x64.msix / Validated**。
+- “此版本的新增功能”（`release/store-0.3.10/whats-new-*.txt`）：
   - 简体中文：新增列表视图：在标题栏切换到“列表”，按天列出任务，可选“近期”或“所有”（包括以前的任务）。重复规则新增“每隔 N 天”，“农历每年”改名为“每年（农历）”。设置 › 日历 新增“行高随任务多少调整”：任务多的一周行更高，尽量不再折叠成“+N”。修复在 设置 › 数据 中更改数据文件夹后点“更改并重启”没有反应的问题。
   - English: New Agenda view: switch the title bar to Agenda to see tasks by day, either Upcoming or All (earlier tasks included). New repeat choice: Every N days; "Yearly (lunar)" now sits next to Yearly. New option in Settings › Calendar, "Row height follows the tasks": busy weeks get taller rows, so fewer days fold into "+N". Fixed "Change and restart" doing nothing after choosing a new data folder in Settings › Data.
   - 繁體中文：新增列表檢視：在標題列切換到“列表”，按天列出任務，可選“近期”或“所有”（包括以前的任務）。重複規則新增“每隔 N 天”，“農曆每年”改名為“每年（農曆）”。設定 › 日曆 新增“行高隨任務多少調整”：任務多的一週行更高，盡量不再摺疊成“+N”。修復在 設定 › 資料 中更改資料資料夾後點“更改並重啟”沒有反應的問題。
+- 三种语言的“此版本的新增功能”已按上文填写并保存，重新载入后逐字一致；“管理 Store 一览语言”页三种语言均为 **完成**。描述、功能、截图、关键词、定价、属性、年龄分级未改。提交选项仍是“在此提交通过认证后立即予以发布”，runFullTrust 用途说明 453 字符未变。
+- 点击“提交进行认证”后，概述页显示 **正在认证更新**，产品更新状态为 **正在认证（Submission 9）**；商店里仍是 Submission 8（0.3.9.0）。临时浏览器已关闭，配置文件已删除。是否上架以商店目录查询为准。
