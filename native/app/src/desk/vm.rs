@@ -4,7 +4,8 @@
 use fluentcal_core::i18n::{tr, trf};
 
 use crate::theme::color;
-use crate::{CellData, ChipData, CountdownData, WeekData, WeekdayHead};
+use crate::{CellData, ChipData, CountdownData, ListRowData, WeekData, WeekdayHead};
+use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub};
 use fluentcal_core::countdown::countdowns;
 use fluentcal_core::date::{add_days, add_months, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
 use fluentcal_core::lunar::{almanac, display_info as day_info, Kind};
@@ -33,6 +34,8 @@ pub struct DeskUi {
     /// Wheel paging: accumulated delta and the time of the last page (ms).
     pub wheel_acc: f32,
     pub wheel_at: i64,
+    /// The list view's 近期: days shown from today (显示更多日期 adds 30, up to 180).
+    pub list_span: i32,
 }
 
 impl DeskUi {
@@ -41,10 +44,15 @@ impl DeskUi {
             cursor: start_of_month(today),
             weeks_start: default_weeks_start(doc, today),
             selected: today.to_owned(),
+            list_span: LIST_SPAN,
             ..Default::default()
         }
     }
 }
+
+/// 近期 first shows 30 days; 显示更多日期 adds as many, up to 180 (the web page's numbers).
+pub const LIST_SPAN: i32 = 30;
+pub const LIST_SPAN_MAX: i32 = 180;
 
 /// First and last day shown (month view: whole weeks around the month).
 pub fn shown_range(doc: &Doc, ui: &DeskUi) -> (String, String) {
@@ -77,11 +85,13 @@ fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(v))
 }
 
-/// "2026年10月", the weeks view's range, or "甘特图".
+/// "2026年10月", the weeks view's range, or "甘特图" ("近期" / "所有" for the screen reader;
+/// the list view shows them as tabs).
 pub fn view_title(doc: &Doc, ui: &DeskUi, today: &str) -> String {
     let c = &doc.settings.calendar;
     match c.view.as_str() {
         "gantt" => tr("甘特图").into(),
+        "list" => if c.list_range == "all" { tr("所有").into() } else { tr("近期").into() },
         "weeks" => {
             let s = &ui.weeks_start;
             let e = add_days(s, c.weeks_rows as i32 * 7 - 1);
@@ -226,6 +236,66 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
         tip: tip.join("\n").into(),
         aria: trf("{0}月{1}日 {2}，农历{3}{4}，{5}", &[format!("{}", m), format!("{}", d), format!("{}", wd), format!("{}", info.lunar_label), format!("{}", legal_aria), format!("{}", if count > 0 { trf("{0} 项任务", &[count.to_string()]) } else { tr("无任务").into() })])
         .into(),
+    }
+}
+
+/// The list view (CAL-14): its rows, the row today's heading is in, and what goes under them
+/// ("more" for 显示更多日期, or a note). 近期 is today and the next `list_span` days; 所有 is
+/// every task once, on its start date.
+pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRowData>, i32, String) {
+    let c = &doc.settings.calendar;
+    let show_done = doc.settings.tasks.show_completed;
+    let all = c.list_range == "all";
+    let days = if all {
+        all_tasks(doc.tasks.values(), today, show_done)
+    } else {
+        agenda(doc.tasks.values(), today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, show_done)
+    };
+    let mut rows = Vec::new();
+    let mut today_row = 0;
+    for d in &days {
+        if d.date == today {
+            today_row = rows.len() as i32;
+        }
+        rows.push(ListRowData { kind: "day".into(), heading: day_heading(&d.date, today).into(), sub: day_sub(&d.date, c.show_holidays).into(), today: d.date == today, ..Default::default() });
+        if d.items.is_empty() {
+            rows.push(ListRowData { kind: "empty".into(), ..Default::default() });
+        }
+        rows.extend(d.items.iter().map(|o| list_item(doc, o, all, today, t)));
+    }
+    let footer = if all {
+        String::new()
+    } else if ui.list_span < LIST_SPAN_MAX {
+        "more".into()
+    } else {
+        tr("只显示 180 天内的任务").into()
+    };
+    (rows, today_row, footer)
+}
+
+/// One task of the list: the chip the calendar would draw (keys, menu, tooltip, colours), its
+/// time, and the dates, rule (所有) and group after the title.
+fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> ListRowData {
+    let task = o.task;
+    let ch = Chip { key: format!("{}@{}", task.id, o.date), occ: o.clone(), col: 0, span: 1, lane: 0, cont_left: false, cont_right: false, multi_day: o.start != o.end, visible: true };
+    let mut meta = Vec::new();
+    if o.start != o.end {
+        meta.push(format_range(&o.start, &o.end, today));
+    }
+    if all && task.repeat.is_some() {
+        meta.push(describe_rule(task.repeat.as_ref(), &task.start));
+    }
+    if let Some(g) = task.group_id.as_deref().and_then(|id| doc.groups.get(id)) {
+        meta.push(g.name.clone());
+    }
+    ListRowData {
+        kind: "item".into(),
+        chip: chip_data(doc, &ch, today, t),
+        when: task.time.clone().unwrap_or_else(|| tr("全天").into()).into(),
+        meta: meta.join(" · ").into(),
+        // 所有 shows a repeating task for its whole series
+        checkable: !(all && task.repeat.is_some()),
+        ..Default::default()
     }
 }
 

@@ -58,7 +58,19 @@ const viewModel = computed({
     if (v !== 'list') patchSettings({ calendar: { view: v as 'month' | 'weeks' | 'gantt' } });
   },
 });
-const title = computed(() => (view.value === 'list' ? tr("近期") : viewTitle()));
+const title = computed(() => viewTitle());
+// The list: 近期 or 所有 (GitHub #4); kept in this browser, else as on the PC.
+const RANGE_KEY = 'fluentcal.web.listRange';
+const chosenRange = ref(localStorage.getItem(RANGE_KEY) ?? '');
+const listRange = computed<'upcoming' | 'all'>(() => ((chosenRange.value || doc.settings.calendar.listRange) === 'all' ? 'all' : 'upcoming'));
+const ranges = computed(() => [
+  { value: 'upcoming' as const, label: tr("近期"), title: tr("今天和之后几天的任务") },
+  { value: 'all' as const, label: tr("所有"), title: tr("全部任务，包括以前的（每个重复任务列一次）") },
+]);
+function setRange(v: 'upcoming' | 'all') {
+  chosenRange.value = v;
+  localStorage.setItem(RANGE_KEY, v);
+}
 
 // Opened on this PC ("在浏览器中查看"): the server there runs only after that menu item.
 const onThisPc = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
@@ -110,7 +122,22 @@ onBeforeUnmount(() => {
 <template>
   <div class="web" :class="{ narrow }">
     <header class="bar">
-      <h1 class="title">{{ title }}</h1>
+      <div v-if="view === 'list'" class="ranges" role="tablist" :aria-label="tr('列表')">
+        <button
+          v-for="r in ranges"
+          :key="r.value"
+          type="button"
+          role="tab"
+          class="title range"
+          :class="{ on: r.value === listRange }"
+          :aria-selected="r.value === listRange"
+          :title="r.title"
+          @click="setRange(r.value)"
+        >
+          {{ r.label }}
+        </button>
+      </div>
+      <h1 v-else class="title">{{ title }}</h1>
       <template v-if="view === 'month' || view === 'weeks'">
         <FButton variant="subtle" size="icon" icon="chevronLeft" :title="view === 'weeks' ? tr('上一周') : tr('上个月')" @click="page(-1)" />
         <FButton variant="subtle" size="icon" icon="chevronRight" :title="view === 'weeks' ? tr('下一周') : tr('下个月')" @click="page(1)" />
@@ -132,7 +159,7 @@ onBeforeUnmount(() => {
     <main class="body">
       <p v-if="!storeState.ready" class="loading">{{ status === 'connecting' ? tr("正在连接电脑上的 FluentCal…") : '' }}</p>
       <template v-else>
-        <AgendaView v-if="view === 'list'" :key="language" />
+        <AgendaView v-if="view === 'list'" :key="language" :range="listRange" />
         <GanttView v-else-if="view === 'gantt'" :key="language" />
         <MonthView v-else :key="language" :mode="view === 'weeks' ? 'weeks' : 'month'" />
         <CountdownBar v-if="view !== 'gantt'" />
@@ -171,6 +198,38 @@ onBeforeUnmount(() => {
   font-size: 20px;
   font-weight: 600;
   white-space: nowrap;
+}
+.ranges {
+  display: flex;
+  gap: 2px;
+  margin-right: 6px;
+}
+.range {
+  position: relative;
+  margin: 0;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.range:hover:not(.on) {
+  background: var(--subtle-fill-hover);
+}
+.range.on {
+  color: var(--text-primary);
+}
+.range.on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 16px;
+  height: 3px;
+  margin-left: -8px;
+  border-radius: 2px;
+  background: var(--accent-fill);
 }
 .grow {
   flex: 1;

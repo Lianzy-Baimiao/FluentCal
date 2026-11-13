@@ -10,6 +10,11 @@ pub fn wire(w: &DeskWindow) {
     w.on_page(|d| run(move |a| a.desk_page(d)));
     w.on_go_today(|| run(|a| a.desk_go_today()));
     w.on_set_view(|v| run(move |a| a.desk_set_view(&v)));
+    w.on_set_list_range(|r| run(move |a| a.desk_set_list_range(&r)));
+    w.on_list_more(|| run(|a| a.desk_list_more()));
+    w.on_list_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
+    w.on_list_open(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
+    w.on_list_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
     w.on_select(|d| run(move |a| a.desk_select(&d)));
     w.on_quick_add(|d| run(move |a| a.desk_quick_add(&d)));
     w.on_quick_add_submit(|t| run(move |a| a.desk_quick_add_submit(&t)));

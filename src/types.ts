@@ -84,7 +84,7 @@ export interface HolidayYear {
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PinMode = 'desktop' | 'top' | 'normal';
-export type CalendarView = 'month' | 'weeks' | 'gantt';
+export type CalendarView = 'month' | 'weeks' | 'gantt' | 'list';
 export type GanttScale = 'day' | 'week' | 'month';
 
 export interface Settings {
@@ -126,6 +126,8 @@ export interface Settings {
   };
   calendar: {
     view: CalendarView;
+    /** The list view: 近期 (today on) or 所有 (every task once). */
+    listRange: 'upcoming' | 'all';
     weekStart: 0 | 1;
     monthRows: 'auto' | 'six';
     weeksRows: number;

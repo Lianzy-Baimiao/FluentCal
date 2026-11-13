@@ -19,6 +19,9 @@ impl App {
     }
 
     pub fn desk_go_today(&mut self) {
+        if self.doc.settings.calendar.view == "list" {
+            return self.desk_list_scroll_today();
+        }
         let today = self.today();
         let ui = &mut self.desk.ui;
         ui.cursor = start_of_month(&today);
@@ -28,9 +31,9 @@ impl App {
         self.desk_refresh_view();
     }
 
-    /// Shows `date` (switching away from the Gantt view) and highlights it.
+    /// Shows `date` (switching from the Gantt or list view to the month) and highlights it.
     pub fn desk_jump(&mut self, date: &str) {
-        if self.doc.settings.calendar.view == "gantt" {
+        if matches!(self.doc.settings.calendar.view.as_str(), "gantt" | "list") {
             self.patch_settings(json!({ "calendar": { "view": "month" } }));
         }
         let c = &self.doc.settings.calendar;
@@ -45,6 +48,25 @@ impl App {
     pub fn desk_set_view(&mut self, view: &str) {
         self.history.boundary();
         self.patch_settings(json!({ "calendar": { "view": view } }));
+    }
+
+    /// The list view's 近期 / 所有 (it opens on today: shell::apply_settings).
+    pub fn desk_set_list_range(&mut self, range: &str) {
+        self.history.boundary();
+        self.patch_settings(json!({ "calendar": { "listRange": range } }));
+    }
+
+    /// 显示更多日期: 30 more days, up to 180.
+    pub fn desk_list_more(&mut self) {
+        let ui = &mut self.desk.ui;
+        ui.list_span = (ui.list_span + vm::LIST_SPAN).min(vm::LIST_SPAN_MAX);
+        self.desk_refresh_data();
+    }
+
+    /// The list view: today's heading to the top (近期: the first row).
+    pub fn desk_list_scroll_today(&mut self) {
+        let w = &self.desk.window;
+        w.invoke_list_scroll_to(w.get_list_today_row());
     }
 
     pub fn desk_flash(&mut self, date: &str) {

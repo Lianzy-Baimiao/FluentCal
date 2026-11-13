@@ -47,6 +47,11 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
         app.gantt_scroll_to(&today, 0.3);
     }
     app.desk_refresh();
+    // The list view opens on today (所有 also lists what came before).
+    let list = |c: &fluentcal_core::settings::Calendar| (c.view == "list").then(|| c.list_range.clone());
+    if list(&new.calendar).is_some() && list(&old.calendar) != list(&new.calendar) {
+        app.desk_list_scroll_today();
+    }
     tray_refresh(app);
     if old.reminders != new.reminders || old.tasks != new.tasks {
         app.schedule_reminders();

@@ -41,6 +41,15 @@ impl App {
             }
         } else if gantt {
             return false;
+        } else if self.doc.settings.calendar.view == "list" {
+            // No day grid: Home goes to today, PageUp / PageDown scroll the list.
+            if is(text, Key::Home) {
+                self.desk_list_scroll_today();
+            } else if is(text, Key::PageUp) || is(text, Key::PageDown) {
+                self.desk.window.invoke_list_page(if is(text, Key::PageUp) { -1 } else { 1 });
+            } else {
+                return false;
+            }
         } else if self.desk.ui.grid_focus && self.desk_grid_key(text, shift) {
         } else if is(text, Key::Home) {
             self.desk_go_today();

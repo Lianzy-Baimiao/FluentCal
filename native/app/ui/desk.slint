@@ -11,10 +11,11 @@ import { Menu, MenuEntry } from "menu.slint";
 import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
 import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData } from "desk_overlays.slint";
+import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
 import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData }
-export { ChipData }
+export { ChipData, ListRowData }
 
 // The day grid has the keyboard (0.2: a focused .cell): the selected day's cell keeps the
 // focus while the arrow keys move the selection (roving tab stop).
@@ -514,6 +515,9 @@ component MonthView inherits TouchArea {
 component TitleBar inherits Rectangle {
     in property <string> title;
     in property <string> view;
+    // The list view: "upcoming" (近期) | "all" (所有), shown as tabs instead of the title.
+    in property <string> list-range;
+    callback set-list-range(string);
     in property <bool> locked;
     in property <bool> sync-enabled;
     in property <bool> sync-busy;
@@ -533,9 +537,13 @@ component TitleBar inherits Rectangle {
     callback more-menu(length, length, length, length);
     // Adjust mode: a press on the empty title bar moves the window.
     callback start-move();
-    // 0.2's container queries measure the content box (padding 0 2px 0 4px).
-    property <bool> wide: root.width - 6px > 520px;
-    property <bool> mid: root.width - 6px > 430px;
+    // 0.2's container queries measure the content box (padding 0 2px 0 4px). `room` is what
+    // is left beside the title and paging (the multi-week title is the longest): the view switch
+    // (four choices since the list view, 170px) with search, lock and more needs 300px; 今天 and
+    // 设置 (and 同步) are the first to go when it gets narrow, as in 0.2.
+    property <length> room: root.width - 6px - left.preferred-width;
+    property <bool> mid: room > 300px;
+    property <bool> wide: room > 300px + 52px + 34px + (root.sync-enabled ? 34px : 0);
     property <float> fs: Theme.desk.fs;
     height: 36px;
     TouchArea {
@@ -555,61 +563,71 @@ component TitleBar inherits Rectangle {
             alignment: start;
             cross-axis-alignment: center;
             horizontal-stretch: 0;
-            title-btn := Rectangle {
-                property <bool> is-button: root.view == "month";
-                height: 32px;
-                border-radius: 4px;
-                background: is-button && tta.has-hover ? Theme.c.subtle-fill-hover : transparent;
-                accessible-role: button;
-                accessible-label: root.title;
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 4px;
-                    cross-axis-alignment: center;
-                    GText {
-                        text: root.title;
-                        font-family: Theme.font-display;
-                        font-size: 18px * fs;
-                        font-weight: 600;
-                    }
-                    if title-btn.is-button: Icon {
-                        glyph: Glyph.chevron-down;
-                        size: 10px;
-                        color: Theme.c.text-primary.transparentize(0.3);
-                    }
+            // the title (or the list's tabs) and the paging: what `room` is measured against
+            left := HorizontalLayout {
+                spacing: 2px;
+                alignment: start;
+                cross-axis-alignment: center;
+                if root.view == "list": ListRangeTabs {
+                    value: root.list-range;
+                    selected(v) => { root.set-list-range(v); }
                 }
-                property <int> tip-token: -1;
-                tta := TouchArea {
-                    enabled: title-btn.is-button;
-                    changed has-hover => {
-                        if self.has-hover && title-btn.is-button {
-                            title-btn.tip-token = Tip.enter(@tr("选择年月"), title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height, false);
-                        } else {
-                            Tip.leave(title-btn.tip-token);
+                if root.view != "list": title-btn := Rectangle {
+                    property <bool> is-button: root.view == "month";
+                    height: 32px;
+                    border-radius: 4px;
+                    background: is-button && tta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+                    accessible-role: button;
+                    accessible-label: root.title;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 4px;
+                        cross-axis-alignment: center;
+                        GText {
+                            text: root.title;
+                            font-family: Theme.font-display;
+                            font-size: 18px * fs;
+                            font-weight: 600;
+                        }
+                        if title-btn.is-button: Icon {
+                            glyph: Glyph.chevron-down;
+                            size: 10px;
+                            color: Theme.c.text-primary.transparentize(0.3);
                         }
                     }
-                    clicked => { root.pick-month(title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height); }
+                    property <int> tip-token: -1;
+                    tta := TouchArea {
+                        enabled: title-btn.is-button;
+                        changed has-hover => {
+                            if self.has-hover && title-btn.is-button {
+                                title-btn.tip-token = Tip.enter(@tr("选择年月"), title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height, false);
+                            } else {
+                                Tip.leave(title-btn.tip-token);
+                            }
+                        }
+                        clicked => { root.pick-month(title-btn.absolute-position.x, title-btn.absolute-position.y, title-btn.width, title-btn.height); }
+                    }
                 }
-            }
-            Rectangle { width: 2px; }
-            if root.view != "gantt": Button {
-                variant: ButtonVariant.subtle;
-                size: ButtonSize.icon;
-                icon: Glyph.chevron-left;
-                accessible-label: root.view == "weeks" ? @tr("上一周") : @tr("上个月");
-                tip: self.accessible-label;
-                tip-bottom: true;
-                clicked => { root.page(-1); }
-            }
-            if root.view != "gantt": Button {
-                variant: ButtonVariant.subtle;
-                size: ButtonSize.icon;
-                icon: Glyph.chevron-right;
-                accessible-label: root.view == "weeks" ? @tr("下一周") : @tr("下个月");
-                tip: self.accessible-label;
-                tip-bottom: true;
-                clicked => { root.page(1); }
+                Rectangle { width: 2px; }
+                if root.view != "gantt" && root.view != "list": Button {
+                    variant: ButtonVariant.subtle;
+                    size: ButtonSize.icon;
+                    icon: Glyph.chevron-left;
+                    accessible-label: root.view == "weeks" ? @tr("上一周") : @tr("上个月");
+                    tip: self.accessible-label;
+                    tip-bottom: true;
+                    clicked => { root.page(-1); }
+                }
+                if root.view != "gantt" && root.view != "list": Button {
+                    variant: ButtonVariant.subtle;
+                    size: ButtonSize.icon;
+                    icon: Glyph.chevron-right;
+                    accessible-label: root.view == "weeks" ? @tr("下一周") : @tr("下个月");
+                    tip: self.accessible-label;
+                    tip-bottom: true;
+                    clicked => { root.page(1); }
+                }
             }
             if root.view != "gantt" && wide: Button {
                 variant: ButtonVariant.subtle;
@@ -629,6 +647,7 @@ component TitleBar inherits Rectangle {
                 small: true;
                 value: root.view;
                 options: [
+                    { value: "list", label: @tr("列表"), title: @tr("列表视图（按天列出任务）") },
                     { value: "month", label: @tr("月"), title: @tr("月视图") },
                     { value: "weeks", label: @tr("多周"), title: @tr("多周视图（滚动显示最近几周）") },
                     { value: "gantt", label: @tr("甘特"), title: @tr("甘特图") },
@@ -803,6 +822,19 @@ export component DeskWindow inherits Window {
     in property <[WeekData]> weeks;
     in property <[WeekdayHead]> heads;
     in property <bool> show-week-no;
+    // The list view (CAL-14): its rows, 近期 / 所有, the row of today's heading, what goes
+    // under the rows ("more" = 显示更多日期, a note, or "").
+    in property <[ListRowData]> list-rows;
+    in property <string> list-range: "upcoming";
+    in property <int> list-today-row;
+    in property <string> list-footer;
+    callback set-list-range(string);
+    callback list-more();
+    callback list-toggle(ChipData);
+    callback list-open(ChipData);
+    callback list-menu(ChipData, length, length);
+    public function list-scroll-to(i: int) { list.scroll-to-row(i); }
+    public function list-page(dir: int) { list.page(dir); }
     in property <[CountdownData]> countdowns;
     in property <string> selected;
     in property <string> flash-date;
@@ -978,6 +1010,8 @@ export component DeskWindow inherits Window {
                 tb := TitleBar {
                     title: root.title-text;
                     view: root.view;
+                    list-range: root.list-range;
+                    set-list-range(r) => { root.set-list-range(r); }
                     locked: root.locked;
                     sync-enabled: root.sync-enabled;
                     sync-busy: root.sync-busy;
@@ -1023,7 +1057,7 @@ export component DeskWindow inherits Window {
                 body := Rectangle {
                 vertical-stretch: 1;
                 month := MonthView {
-                    visible: root.view != "gantt";
+                    visible: root.view != "gantt" && root.view != "list";
                     weeks: root.weeks;
                     heads: root.heads;
                     show-week-no: root.show-week-no;
@@ -1051,6 +1085,17 @@ export component DeskWindow inherits Window {
                     changed capacity => { root.capacity-changed(self.capacity); }
                 }
                 gantt := GanttView { visible: root.view == "gantt"; }
+                list := AgendaList {
+                    visible: root.view == "list";
+                    rows: root.list-rows;
+                    read-only: root.read-only;
+                    footer: root.list-footer;
+                    toggle(c) => { root.list-toggle(c); }
+                    open(c) => { root.list-open(c); }
+                    menu(c, x, y) => { root.list-menu(c, x, y); }
+                    more => { root.list-more(); }
+                    leave-focus => { root.focus-root(); }
+                }
                 }
                 if root.countdowns.length > 0 && root.view != "gantt": CountdownBar {
                     items: root.countdowns;

@@ -34,13 +34,24 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: O
     push_weeks(w, doc, ui, today, capacity, t);
 }
 
-/// The week rows and the countdowns (the parts that follow tasks).
+/// The week rows, the list view and the countdowns (the parts that follow tasks).
 pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
     use slint::Model;
     let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, capacity, t).iter().collect();
     sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
+    push_list(w, doc, ui, today, t);
     let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
     sync::rows(&w.get_countdowns(), cds, |m| w.set_countdowns(m));
+}
+
+/// The list view's rows; none while another view shows (nothing kept for it).
+pub fn push_list(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) {
+    let c = &doc.settings.calendar;
+    w.set_list_range(c.list_range.clone().into());
+    let (rows, today_row, footer) = if c.view == "list" { vm::list_rows(doc, ui, today, t) } else { (Vec::new(), 0, String::new()) };
+    sync::rows(&w.get_list_rows(), rows, |m| w.set_list_rows(m));
+    w.set_list_today_row(today_row);
+    w.set_list_footer(footer.into());
 }
 
 /// Lane capacity the window's layout gives now.

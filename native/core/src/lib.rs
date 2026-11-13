@@ -2,6 +2,7 @@
 //! sync, the local web view server, window layout geometry, and the calendar logic. No UI and
 //! no Tauri, so all of it is tested with plain `cargo test`.
 
+pub mod agenda;
 pub mod cloud;
 pub mod color;
 pub mod countdown;

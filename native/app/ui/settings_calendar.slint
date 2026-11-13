@@ -43,7 +43,7 @@ export component CalendarPage inherits VerticalLayout {
             Select {
                 width: 150px;
                 value: SetState.calendar.view;
-                options: [{ value: "month", label: @tr("月视图") }, { value: "weeks", label: @tr("多周视图") }, { value: "gantt", label: @tr("甘特图") }];
+                options: [{ value: "list", label: @tr("列表视图") }, { value: "month", label: @tr("月视图") }, { value: "weeks", label: @tr("多周视图") }, { value: "gantt", label: @tr("甘特图") }];
                 selected(v) => { SetState.set-str("calendar.view", v); }
             }
         }

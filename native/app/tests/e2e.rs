@@ -926,3 +926,86 @@ fn dump_labels() {
     }
     println!("weeks {} cap {} size {:?}", t.w.get_weeks().row_count(), t.w.get_capacity(), t.w.window().size());
 }
+
+/// GitHub #1 / #4: the list view (列表) with 近期 and 所有, by real clicks: the view switch,
+/// the tabs, the check box, a double click opens the editor, a right click the task's menu,
+/// 显示更多日期, and 所有 opening on today with what came before above it.
+#[test]
+fn list_view_upcoming_and_all() {
+    use fluentcal_core::date::add_days;
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let tasks = [
+        json!({ "id": "past", "title": "去年的体检", "start": add_days(&today, -400), "done": true }),
+        json!({ "id": "old", "title": "上周的会", "start": add_days(&today, -7) }),
+        json!({ "id": "now", "title": "交房租", "start": today, "time": "09:30" }),
+        json!({ "id": "trip", "title": "出差", "start": add_days(&today, 2), "end": add_days(&today, 4) }),
+        json!({ "id": "far", "title": "四十天后", "start": add_days(&today, 40) }),
+        json!({ "id": "gym", "title": "健身", "start": add_days(&today, -30), "repeat": { "freq": "daily", "interval": 1 } }),
+    ];
+    // enough days before and after today that 所有 has to scroll to it
+    let earlier: Vec<Value> = (1..=20).map(|k| json!({ "id": format!("e{k}"), "title": format!("早先 {k}"), "start": add_days(&today, -40 - k) })).collect();
+    let later: Vec<Value> = (1..=20).map(|k| json!({ "id": format!("l{k}"), "title": format!("以后 {k}"), "start": add_days(&today, 100 + k) })).collect();
+    let tasks: Vec<Value> = tasks.iter().cloned().chain(earlier).chain(later).collect();
+    let t = start("listview", Some(doc_with(&tasks, json!({}))));
+    let tab = |t: &T, label: &str| {
+        let e = ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::Tab)).unwrap_or_else(|| panic!("no tab {label:?}"));
+        let s = e.size();
+        t.click_at(t.at(&e, s.width / 2.0, s.height / 2.0));
+    };
+    let item = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::ListItem));
+    tab(&t, "列表");
+    assert_eq!(with(|a| a.doc.settings.calendar.view.clone()).unwrap(), "list");
+    // 近期: today on, so not what came before nor what is 40 days away
+    assert!(item(&t, "交房租").is_some() && item(&t, "出差").is_some());
+    assert!(item(&t, "上周的会").is_none() && item(&t, "四十天后").is_none());
+    let trip = item(&t, "出差").unwrap();
+    assert!(trip.accessible_description().is_some_and(|d| d.contains('–')), "a multi-day task shows its dates");
+    // the check box
+    let check = |t: &T, title: &str| {
+        let row = item(t, title).unwrap();
+        let (p, s) = (row.absolute_position(), row.size());
+        t.click_at(LogicalPosition::new(p.x + 15.0, p.y + s.height / 2.0));
+    };
+    check(&t, "交房租");
+    assert_eq!(t.task("交房租")["done"], json!(true));
+    check(&t, "交房租，已完成");
+    assert_eq!(t.task("交房租")["done"], json!(false));
+    // a double click opens the editor; a right click the task's menu
+    let row = item(&t, "出差").unwrap();
+    t.double_click_at(t.at(&row, row.size().width / 2.0, row.size().height / 2.0));
+    assert!(with(|a| a.editor.is_some()).unwrap(), "the editor opened");
+    with(|a| a.editor = None).unwrap();
+    let row = item(&t, "出差").unwrap();
+    t.right_click_at(t.at(&row, row.size().width / 2.0, row.size().height / 2.0));
+    assert!(t.w.get_any_popup() && t.has("标记为完成"), "the task's menu");
+    t.key(&slint::SharedString::from(Key::Escape));
+    // 显示更多日期 is under the last day. PageDown scrolls the list; the keys keep working while
+    // the focused task (the double click above) scrolls far out of view.
+    for _ in 0..8 {
+        t.key(&slint::SharedString::from(Key::PageDown));
+    }
+    t.click("显示更多日期");
+    assert!(item(&t, "四十天后").is_some() || t.w.get_list_rows().iter().any(|r| r.chip.title == "四十天后"));
+
+    // 所有: every task once, the past too; it opens on today
+    tab(&t, "所有");
+    assert_eq!(with(|a| a.doc.settings.calendar.list_range.clone()).unwrap(), "all");
+    let rows: Vec<_> = t.w.get_list_rows().iter().filter(|r| r.kind == "item").map(|r| r.chip.title.to_string()).collect();
+    let mut want = vec!["去年的体检".to_owned()];
+    want.extend((1..=20).rev().map(|k| format!("早先 {k}")));
+    want.extend(["健身", "上周的会", "交房租", "出差", "四十天后"].map(String::from));
+    want.extend((1..=20).map(|k| format!("以后 {k}")));
+    assert_eq!(rows, want, "by start date, a repeating task once");
+    let gym = t.w.get_list_rows().iter().find(|r| r.chip.title == "健身").unwrap();
+    assert!(!gym.checkable && gym.meta == "每天", "the series, with its rule: {:?}", gym.meta);
+    let heading = ElementHandle::find_by_accessible_label(&t.w, &format!("今天 {}", fluentcal_core::agenda::day_sub(&today, true))).next().expect("today's heading is built");
+    let list = ElementHandle::find_by_accessible_label(&t.w, "任务列表").find(|e| e.accessible_role() == Some(R::List)).unwrap();
+    let dy = heading.absolute_position().y - list.absolute_position().y;
+    assert!((0.0..40.0).contains(&dy), "today's heading at the top of the list: {dy}");
+    // back to 近期, and the setting stays
+    tab(&t, "近期");
+    assert!(item(&t, "去年的体检").is_none());
+    tab(&t, "月");
+    assert!(t.w.get_list_rows().row_count() == 0, "nothing kept for another view");
+}

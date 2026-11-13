@@ -26,7 +26,7 @@ pub fn tray_refresh(app: &mut App) {
         Item::Separator,
         Item::Sub {
             title: tr("视图").into(),
-            items: vec![check("view:month", tr("月视图"), view == "month"), check("view:weeks", tr("多周视图"), view == "weeks"), check("view:gantt", tr("甘特图"), view == "gantt")],
+            items: vec![check("view:list", tr("列表视图"), view == "list"), check("view:month", tr("月视图"), view == "month"), check("view:weeks", tr("多周视图"), view == "weeks"), check("view:gantt", tr("甘特图"), view == "gantt")],
         },
         Item::Sub {
             title: tr("窗口层级").into(),

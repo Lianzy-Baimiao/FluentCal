@@ -1,0 +1,390 @@
+// The list view (CAL-14, GitHub #1 / #4; the web page's AgendaView): days and their tasks.
+// 近期 lists today and the next days, 所有 every task once (past ones too). Every row has the
+// same height, so Rust knows where a day is (`scroll-to-row`), and only the rows near the
+// visible part are built.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { GText, Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Tip, Overlay, FocusRing } from "overlay.slint";
+import { ChipData, ChipKeys } from "chip.slint";
+
+export struct ListRowData {
+    // "day" (a day's heading) | "item" (a task) | "empty" (今天 without tasks)
+    kind: string,
+    heading: string,
+    sub: string,
+    today: bool,
+    chip: ChipData,
+    // "全天" or the time
+    when: string,
+    // the dates of a multi-day task, the group, the rule of a repeating one (所有)
+    meta: string,
+    // 所有 lists a repeating task once, for its whole series: no check box
+    checkable: bool,
+}
+
+// One task: check box, time, colour, title, details. Double click opens it, right click its
+// menu; keys as on a chip (Enter, Space, Delete, the menu key).
+component ListItem inherits Rectangle {
+    in property <ChipData> chip;
+    in property <string> when;
+    in property <string> meta;
+    in property <bool> checkable;
+    in property <bool> read-only;
+    callback toggle();
+    callback open();
+    callback menu(length, length);
+    callback focus-changed(bool);
+    property <float> fs: Theme.desk.fs;
+    property <int> tip-token: -1;
+    border-radius: 4px;
+    background: Theme.desk.cell-bg;
+    accessible-role: list-item;
+    accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
+    accessible-description: meta != "" ? when + " · " + meta : when;
+    Rectangle {
+        border-radius: 4px;
+        background: ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    }
+    // Not ChipKeys.focused(): that gives the arrow keys to the day grid, which isn't shown.
+    kfs := FocusScope {
+        focus-on-click: false;
+        changed has-focus => { root.focus-changed(self.has-focus); }
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.open();
+                return accept;
+            }
+            if e.text == " " {
+                if !root.read-only && root.checkable {
+                    root.toggle();
+                }
+                return accept;
+            }
+            if e.text == Key.Delete && !root.read-only {
+                ChipKeys.remove(root.chip);
+                return accept;
+            }
+            if e.text == Key.Menu || (e.modifiers.shift && e.text == Key.F10) {
+                ChipKeys.menu(root.chip, root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        changed has-hover => {
+            if self.has-hover {
+                root.tip-token = Tip.enter(chip.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
+        double-clicked => { root.open(); }
+        clicked => { if root.read-only { root.open(); } }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                Tip.leave(root.tip-token);
+                Overlay.keyboard = false;
+                kfs.focus();
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        alignment: start;
+        cross-axis-alignment: center;
+        check := Rectangle {
+            property <length> s: 14px * fs;
+            width: s;
+            height: s;
+            border-radius: s / 2;
+            border-width: root.checkable ? 1px : 0;
+            border-color: chip.check-ring;
+            background: !root.checkable ? transparent : cta.has-hover ? chip.bar.transparentize(0.75) : chip.done ? chip.bar : transparent;
+            if root.checkable && chip.done: Path {
+                x: 1px;
+                y: 1px;
+                width: check.s - 2px;
+                height: check.s - 2px;
+                viewbox-width: 12;
+                viewbox-height: 12;
+                commands: "M2.6 6.2 5 8.5l4.4-4.9";
+                stroke: chip.on-bar;
+                stroke-width: 1.6px * (check.s - 2px) / 12px;
+                fill: transparent;
+            }
+            cta := TouchArea {
+                enabled: root.checkable;
+                accessible-role: checkbox;
+                accessible-label: @tr("完成");
+                accessible-checked: chip.done;
+                accessible-action-default => { if !root.read-only { root.toggle(); } }
+                clicked => { if !root.read-only { root.toggle(); } }
+                double-clicked => { }
+            }
+        }
+        GText {
+            width: 40px * fs;
+            text: root.when;
+            font-size: 12px * fs;
+            color: Theme.c.text-secondary;
+            overflow: elide;
+        }
+        Rectangle {
+            width: 4px;
+            height: max(8px, root.height - 14px);
+            border-radius: 2px;
+            background: chip.bar;
+        }
+        title-box := Rectangle {
+            height: root.height;
+            min-width: 0;
+            horizontal-stretch: 1;
+            preferred-width: title.preferred-width;
+            opacity: chip.done ? 0.6 : 1;
+            title := GText {
+                width: parent.width;
+                text: (chip.milestone ? "◆ " : "") + chip.title;
+                font-size: 13px * fs;
+                color: Theme.c.text-primary;
+                overflow: elide;
+            }
+            if chip.done: Rectangle {
+                x: 0;
+                y: round((parent.height / 2 + 0.8px * fs) / 1phx) * 1phx;
+                width: min(parent.width, title.text-width);
+                height: max(1px, round(0.9px * fs / 1phx) * 1phx);
+                background: Theme.c.text-primary;
+            }
+        }
+        if root.meta != "": GText {
+            min-width: 0;
+            max-width: root.width * 0.45;
+            text: root.meta;
+            font-size: 12px * fs;
+            color: Theme.c.text-secondary;
+            overflow: elide;
+        }
+        if chip.repeat: Icon {
+            glyph: Glyph.repeat;
+            size: 11px * fs;
+            color: Theme.c.text-secondary;
+        }
+    }
+    FocusRing { show: kfs.has-focus && Overlay.keyboard; radius: 4px; }
+}
+
+// A day's heading: "今天  周五 · 九月二十", at the bottom of its row (the space above it parts
+// the days).
+component ListHeading inherits Rectangle {
+    in property <string> heading;
+    in property <string> sub;
+    in property <bool> today;
+    property <float> fs: Theme.desk.fs;
+    accessible-role: text;
+    accessible-label: heading + " " + sub;
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-bottom: 3px;
+        spacing: 8px;
+        alignment: start;
+        GText {
+            vertical-alignment: bottom;
+            text: root.heading;
+            font-size: 14px * fs;
+            font-weight: 600;
+            color: root.today ? Theme.c.accent-text : Theme.c.text-primary;
+        }
+        GText {
+            min-width: 0;
+            vertical-alignment: bottom;
+            text: root.sub;
+            font-size: 12px * fs;
+            color: Theme.c.text-secondary;
+            overflow: elide;
+        }
+    }
+}
+
+export component AgendaList inherits Rectangle {
+    in property <[ListRowData]> rows;
+    in property <bool> read-only;
+    // Under the rows: "more" (显示更多日期), a note, or nothing.
+    in property <string> footer;
+    callback toggle(ChipData);
+    callback open(ChipData);
+    callback menu(ChipData, length, length);
+    callback more();
+    // The focused task scrolled out of view: Slint drops the keys of a focused item it can't
+    // see (and the focus with it), so the window's keys need the focus back (Ctrl+Z, PageDown).
+    callback leave-focus();
+    // Puts row `i` (a day's heading) at the top, as far as the list goes.
+    public function scroll-to-row(i: int) {
+        flick.content-y = -max(0px, min(i * rh, flick.content-height - flick.height));
+    }
+    // PageUp / PageDown.
+    public function page(dir: int) {
+        flick.content-y = max(min(0px, flick.height - flick.content-height), min(0px, flick.content-y - dir * flick.height * 0.9));
+    }
+    property <float> fs: Theme.desk.fs;
+    property <length> rh: round(32 * fs) * 1px;
+    property <length> foot-h: footer != "" ? 52px : 0;
+    property <int> focused-row: -1;
+    accessible-role: list;
+    accessible-label: @tr("任务列表");
+    flick := Flickable {
+        width: root.width - 6px;
+        content-height: root.rows.length * rh + foot-h;
+        // overflow-y: auto: the wheel scrolls, dragging doesn't
+        mouse-drag-pan-enabled: false;
+        changed content-y => {
+            if root.focused-row >= 0 && ((root.focused-row + 1) * rh - 1px < -self.content-y || root.focused-row * rh + 1px > -self.content-y + self.height) {
+                root.focused-row = -1;
+                root.leave-focus();
+            }
+        }
+        for r[i] in root.rows: Rectangle {
+            // Built only near the visible part (所有 can have thousands of rows), and the row
+            // with the keyboard focus: removing that would leave the keys nowhere (Ctrl+Z).
+            property <bool> near: i == root.focused-row || ((i + 1) * rh > -flick.content-y - flick.height && i * rh < -flick.content-y + 2 * flick.height);
+            y: i * rh;
+            height: rh;
+            if near && r.kind == "day": ListHeading {
+                heading: r.heading;
+                sub: r.sub;
+                today: r.today;
+            }
+            if near && r.kind == "item": ListItem {
+                y: 1px;
+                height: rh - 2px;
+                chip: r.chip;
+                when: r.when;
+                meta: r.meta;
+                checkable: r.checkable;
+                read-only: root.read-only;
+                toggle => { root.toggle(r.chip); }
+                open => { root.open(r.chip); }
+                menu(x, y) => { root.menu(r.chip, x, y); }
+                focus-changed(on) => {
+                    if on {
+                        root.focused-row = i;
+                    } else if root.focused-row == i {
+                        root.focused-row = -1;
+                    }
+                }
+            }
+            if near && r.kind == "empty": GText {
+                x: 8px;
+                width: parent.width - 16px;
+                text: @tr("没有任务");
+                font-size: 12px * fs;
+                color: Theme.c.text-tertiary;
+            }
+        }
+        if root.footer == "more": Button {
+            x: (parent.width - self.width) / 2;
+            y: root.rows.length * rh + 12px;
+            text: @tr("显示更多日期");
+            clicked => { root.more(); }
+        }
+        if root.footer != "" && root.footer != "more": GText {
+            x: 8px;
+            y: root.rows.length * rh + 12px;
+            width: parent.width - 16px;
+            height: 32px;
+            text: root.footer;
+            font-size: 12px * fs;
+            color: Theme.c.text-secondary;
+            horizontal-alignment: center;
+        }
+    }
+    // A thin scroll bar while the list is longer than the view; its thumb can be dragged.
+    if flick.content-height > flick.height + 1px: bar := Rectangle {
+        property <length> track: root.height;
+        property <length> thumb-h: max(24px, track * flick.height / flick.content-height);
+        property <length> room: flick.content-height - flick.height;
+        x: root.width - 6px;
+        width: 6px;
+        thumb := Rectangle {
+            x: bta.has-hover || bta.pressed ? 1px : 2px;
+            width: bta.has-hover || bta.pressed ? 4px : 2px;
+            y: (-flick.content-y) / bar.room * (bar.track - bar.thumb-h);
+            height: bar.thumb-h;
+            border-radius: 2px;
+            background: Theme.c.text-tertiary;
+            opacity: bta.has-hover || bta.pressed ? 0.9 : 0.5;
+            animate width, x, opacity { duration: Theme.dur-fast; }
+        }
+        property <length> grab;
+        bta := TouchArea {
+            pointer-event(e) => {
+                if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                    // on the thumb: keep the grip; elsewhere: the thumb's middle jumps there
+                    bar.grab = self.mouse-y >= thumb.y && self.mouse-y <= thumb.y + thumb.height ? self.mouse-y - thumb.y : thumb.height / 2;
+                    flick.content-y = -max(0px, min(bar.room, (self.mouse-y - bar.grab) / max(1px, bar.track - bar.thumb-h) * bar.room));
+                }
+            }
+            moved => {
+                if self.pressed {
+                    flick.content-y = -max(0px, min(bar.room, (self.mouse-y - bar.grab) / max(1px, bar.track - bar.thumb-h) * bar.room));
+                }
+            }
+        }
+    }
+}
+
+// 近期 | 所有, where the list view's title is (the title's size and weight).
+export component ListRangeTabs inherits HorizontalLayout {
+    in property <string> value;
+    callback selected(string);
+    property <float> fs: Theme.desk.fs;
+    spacing: 2px;
+    accessible-role: tab-list;
+    for o in [{ value: "upcoming", label: @tr("近期"), tip: @tr("今天和之后几天的任务") }, { value: "all", label: @tr("所有"), tip: @tr("全部任务，包括以前的（每个重复任务列一次）") }]: tab-item := Rectangle {
+        property <bool> on: o.value == root.value;
+        property <int> tip-token: -1;
+        height: 32px;
+        border-radius: 4px;
+        background: tta.has-hover && !on ? Theme.c.subtle-fill-hover : transparent;
+        accessible-role: tab;
+        accessible-label: o.label;
+        accessible-item-selected: on;
+        accessible-action-default => { if !on { root.selected(o.value); } }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            GText {
+                text: o.label;
+                font-family: Theme.font-display;
+                font-size: 18px * fs;
+                font-weight: 600;
+                color: on ? Theme.c.text-primary : Theme.c.text-secondary;
+            }
+        }
+        if on: Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: parent.height - self.height;
+            width: 16px;
+            height: 3px;
+            border-radius: 2px;
+            background: Theme.c.accent-fill;
+        }
+        tta := TouchArea {
+            changed has-hover => {
+                if self.has-hover {
+                    tab-item.tip-token = Tip.enter(o.tip, tab-item.absolute-position.x, tab-item.absolute-position.y, tab-item.width, tab-item.height, true);
+                } else {
+                    Tip.leave(tab-item.tip-token);
+                }
+            }
+            clicked => { if !on { root.selected(o.value); } }
+        }
+    }
+}

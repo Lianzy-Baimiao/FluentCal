@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { t as tr } from '@/i18n';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { FButton, FIcon, taskColor } from '@/fluent';
 import { addDays, formatRange, weekday, WEEKDAY_SHORT } from '@/lib/date';
 import { displayInfo as dayInfo } from '@/lib/lunar';
-import { agenda, dayHeading } from '@/lib/agenda';
-import type { Occurrence } from '@/lib/recur';
+import { agenda, allTasks, dayHeading } from '@/lib/agenda';
+import { describeRule, type Occurrence } from '@/lib/recur';
 import { doc, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { isDark } from '@/composables/theme';
 import { openEditor } from '../desk/state';
 
-/** The web view's list for phones (WEB-03): today and the next days, by day. */
+/**
+ * The web view's list (WEB-03): 近期 is today and the next days, by day; 所有 every task once
+ * on its start date, past ones too (GitHub #4), opening on today.
+ */
+const props = withDefaults(defineProps<{ range?: 'upcoming' | 'all' }>(), { range: 'upcoming' });
 const span = ref(30);
-const days = computed(() => agenda(taskList.value, now.value, addDays(now.value, span.value - 1), now.value, doc.settings.tasks.showCompleted));
+const all = computed(() => props.range === 'all');
+const days = computed(() =>
+  all.value
+    ? allTasks(taskList.value, now.value, doc.settings.tasks.showCompleted)
+    : agenda(taskList.value, now.value, addDays(now.value, span.value - 1), now.value, doc.settings.tasks.showCompleted),
+);
 
 function sub(date: string): string {
   const i = dayInfo(date);
@@ -23,12 +32,26 @@ function sub(date: string): string {
 
 const dot = (o: Occurrence) => taskColor(o.task.color, isDark.value).bar;
 const range = (o: Occurrence) => (o.start !== o.end ? formatRange(o.start, o.end) : '');
+const rule = (o: Occurrence) => (all.value && o.task.repeat ? describeRule(o.task.repeat, o.task.start) : '');
 const group = (o: Occurrence) => (o.task.groupId ? doc.groups[o.task.groupId]?.name ?? '' : '');
+const meta = (o: Occurrence) => [range(o), rule(o), group(o)].filter(Boolean).join(' · ');
 const open = (o: Occurrence) => openEditor({ mode: 'edit', taskId: o.task.id, date: o.date });
+
+// 所有 opens on today, with what came before above it.
+const list = ref<HTMLElement>();
+async function showToday() {
+  await nextTick();
+  const el = list.value;
+  const day = el?.querySelector<HTMLElement>('.day.today');
+  if (el && day) el.scrollTop = day.offsetTop - el.offsetTop - 4;
+}
+onMounted(showToday);
+watch(() => props.range, showToday);
+defineExpose({ showToday });
 </script>
 
 <template>
-  <div class="agenda">
+  <div ref="list" class="agenda">
     <section v-for="d in days" :key="d.date" class="day" :class="{ today: d.date === now }">
       <h2>
         <span class="when">{{ dayHeading(d.date, now) }}</span>
@@ -40,12 +63,12 @@ const open = (o: Occurrence) => openEditor({ mode: 'edit', taskId: o.task.id, da
         <span class="dot" :style="{ background: dot(o) }" aria-hidden="true" />
         <span class="text">
           <span class="title">{{ o.task.title }}</span>
-          <span v-if="range(o) || group(o)" class="meta">{{ [range(o), group(o)].filter(Boolean).join(' · ') }}</span>
+          <span v-if="meta(o)" class="meta">{{ meta(o) }}</span>
         </span>
         <FIcon v-if="o.task.repeat" name="repeat" :size="12" class="rep" :title="tr('重复')" />
       </button>
     </section>
-    <div class="more">
+    <div v-if="!all" class="more">
       <FButton v-if="span < 180" @click="span += 30">{{ tr("显示更多日期") }}</FButton>
       <span v-else class="note">{{ tr("只显示 180 天内的任务") }}</span>
     </div>

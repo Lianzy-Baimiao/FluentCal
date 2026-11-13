@@ -65,8 +65,10 @@ section!(Desk {
 });
 
 section!(Calendar {
-    /// "month" | "weeks" | "gantt"
+    /// "month" | "weeks" | "gantt" | "list"
     view: String = "month".into(),
+    /// The list view: "upcoming" (近期) | "all" (所有)
+    list_range: String = "upcoming".into(),
     /// 0 = Sunday, 1 = Monday
     week_start: u32 = 1,
     /// "auto" | "six"

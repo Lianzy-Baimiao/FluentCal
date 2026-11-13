@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   calendar: {
     view: 'month',
+    listRange: 'upcoming',
     weekStart: 1,
     monthRows: 'auto',
     weeksRows: 5,
