@@ -283,7 +283,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 已点击“提交进行认证”，后台确认 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**。此记录只确认送审成功，不代表 0.3.7.0 已上架。凭证：`release/store-proof/certification-0.3.7-2026-11-06.png`（本地忽略目录；满意度调查未作答）。
 - 2026-11-08 创建下一次更新前，合作伙伴中心确认 Submission 7 已发布，显示“恭喜!你的产品现已更新”“你的最新产品现已在 Microsoft Store 上架”。
 
-### 0.3.9.0 提醒关闭与跨周拖动快捷键修复（2026-11-08 03:13 送审，正在认证）
+### 0.3.9.0 提醒关闭与跨周拖动快捷键修复（2026-11-08 03:13 送审，已上架）
 
 - 用户要求“推送github更新，还有微软商店更新”，据此发布 GitHub **v0.3.9**，并通过内置浏览器创建、提交 **Submission 8 / 1152921505702342788**。产品为 **FluentCal 桌面日历 / 9NTT06453DG5**，时间为 UTC+8。
 - 修复提醒卡片点 X、完成、稍后提醒后窗口残留的问题；修复任务跨周拖动后 Ctrl+Z、Ctrl+Y、Ctrl+F 无响应的问题。两个问题均在修复前复现、修复后通过回归；完整原生工作区 **164 项测试全部通过**，真实 Windows 窗口三项回归、网页构建和类型检查通过。
@@ -297,3 +297,14 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
   - 繁體中文：修復提醒卡片無法關閉的問題：點擊右上角 X、完成或稍後提醒後，卡片會正常移除，處理最後一張卡片後視窗會關閉。修復工作拖曳到上一週或下一週後快捷鍵失效的問題，現在可繼續使用 Ctrl+Z 復原、Ctrl+Y 重做和 Ctrl+F 搜尋。
 - 沿用定价、属性、年龄分级、商店描述与截图；已核对发布选项为 **在此提交通过认证后立即予以发布**，`runFullTrust` 用途说明保留。
 - 点击“提交进行认证”后，后台明确显示 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**，产品更新状态为 **正在认证（Submission 8）**。此记录确认已送审，尚未确认 0.3.9.0 上架；后续以[产品概述页](https://partner.microsoft.com/zh-cn/dashboard/products/9NTT06453DG5/overview)为准。
+- 2026-11-13 查询商店目录（CN）返回 `ice.FluentCal_0.3.9.0_x64__rz8m2sa64m4em`，确认 0.3.9.0 已上架。
+
+### 0.3.10.0 列表视图、每隔 N 天、行高随任务调整（包已就绪，尚未送审）
+
+- 对应 GitHub [v0.3.10](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.10)（提交 `2d2826a`）。用户的授权是“可以推送、发版、回复/关闭 Iss”。
+- 商店包：`release/FluentCal_0.3.10.0_x64.msix`，10,530,035 字节，SHA-256 `2c689ce2a3e41b3e481f2c011f926a11187e08debb6c9d54730effef4fbf2a44`。包内 EXE 与独立 EXE `FluentCal-Desktop-0.3.10.exe` 哈希一致（`7fbb9213…2074`）；清单与 0.3.9.0 相比只有版本号不同。
+- 2026-11-13 用 `release/store-0.3.10/` 的临时 Edge（隐藏桌面、CDP 9441）打开 Partner Center 时停在输入邮箱的登录页，之前那种用 Windows 帐户自动登录这次没有发生，所以未送审；临时浏览器已关闭、配置文件已删除。需要用户登录后再按上面的步骤上传、填写、送审。
+- 准备好的“此版本的新增功能”（`release/store-0.3.10/whats-new-*.txt`）：
+  - 简体中文：新增列表视图：在标题栏切换到“列表”，按天列出任务，可选“近期”或“所有”（包括以前的任务）。重复规则新增“每隔 N 天”，“农历每年”改名为“每年（农历）”。设置 › 日历 新增“行高随任务多少调整”：任务多的一周行更高，尽量不再折叠成“+N”。修复在 设置 › 数据 中更改数据文件夹后点“更改并重启”没有反应的问题。
+  - English: New Agenda view: switch the title bar to Agenda to see tasks by day, either Upcoming or All (earlier tasks included). New repeat choice: Every N days; "Yearly (lunar)" now sits next to Yearly. New option in Settings › Calendar, "Row height follows the tasks": busy weeks get taller rows, so fewer days fold into "+N". Fixed "Change and restart" doing nothing after choosing a new data folder in Settings › Data.
+  - 繁體中文：新增列表檢視：在標題列切換到“列表”，按天列出任務，可選“近期”或“所有”（包括以前的任務）。重複規則新增“每隔 N 天”，“農曆每年”改名為“每年（農曆）”。設定 › 日曆 新增“行高隨任務多少調整”：任務多的一週行更高，盡量不再摺疊成“+N”。修復在 設定 › 資料 中更改資料資料夾後點“更改並重啟”沒有反應的問題。
