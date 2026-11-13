@@ -117,9 +117,10 @@ impl Editor {
             show_progress: rule.is_none(),
             show_postpone: rule.is_none() && t.start == t.end,
             postpone: t.auto_postpone.unwrap_or(doc.settings.tasks.auto_postpone),
-            freq: freq.and_then(|f| serde_json::to_value(f).ok()).and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default(),
+            freq: super::choice_of(rule),
             interval: rule.and_then(|r| r.interval).unwrap_or(1),
-            unit: super::unit_of(freq),
+            // 每天 has no "每 N 天" of its own: that is 每隔 N 天.
+            unit: if super::choice_of(rule) == "daily" { "" } else { super::unit_of(freq) },
             weekly: freq == Some(Freq::Weekly),
             weekdays: rule.and_then(|r| r.weekdays.clone()).unwrap_or_default(),
             monthly: freq == Some(Freq::Monthly),

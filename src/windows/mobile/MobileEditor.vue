@@ -322,9 +322,9 @@ async function remove(all = false) {
                 <option value="weekly">每周</option>
                 <option value="monthly">每月</option>
                 <option value="yearly">每年</option>
+                <option value="lunarYearly">每年（农历）</option>
                 <option value="workday">工作日</option>
                 <option value="legalWorkday">法定工作日</option>
-                <option value="lunarYearly">农历每年</option>
                 <option value="monthLastDay">每月最后一天</option>
                 <option value="ebbinghaus">艾宾浩斯</option>
               </select></label

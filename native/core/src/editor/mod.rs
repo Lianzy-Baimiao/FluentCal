@@ -8,7 +8,7 @@ mod fields;
 mod flow;
 mod view;
 
-pub use fields::{freq_of, unit_of, FREQS};
+pub use fields::{choice_of, freq_of, unit_of, EVERY_N_DAYS, FREQS};
 pub use flow::{Answer, Ask, Effect};
 pub use view::{DepOption, DepTag, Option_, View};
 

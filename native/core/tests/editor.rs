@@ -124,6 +124,40 @@ fn repeat_rules() {
     assert_eq!(e.draft.as_ref().unwrap().repeat, None);
 }
 
+/// GitHub #8: 每隔 N 天 is a choice of its own (the rule stays daily + interval), and the
+/// lunar year sits next to the solar one.
+#[test]
+fn every_n_days_and_the_order_of_the_choices() {
+    use fluentcal_core::editor::FREQS;
+    let labels: Vec<&str> = FREQS.iter().map(|(_, l)| *l).collect();
+    assert_eq!(labels[..3], ["不重复", "每天", "每隔 N 天"]);
+    let y = labels.iter().position(|l| *l == "每年").unwrap();
+    assert_eq!(labels[y + 1], "每年（农历）");
+
+    let doc = doc_with(vec![mk("a", "2026-10-16"), Task { repeat: Some(RepeatRule { freq: Some(Freq::Daily), interval: Some(9), ..Default::default() }), ..mk("b", "2026-10-16") }], vec![]);
+    let mut e = open(&doc, Payload::edit("a", None));
+    let rule = |e: &Editor| e.draft.as_ref().unwrap().repeat.clone().unwrap();
+    e.edit("freq", "daily");
+    let v = e.view(&doc, TODAY);
+    assert_eq!((v.freq.as_str(), v.unit, v.summary.as_str()), ("daily", "", "每天"), "每天 has no interval box");
+    e.edit("freq", "everyNDays");
+    assert_eq!((rule(&e).freq, rule(&e).interval), (Some(Freq::Daily), Some(2)));
+    let v = e.view(&doc, TODAY);
+    assert_eq!((v.freq.as_str(), v.unit, v.summary.as_str()), ("everyNDays", "天", "每 2 天"));
+    e.edit("interval", "9");
+    assert_eq!(e.view(&doc, TODAY).summary, "每 9 天");
+    e.edit("interval", "1");
+    assert_eq!(rule(&e).interval, Some(2), "stays 每隔 N 天");
+    e.edit("freq", "everyNDays"); // the same choice again changes nothing
+    assert_eq!(rule(&e).interval, Some(2));
+    e.edit("freq", "daily");
+    assert_eq!((rule(&e).freq, rule(&e).interval), (Some(Freq::Daily), Some(1)));
+    // a task saved as every 9 days opens as 每隔 N 天
+    let e = open(&doc, Payload::edit("b", None));
+    let v = e.view(&doc, TODAY);
+    assert_eq!((v.freq.as_str(), v.interval, v.unit), ("everyNDays", 9, "天"));
+}
+
 #[test]
 fn reminders_offer_what_suits_the_task() {
     let mut doc = doc_with(vec![mk("a", TODAY)], vec![]);

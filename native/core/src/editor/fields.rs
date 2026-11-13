@@ -7,19 +7,34 @@ use crate::date::{add_days, add_months, diff_days, weekday};
 use crate::model::{Freq, RepeatRule};
 use crate::tasks::Doc;
 
-/// The repeat choices (RepeatEditor FREQS), value and label.
-pub const FREQS: [(&str, &str); 10] = [
+/// The repeat choices (RepeatEditor FREQS), value and label. The lunar year sits next to the
+/// solar one (GitHub #8).
+pub const FREQS: [(&str, &str); 11] = [
     ("", "不重复"),
     ("daily", "每天"),
+    (EVERY_N_DAYS, "每隔 N 天"),
     ("weekly", "每周"),
     ("monthly", "每月"),
     ("yearly", "每年"),
+    ("lunarYearly", "每年（农历）"),
     ("workday", "工作日（周一至周五）"),
     ("legalWorkday", "法定工作日（含调休）"),
-    ("lunarYearly", "农历每年"),
     ("monthLastDay", "每月最后一天"),
     ("ebbinghaus", "艾宾浩斯记忆曲线"),
 ];
+
+/// 每隔 N 天: the daily rule with an interval of 2 or more. Not a rule of its own (the data
+/// stays `daily` + `interval`), only a choice that can be found in the list (GitHub #8).
+pub const EVERY_N_DAYS: &str = "everyNDays";
+
+/// The repeat choice a rule shows as ("" = none).
+pub fn choice_of(rule: Option<&RepeatRule>) -> String {
+    let Some(f) = rule.and_then(|r| r.freq) else { return String::new() };
+    if f == Freq::Daily && rule.and_then(|r| r.interval).unwrap_or(1) > 1 {
+        return EVERY_N_DAYS.into();
+    }
+    serde_json::to_value(f).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
+}
 
 /// The unit after "每 N" (RepeatEditor UNIT); "" = no interval for this frequency.
 pub fn unit_of(f: Option<Freq>) -> &'static str {
@@ -76,7 +91,11 @@ impl Editor {
             "countdown" => t.countdown = on(v).then_some(true),
             "postpone" => t.auto_postpone = Some(on(v)),
             "freq" => self.set_freq(v),
-            "interval" => self.patch_rule(|r| r.interval = Some(num(v).round().clamp(1.0, 99.0) as u32)),
+            "interval" => {
+                // 每隔 N 天 stays itself: every 2 days at least (1 would be 每天).
+                let min = if choice_of(t.repeat.as_ref()) == EVERY_N_DAYS { 2.0 } else { 1.0 };
+                self.patch_rule(|r| r.interval = Some(num(v).round().clamp(min, 99.0) as u32))
+            }
             "month-mode" => self.patch_rule(|r| r.month_mode = Some(v.into())),
             "end-mode" => {
                 let start = t.start.clone();
@@ -95,13 +114,13 @@ impl Editor {
 
     fn set_freq(&mut self, v: &str) {
         let Some(t) = self.draft.as_mut() else { return };
-        let cur = t.repeat.as_ref().and_then(|r| r.freq).and_then(|f| serde_json::to_value(f).ok());
-        if cur.as_ref().and_then(|c| c.as_str()).unwrap_or("") == v {
+        if choice_of(t.repeat.as_ref()) == v {
             return; // the same choice (FSelect only emits a change)
         }
-        t.repeat = freq_of(v).map(|f| RepeatRule {
+        let (freq, interval) = if v == EVERY_N_DAYS { (Some(Freq::Daily), 2) } else { (freq_of(v), 1) };
+        t.repeat = freq.map(|f| RepeatRule {
             freq: Some(f),
-            interval: Some(1),
+            interval: Some(interval),
             weekdays: (f == Freq::Weekly).then(|| vec![weekday(&t.start)]),
             ..Default::default()
         });

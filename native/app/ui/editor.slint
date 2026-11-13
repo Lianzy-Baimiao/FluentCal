@@ -266,7 +266,8 @@ export component EditorWindow inherits Window {
                                         if root.data.unit != "": NumberBox {
                                             width: 100px;
                                             value: root.data.interval;
-                                            minimum: 1;
+                                            // 每隔 N 天: 1 would be 每天
+                                            minimum: root.data.freq == "everyNDays" ? 2 : 1;
                                             maximum: 99;
                                             changed-value(v) => { root.edit("interval", v); }
                                         }
