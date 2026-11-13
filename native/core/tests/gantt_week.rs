@@ -101,3 +101,26 @@ fn week_layout_lanes_overflow_and_clipping() {
     let l = layout_week(WEEK, both, None, true);
     assert_eq!(l.chips.iter().map(|c| c.occ.task.id.as_str()).collect::<Vec<_>>(), ["b", "a"]);
 }
+
+#[test]
+fn rows_fit_their_tasks() {
+    use fluentcal_core::week::{fit_rows, lanes_in};
+    let (top, lane) = (25.0, 19.0);
+    let sum = |v: &[f32]| v.iter().sum::<f32>();
+    // Room for all: each row gets what it needs, plus an equal share of the rest.
+    let h = fit_rows(&[0, 4, 1, 0, 2], 500.0, top, lane);
+    assert!((sum(&h) - 500.0).abs() < 0.01);
+    assert_eq!(h.iter().map(|&x| lanes_in(x, top, lane)).collect::<Vec<_>>(), [3, 6, 3, 3, 4]);
+    assert!(h[1] > h[4] && h[4] > h[2] && (h[0] - h[3]).abs() < 0.01 && (h[2] - h[0]).abs() < 0.01, "{h:?}");
+    // Not enough room: quiet rows keep what they need, the busy ones share the rest.
+    let h = fit_rows(&[0, 9, 1, 0, 8], 300.0, top, lane);
+    assert!((sum(&h) - 300.0).abs() < 0.01);
+    assert_eq!([h[0], h[2], h[3]], [top + lane; 3]);
+    assert!((h[1] - h[4]).abs() < 0.01);
+    assert_eq!(lanes_in(h[1], top, lane), 3, "{h:?}");
+    // Too small even for one lane each: equal rows.
+    let h = fit_rows(&[3, 0, 5], 90.0, top, lane);
+    assert!(h.iter().all(|&x| (x - 30.0).abs() < 0.01), "{h:?}");
+    // A row exactly k lanes high holds k lanes.
+    assert_eq!((lanes_in(top + 3.0 * lane, top, lane), lanes_in(top + 3.0 * lane - 0.5, top, lane)), (3, 2));
+}

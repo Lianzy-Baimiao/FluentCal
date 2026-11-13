@@ -51,6 +51,9 @@ export struct WeekData {
     more: [int],
     more-lane: [int],
     week-no: int,
+    // 行高随任务多少调整: the row's top in the grid and its height, from Rust; 0: equal rows.
+    row-y: length,
+    row-h: length,
 }
 
 export struct CountdownData {
@@ -422,13 +425,16 @@ component MonthView inherits TouchArea {
     property <length> gap: Theme.desk.cell-gap;
     property <length> head-h: round(22 * fs) * 1px;
     property <length> chip-h: round(17 * fs) * 1px;
-    property <length> lane-h: chip-h + Theme.desk.line-gap;
+    out property <length> lane-h: chip-h + Theme.desk.line-gap;
     property <length> wd-h: 20px;
     property <length> grid-y: wd-h + gap;
-    property <length> grid-h: root.height - grid-y;
+    out property <length> grid-h: root.height - grid-y;
     property <int> n: max(1, weeks.length);
     property <length> row-h: (grid-h - gap * (n - 1)) / n;
-    out property <int> capacity: max(0, floor((row-h - head-h - 3px + Theme.desk.line-gap) / lane-h));
+    // A row k lanes high is lane-top + k * lane-h: Rust sizes the rows with these when they
+    // follow their tasks (行高随任务多少调整).
+    out property <length> lane-top: head-h + 3px - Theme.desk.line-gap;
+    out property <int> capacity: max(0, floor((row-h - lane-top) / lane-h));
     // Grid geometry in window coordinates, for finding the day under the pointer (drag).
     out property <length> grid-abs-x: self.absolute-position.x + area-x;
     out property <length> grid-abs-y: self.absolute-position.y + grid-y;
@@ -479,9 +485,9 @@ component MonthView inherits TouchArea {
     accessible-role: table;
     for w[i] in weeks: WeekRow {
         x: 0;
-        y: grid-y + i * (row-h + gap);
+        y: w.row-h > 0 ? grid-y + w.row-y : grid-y + i * (row-h + gap);
         width: root.width;
-        height: row-h;
+        height: w.row-h > 0 ? w.row-h : row-h;
         week: w;
         show-week-no: root.show-week-no;
         head-h: root.head-h;
@@ -862,6 +868,10 @@ export component DeskWindow inherits Window {
     out property <length> cell-w: month.cell-w;
     out property <length> cell-h: month.cell-h;
     out property <length> cell-gap: month.cell-gap;
+    // For rows that follow their tasks: the grid's height, a row without lanes, a lane.
+    out property <length> rows-room: month.grid-h;
+    out property <length> lane-top: month.lane-top;
+    out property <length> lane-step: month.lane-h;
     out property <length> gantt-view-w: gantt.chart-view-w;
     out property <length> gantt-view-h: gantt.chart-view-h;
     callback capacity-changed(int);
@@ -1083,6 +1093,9 @@ export component DeskWindow inherits Window {
                     more(d, x, y, w, h) => { root.more(d, x, y, w, h); }
                     wheel(dy, ctrl) => { root.wheel(dy, ctrl); }
                     changed capacity => { root.capacity-changed(self.capacity); }
+                    changed grid-h => { root.capacity-changed(self.capacity); }
+                    changed lane-top => { root.capacity-changed(self.capacity); }
+                    changed lane-h => { root.capacity-changed(self.capacity); }
                 }
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {

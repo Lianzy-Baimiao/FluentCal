@@ -73,6 +73,9 @@ section!(Calendar {
     week_start: u32 = 1,
     /// "auto" | "six"
     month_rows: String = "auto".into(),
+    /// Busy weeks get taller rows and quiet ones shorter, in the month and multi-week views
+    /// (GitHub #6); off: equal rows.
+    fit_rows: bool = false,
     weeks_rows: u32 = 5,
     weeks_past: u32 = 1,
     show_lunar: bool = true,

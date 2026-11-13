@@ -167,15 +167,20 @@ impl App {
     pub fn desk_date_at(&self, x: f32, y: f32) -> Option<String> {
         let w = &self.desk.window;
         let (gx, gy, cw, ch, gap) = (w.get_grid_x(), w.get_grid_y(), w.get_cell_w(), w.get_cell_h(), w.get_cell_gap());
-        let (rx, ry) = (x - gx, y - gy);
-        if rx < 0.0 || ry < 0.0 || cw <= 0.0 || ch <= 0.0 {
+        let rx = x - gx;
+        if rx < 0.0 || y < gy || cw <= 0.0 || ch <= 0.0 {
             return None;
         }
-        let (col, row) = ((rx / (cw + gap)) as usize, (ry / (ch + gap)) as usize);
-        if col > 6 || rx - col as f32 * (cw + gap) > cw || ry - row as f32 * (ch + gap) > ch {
+        let col = (rx / (cw + gap)) as usize;
+        if col > 6 || rx - col as f32 * (cw + gap) > cw {
             return None;
         }
-        let week = w.get_weeks().row_data(row)?;
+        // The rows may differ in height (行高随任务多少调整); over a gap: none.
+        let weeks = w.get_weeks();
+        let (_, week) = (0..weeks.row_count()).filter_map(|r| weeks.row_data(r).map(|wk| (r, wk))).find(|(r, wk)| {
+            let (top, h) = super::row_box(wk, *r, gy, ch, gap);
+            y >= top && y <= top + h
+        })?;
         week.cells.row_data(col).map(|c| c.date.to_string())
     }
 

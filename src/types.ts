@@ -130,6 +130,8 @@ export interface Settings {
     listRange: 'upcoming' | 'all';
     weekStart: 0 | 1;
     monthRows: 'auto' | 'six';
+    /** Busy weeks get taller rows (the PC calendar; the web view keeps equal rows). */
+    fitRows: boolean;
     weeksRows: number;
     weeksPast: number;
     showLunar: boolean;

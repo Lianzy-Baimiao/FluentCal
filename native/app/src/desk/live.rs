@@ -27,7 +27,7 @@ pub struct Drag {
 pub struct DeskLive {
     pub window: DeskWindow,
     pub ui: DeskUi,
-    pub capacity: Option<usize>,
+    pub room: Option<super::vm::Room>,
     pub drag: Option<Drag>,
     pub toast_timer: slint::Timer,
     pub flash_timer: slint::Timer,
@@ -39,7 +39,7 @@ pub struct DeskLive {
 
 impl DeskLive {
     pub fn new(window: DeskWindow, ui: DeskUi) -> DeskLive {
-        DeskLive { window, ui, capacity: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
+        DeskLive { window, ui, room: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
     }
 }
 
@@ -48,7 +48,7 @@ impl App {
     pub fn desk_refresh(&mut self) {
         let today = self.today();
         let d = &self.desk;
-        super::push_all(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
+        super::push_all(&d.window, &self.doc, &d.ui, &today, d.room, &self.tokens);
         self.desk_refresh_status();
         self.gantt_refresh();
         self.desk_refresh_overlays();
@@ -58,7 +58,7 @@ impl App {
     pub fn desk_refresh_data(&mut self) {
         let today = self.today();
         let d = &self.desk;
-        super::push_weeks(&d.window, &self.doc, &d.ui, &today, d.capacity, &self.tokens);
+        super::push_weeks(&d.window, &self.doc, &d.ui, &today, d.room, &self.tokens);
         self.gantt_refresh();
         self.desk_refresh_overlays();
     }
@@ -91,11 +91,12 @@ impl App {
         w.set_sync_tip(trf("{0}（点击立即同步）", &[format!("{}", line)]).into());
     }
 
-    /// Lane capacity from the layout changed: lay the chips out again.
+    /// The room the layout gives the rows changed (lanes, or the grid for rows that follow
+    /// their tasks): lay the chips out again.
     pub fn desk_sync_capacity(&mut self) {
-        let cap = super::capacity_of(&self.desk.window);
-        if cap != self.desk.capacity {
-            self.desk.capacity = cap;
+        let room = super::room_of(&self.desk.window, self.doc.settings.calendar.fit_rows);
+        if room != self.desk.room {
+            self.desk.room = room;
             self.desk_refresh_data();
         }
     }

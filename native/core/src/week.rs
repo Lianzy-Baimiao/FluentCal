@@ -126,3 +126,43 @@ pub fn layout_week<'a>(week_start: &str, occs: Vec<Occurrence<'a>>, capacity: Op
     }
     out
 }
+
+/// Lanes a week row needs to show all of its chips (0 when it has none).
+pub fn lanes_needed(layout: &WeekLayout) -> usize {
+    layout.chips.iter().map(|c| c.lane + 1).max().unwrap_or(0)
+}
+
+/// 行高随任务多少调整 (GitHub #6): splits `room` (the grid's height without the gaps between
+/// rows) between week rows needing `lanes[i]` task lanes, at least one each. A row with k lanes
+/// is `top + k * lane` high. When everything fits, what is left is shared equally; when not,
+/// rows needing less than an equal share keep what they need and the others share the rest
+/// (and show "+N"). With no room for one lane each, the rows come out equal.
+pub fn fit_rows(lanes: &[usize], room: f32, top: f32, lane: f32) -> Vec<f32> {
+    let n = lanes.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let want: Vec<f32> = lanes.iter().map(|&k| top + k.max(1) as f32 * lane).collect();
+    let total: f32 = want.iter().sum();
+    if total <= room {
+        let extra = (room - total) / n as f32;
+        return want.iter().map(|w| w + extra).collect();
+    }
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| want[a].total_cmp(&want[b]));
+    let (mut left, mut out) = (room, vec![0.0; n]);
+    for (k, &i) in order.iter().enumerate() {
+        let h = want[i].min(left / (n - k) as f32);
+        out[i] = h;
+        left -= h;
+    }
+    out
+}
+
+/// Lanes that fit in a row `h` high (the inverse of `fit_rows`'s `top + k * lane`).
+pub fn lanes_in(h: f32, top: f32, lane: f32) -> usize {
+    if lane <= 0.0 {
+        return 0;
+    }
+    ((h - top) / lane + 1e-3).floor().max(0.0) as usize
+}

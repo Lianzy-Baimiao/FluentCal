@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
     listRange: 'upcoming',
     weekStart: 1,
     monthRows: 'auto',
+    fitRows: false,
     weeksRows: 5,
     weeksPast: 1,
     showLunar: true,

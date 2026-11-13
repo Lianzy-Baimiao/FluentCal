@@ -47,6 +47,10 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
         app.gantt_scroll_to(&today, 0.3);
     }
     app.desk_refresh();
+    // Rows that follow their tasks need the grid's room; equal rows only the lanes.
+    if old.calendar.fit_rows != new.calendar.fit_rows {
+        app.desk_sync_capacity();
+    }
     // The list view opens on today (所有 also lists what came before).
     let list = |c: &fluentcal_core::settings::Calendar| (c.view == "list").then(|| c.list_range.clone());
     if list(&new.calendar).is_some() && list(&old.calendar) != list(&new.calendar) {

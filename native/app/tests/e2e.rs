@@ -1009,3 +1009,77 @@ fn list_view_upcoming_and_all() {
     tab(&t, "月");
     assert!(t.w.get_list_rows().row_count() == 0, "nothing kept for another view");
 }
+
+/// GitHub #6: 行高随任务多少调整. Off (the default): equal rows, a busy day folds into "+N". On:
+/// the busy week's row is as tall as its tasks need, the quiet ones share the rest, the rows
+/// fill the grid without overlapping, and the day under the pointer follows the uneven rows
+/// (a drag from the tall row into a short one lands on the day it's dropped on). Also in 多周.
+#[test]
+fn rows_follow_their_tasks() {
+    let busy = "2026-11-11";
+    let tasks: Vec<Value> = (1..=7).map(|k| json!({ "title": format!("忙碌 {k}"), "start": busy })).collect();
+    let t = start("fit-rows", Some(doc_with(&tasks, json!({ "calendar": { "weekStart": 1 } }))));
+    t.w.invoke_jump(busy.into());
+    settle();
+    let weeks = || -> Vec<fluentcal_app::WeekData> { t.w.get_weeks().iter().collect() };
+    let row_of = |ws: &[fluentcal_app::WeekData], d: &str| ws.iter().position(|w| w.cells.iter().any(|c| c.date == d)).unwrap();
+    let ws = weeks();
+    assert_eq!(ws.len(), 6, "November 2026, Monday first");
+    let r = row_of(&ws, busy);
+    assert!(ws.iter().all(|w| w.row_h == 0.0), "equal rows by default");
+    assert!(ws[r].more.iter().any(|m| m > 0), "equal rows fold the busy day: {:?}", ws[r].more);
+
+    with(|a| a.patch_settings(json!({ "calendar": { "fitRows": true } }))).unwrap();
+    settle();
+    let check_rows = |ws: &[fluentcal_app::WeekData], r: usize| {
+        let (gap, lane, room) = (t.w.get_cell_gap(), t.w.get_lane_step(), t.w.get_rows_room());
+        assert!(ws.iter().all(|w| w.more.iter().all(|m| m == 0)), "every task shows: {:?}", ws.iter().map(|w| w.more.iter().collect::<Vec<_>>()).collect::<Vec<_>>());
+        assert_eq!(ws[0].row_y, 0.0);
+        for i in 1..ws.len() {
+            assert!((ws[i].row_y - (ws[i - 1].row_y + ws[i - 1].row_h + gap)).abs() < 0.01, "row {i} follows row {}", i - 1);
+        }
+        let last = ws.last().unwrap();
+        assert!((last.row_y + last.row_h - room).abs() < 0.01, "the rows fill the grid: {} of {room}", last.row_y + last.row_h);
+        let quiet: Vec<f32> = ws.iter().enumerate().filter(|(i, _)| *i != r).map(|(_, w)| w.row_h).collect();
+        assert!(quiet.iter().all(|h| (h - quiet[0]).abs() < 0.01), "the quiet rows share the rest: {quiet:?}");
+        assert!((ws[r].row_h - quiet[0] - 6.0 * lane).abs() < 0.01, "7 lanes against 1: {} vs {}", ws[r].row_h, quiet[0]);
+        // the last chip sits inside its row
+        let chip = t.find("忙碌 7");
+        let bottom = chip.absolute_position().y + chip.size().height;
+        assert!(bottom <= t.w.get_grid_y() + ws[r].row_y + ws[r].row_h, "忙碌 7 inside the tall row");
+    };
+    let ws = weeks();
+    check_rows(&ws, r);
+
+    // The day under the pointer: the busy row's bottom (where equal rows would be the next
+    // week), and the middle of a short row.
+    let (gx, gy, cw, gap) = (t.w.get_grid_x(), t.w.get_grid_y(), t.w.get_cell_w(), t.w.get_cell_gap());
+    let col_x = |c: usize| gx + c as f32 * (cw + gap) + cw / 2.0;
+    let at = |x: f32, y: f32| with(|a| a.desk_date_at(x, y)).flatten();
+    assert_eq!(at(col_x(2), gy + ws[r].row_y + ws[r].row_h - 4.0).as_deref(), Some(busy));
+    let target = "2026-11-25";
+    let s = row_of(&ws, target);
+    let to = LogicalPosition::new(col_x(2), gy + ws[s].row_y + ws[s].row_h / 2.0);
+    assert_eq!(at(to.x, to.y).as_deref(), Some(target));
+    assert_eq!(at(col_x(2), gy + ws[s].row_y - gap / 2.0), None, "between rows: no day");
+    let chip = t.find("忙碌 1");
+    t.drag(t.at(&chip, 40.0, chip.size().height / 2.0), to);
+    assert_eq!(t.task("忙碌 1")["start"], json!(target));
+    let ws = weeks();
+    assert!(ws[r].row_h > ws[s].row_h, "6 lanes still the tallest");
+
+    // 多周 too
+    with(|a| a.patch_settings(json!({ "calendar": { "view": "weeks", "weeksRows": 4 } }))).unwrap();
+    settle();
+    let ws = weeks();
+    let r = row_of(&ws, busy);
+    assert!(ws.len() == 4 && ws.iter().all(|w| w.row_h > 0.0), "多周 rows follow too");
+    assert!(ws.iter().enumerate().all(|(i, w)| i == r || w.row_h < ws[r].row_h));
+
+    // Off again: equal rows and "+N".
+    with(|a| a.patch_settings(json!({ "calendar": { "view": "month", "fitRows": false } }))).unwrap();
+    settle();
+    let ws = weeks();
+    assert!(ws.iter().all(|w| w.row_h == 0.0), "equal rows again");
+    assert!(ws[row_of(&ws, busy)].more.iter().any(|m| m > 0));
+}

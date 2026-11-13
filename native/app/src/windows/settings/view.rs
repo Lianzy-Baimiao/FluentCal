@@ -284,6 +284,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         view: s(&c.view),
         week_start: s(&c.week_start.to_string()),
         month_rows: s(&c.month_rows),
+        fit_rows: c.fit_rows,
         weeks_rows: c.weeks_rows as f32,
         weeks_past: c.weeks_past as f32,
         show_lunar: c.show_lunar,

@@ -21,7 +21,7 @@ use slint::ComponentHandle;
 use vm::DeskUi;
 
 /// Sets everything the window shows that comes from the document and the view state.
-pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
+pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Option<vm::Room>, t: &Tokens) {
     let c = &doc.settings.calendar;
     w.set_view(c.view.clone().into());
     w.set_locked(doc.settings.desk.locked);
@@ -31,13 +31,13 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: O
     w.set_show_week_no(c.show_week_numbers);
     w.set_selected(ui.selected.clone().into());
     w.set_flash_date(ui.flash.clone().into());
-    push_weeks(w, doc, ui, today, capacity, t);
+    push_weeks(w, doc, ui, today, room, t);
 }
 
 /// The week rows, the list view and the countdowns (the parts that follow tasks).
-pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) {
+pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Option<vm::Room>, t: &Tokens) {
     use slint::Model;
-    let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, capacity, t).iter().collect();
+    let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, room, t).iter().collect();
     sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
     push_list(w, doc, ui, today, t);
     let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
@@ -54,9 +54,21 @@ pub fn push_list(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens
     w.set_list_footer(footer.into());
 }
 
-/// Lane capacity the window's layout gives now.
-pub fn capacity_of(w: &DeskWindow) -> Option<usize> {
-    Some(w.get_capacity().max(0) as usize)
+/// What the window's layout gives the week rows now; the rest of the room only for rows that
+/// follow their tasks (equal rows aren't laid out again on every resize).
+pub fn room_of(w: &DeskWindow, fit: bool) -> Option<vm::Room> {
+    let capacity = w.get_capacity().max(0) as usize;
+    Some(if fit { vm::Room { capacity, grid_h: w.get_rows_room(), top: w.get_lane_top(), lane: w.get_lane_step(), gap: w.get_cell_gap() } } else { vm::Room { capacity, ..Default::default() } })
+}
+
+/// A week row's top and height in window px: its own when the rows follow their tasks, else
+/// row `r` of equal rows `ch` high.
+pub fn row_box(week: &crate::WeekData, r: usize, gy: f32, ch: f32, gap: f32) -> (f32, f32) {
+    if week.row_h > 0.0 {
+        (gy + week.row_y, week.row_h)
+    } else {
+        (gy + r as f32 * (ch + gap), ch)
+    }
 }
 
 /// The desk window drawn offscreen with fixed data (examples/snapshot.rs).
@@ -67,7 +79,7 @@ pub struct Desk {
     pub today: String,
     pub tokens: Tokens,
     /// Task lanes that fit in a week row (from the window's layout).
-    pub capacity: Option<usize>,
+    pub room: Option<vm::Room>,
     pub gantt: gantt::GanttUi,
 }
 
@@ -75,7 +87,7 @@ impl Desk {
     pub fn new(window: DeskWindow, doc: Doc, today: String, tokens: Tokens) -> Desk {
         let ui = DeskUi::new(&doc, &today);
         let gantt = gantt::GanttUi { center: Some((today.clone(), 0.3)), ..Default::default() };
-        Desk { window, doc, ui, today, tokens, capacity: None, gantt }
+        Desk { window, doc, ui, today, tokens, room: None, gantt }
     }
 
     fn gantt_view(&mut self) -> gantt::View<'_> {
@@ -83,7 +95,7 @@ impl Desk {
     }
 
     pub fn refresh(&mut self) {
-        push_all(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
+        push_all(&self.window, &self.doc, &self.ui, &self.today, self.room, &self.tokens);
         self.window.set_welcome(overlays::welcome(&self.doc, false));
         if self.doc.settings.calendar.view == "gantt" {
             self.gantt_view().push();
@@ -151,7 +163,7 @@ impl Desk {
     }
 
     pub fn refresh_weeks(&mut self) {
-        push_weeks(&self.window, &self.doc, &self.ui, &self.today, self.capacity, &self.tokens);
+        push_weeks(&self.window, &self.doc, &self.ui, &self.today, self.room, &self.tokens);
     }
 
     /// Re-lays the chips out if the lane capacity changed; true when it did. (Also applies the
@@ -161,11 +173,11 @@ impl Desk {
             self.gantt_view().scrolled();
             return true;
         }
-        let cap = capacity_of(&self.window);
-        if cap == self.capacity {
+        let room = room_of(&self.window, self.doc.settings.calendar.fit_rows);
+        if room == self.room {
             return false;
         }
-        self.capacity = cap;
+        self.room = room;
         self.refresh_weeks();
         true
     }

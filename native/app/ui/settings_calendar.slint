@@ -70,6 +70,12 @@ export component CalendarPage inherits VerticalLayout {
         }
         SettingsCard {
             icon: Glyph.list;
+            title: @tr("行高随任务多少调整");
+            description: @tr("任务多的一周行更高，任务少的一周更矮（月视图和多周视图）");
+            Toggle { checked: SetState.calendar.fit-rows; toggled(v) => { SetState.set-bool("calendar.fitRows", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.list;
             title: @tr("多周视图");
             description: @tr("显示的周数，以及其中已经过去的周数；日历每周自动向后滚动");
             Text { text: @tr("显示"); font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }

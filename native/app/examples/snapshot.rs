@@ -289,7 +289,7 @@ fn main() {
         }
     }
     write_png(out, size.width, size.height, &rgba);
-    println!("{out} {}x{}{}", size.width, size.height, desk.map_or(String::new(), |d| format!(" capacity {:?}", d.capacity)));
+    println!("{out} {}x{}{}", size.width, size.height, desk.map_or(String::new(), |d| format!(" room {:?}", d.room)));
 }
 
 /// The settings window's state in a parity scene: 0.2's browser preview mock (src/api.ts),

@@ -132,7 +132,8 @@ impl App {
         (0..weeks.row_count()).find_map(|r| {
             let week = weeks.row_data(r)?;
             let c = (0..week.cells.row_count()).find(|&c| week.cells.row_data(c).is_some_and(|cell| cell.date == date))?;
-            Some((gx + c as f32 * (cw + gap), gy + r as f32 * (ch + gap), cw, ch))
+            let (top, h) = super::row_box(&week, r, gy, ch, gap);
+            Some((gx + c as f32 * (cw + gap), top, cw, h))
         })
     }
 

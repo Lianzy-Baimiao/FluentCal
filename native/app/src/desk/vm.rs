@@ -13,7 +13,7 @@ use fluentcal_core::model::Task;
 use fluentcal_core::recur::{describe_rule, occurrences, Occurrence};
 use fluentcal_core::tasks::Doc;
 use fluentcal_core::theme::{mark_color, task_color, Tokens, TRANSPARENT};
-use fluentcal_core::week::{layout_week, Chip};
+use fluentcal_core::week::{fit_rows, lanes_in, lanes_needed, layout_week, Chip};
 use slint::{ModelRc, SharedString, VecModel};
 
 /// The desk window's own state (0.2's `ui` in desk/state.ts).
@@ -146,8 +146,21 @@ pub fn countdown_items(doc: &Doc, today: &str) -> ModelRc<CountdownData> {
     )
 }
 
-/// Lane capacity: None lays out everything (before the first measurement).
-pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &Tokens) -> ModelRc<WeekData> {
+/// What the window's layout gives the week rows (measured in Slint).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Room {
+    /// Task lanes in each row when the rows are equal.
+    pub capacity: usize,
+    /// For rows that follow their tasks (行高随任务多少调整): the grid's height (gaps included),
+    /// a row without lanes, a lane, the gap between rows; 0 when the rows are equal.
+    pub grid_h: f32,
+    pub top: f32,
+    pub lane: f32,
+    pub gap: f32,
+}
+
+/// The week rows: `room` None lays out everything (before the first measurement).
+pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, room: Option<Room>, t: &Tokens) -> ModelRc<WeekData> {
     let c = &doc.settings.calendar;
     let month_mode = c.view != "weeks";
     let starts: Vec<String> = if month_mode {
@@ -166,11 +179,28 @@ pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &T
         .flat_map(|task| occurrences(task, &first, &last, 400))
         .filter(|o| show_done || !o.done)
         .collect();
+    let last = doc.settings.tasks.completed_last;
+    // 行高随任务多少调整 (GitHub #6): each row as high as its tasks need, as far as the room goes.
+    let fit = room.filter(|r| c.fit_rows && r.lane > 0.0);
+    let heights = fit.map(|r| {
+        let lanes: Vec<usize> = starts.iter().map(|w| lanes_needed(&layout_week(w, occs.clone(), None, last))).collect();
+        fit_rows(&lanes, r.grid_h - r.gap * (starts.len() as f32 - 1.0), r.top, r.lane)
+    });
+    let mut next_y = 0.0;
     let rows = starts
         .iter()
-        .map(|w| {
+        .enumerate()
+        .map(|(i, w)| {
+            let (capacity, row_y, row_h) = match (fit, &heights) {
+                (Some(r), Some(h)) => {
+                    let y = next_y;
+                    next_y += h[i] + r.gap;
+                    (Some(lanes_in(h[i], r.top, r.lane)), y, h[i])
+                }
+                _ => (room.map(|r| r.capacity), 0.0, 0.0),
+            };
             let cells: Vec<CellData> = (0..7).map(|i| cell(doc, &add_days(w, i), &focus, month_mode, today, &occs)).collect();
-            let layout = layout_week(w, occs.clone(), capacity, doc.settings.tasks.completed_last);
+            let layout = layout_week(w, occs.clone(), capacity, last);
             let mut chips: Vec<&Chip> = layout.chips.iter().filter(|c| c.visible).collect();
             chips.sort_by_key(|c| c.col);
             WeekData {
@@ -179,6 +209,8 @@ pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, capacity: Option<usize>, t: &T
                 more: model(layout.overflow.iter().map(|&n| n as i32).collect()),
                 more_lane: model(layout.overflow_lane.iter().map(|&n| n as i32).collect()),
                 week_no: if c.show_week_numbers { iso_week(&add_days(w, if c.week_start == 0 { 1 } else { 0 })) as i32 } else { 0 },
+                row_y,
+                row_h,
             }
         })
         .collect();

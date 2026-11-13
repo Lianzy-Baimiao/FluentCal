@@ -50,9 +50,9 @@ pub fn weeks(current: &ModelRc<WeekData>, new: Vec<WeekData>, set: impl FnOnce(M
         };
         reconcile(cm, w.cells.iter().collect(), |a, b| a == b);
         reconcile(hm, w.chips.iter().collect(), |a, b| a == b);
-        let same = old.more.iter().eq(w.more.iter()) && old.more_lane.iter().eq(w.more_lane.iter()) && old.week_no == w.week_no;
+        let same = old.more.iter().eq(w.more.iter()) && old.more_lane.iter().eq(w.more_lane.iter()) && old.week_no == w.week_no && old.row_y == w.row_y && old.row_h == w.row_h;
         if !same {
-            m.set_row_data(i, WeekData { cells: old.cells.clone(), chips: old.chips.clone(), more: ints(&w.more), more_lane: ints(&w.more_lane), week_no: w.week_no });
+            m.set_row_data(i, WeekData { cells: old.cells.clone(), chips: old.chips.clone(), more: ints(&w.more), more_lane: ints(&w.more_lane), week_no: w.week_no, row_y: w.row_y, row_h: w.row_h });
         }
     }
     while m.row_count() > n {
@@ -68,6 +68,8 @@ fn own(w: WeekData) -> WeekData {
         more: ints(&w.more),
         more_lane: ints(&w.more_lane),
         week_no: w.week_no,
+        row_y: w.row_y,
+        row_h: w.row_h,
     }
 }
 
