@@ -1,0 +1,320 @@
+// 不定日待办 (GitHub #7): a column left of the month and multi-week views with the to-dos that
+// have no day. Three parts: this month's (once every month, on whichever day; done ones stay,
+// struck through), last month's left open (逾期), and those without any date. Each part ends
+// in a box to add one. Rows have one height; Rust gives them as a flat list.
+
+import { Theme } from "theme.slint";
+import { Glyph, Icon } from "icons.slint";
+import { GText, Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Tip, Overlay } from "overlay.slint";
+import { ChipData, ChipKeys } from "chip.slint";
+
+export struct SideRowData {
+    // "head" (a part's title) | "item" (a to-do) | "add" (the box to add one)
+    kind: string,
+    // "month" | "overdue" | "someday"
+    zone: string,
+    text: string,
+    chip: ChipData,
+    // "逾期" on last month's
+    tag: string,
+}
+
+component SideItem inherits Rectangle {
+    in property <ChipData> chip;
+    in property <string> tag;
+    in property <bool> read-only;
+    callback toggle();
+    callback open();
+    callback menu(length, length);
+    property <float> fs: Theme.desk.fs;
+    property <int> tip-token: -1;
+    border-radius: 4px;
+    background: ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    accessible-role: list-item;
+    accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
+    accessible-description: tag;
+    kfs := FocusScope {
+        focus-on-click: false;
+        key-pressed(e) => {
+            if e.text == Key.Return {
+                root.open();
+                return accept;
+            }
+            if e.text == " " {
+                if !root.read-only { root.toggle(); }
+                return accept;
+            }
+            if e.text == Key.Delete && !root.read-only {
+                ChipKeys.remove(root.chip);
+                return accept;
+            }
+            if e.text == Key.Menu || (e.modifiers.shift && e.text == Key.F10) {
+                ChipKeys.menu(root.chip, root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                return accept;
+            }
+            reject
+        }
+    }
+    ta := TouchArea {
+        changed has-hover => {
+            if self.has-hover {
+                root.tip-token = Tip.enter(chip.tip, root.absolute-position.x, root.absolute-position.y, root.width, root.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
+        double-clicked => { root.open(); }
+        clicked => { if root.read-only { root.open(); } }
+        pointer-event(e) => {
+            if e.button == PointerEventButton.right && e.kind == PointerEventKind.up {
+                root.menu(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.down {
+                Tip.leave(root.tip-token);
+                Overlay.keyboard = false;
+                kfs.focus();
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 5px;
+        alignment: start;
+        cross-axis-alignment: center;
+        check := Rectangle {
+            property <length> s: 12px * fs;
+            width: s;
+            height: s;
+            border-radius: s / 2;
+            border-width: 1px;
+            border-color: chip.check-ring;
+            background: cta.has-hover ? chip.bar.transparentize(0.75) : chip.done ? chip.bar : transparent;
+            if chip.done: Path {
+                x: 1px;
+                y: 1px;
+                width: check.s - 2px;
+                height: check.s - 2px;
+                viewbox-width: 12;
+                viewbox-height: 12;
+                commands: "M2.6 6.2 5 8.5l4.4-4.9";
+                stroke: chip.on-bar;
+                stroke-width: 1.6px * (check.s - 2px) / 12px;
+                fill: transparent;
+            }
+            cta := TouchArea {
+                accessible-role: checkbox;
+                accessible-label: @tr("完成");
+                accessible-checked: chip.done;
+                accessible-action-default => { if !root.read-only { root.toggle(); } }
+                clicked => { if !root.read-only { root.toggle(); } }
+                double-clicked => { }
+            }
+        }
+        title-box := Rectangle {
+            height: root.height;
+            min-width: 0;
+            horizontal-stretch: 1;
+            preferred-width: title.preferred-width;
+            opacity: chip.done ? 0.6 : 1;
+            title := GText {
+                width: parent.width;
+                text: chip.title;
+                font-size: 12px * fs;
+                color: chip.text;
+                overflow: elide;
+            }
+            if chip.done: Rectangle {
+                x: 0;
+                y: round((parent.height / 2 + 0.8px * fs) / 1phx) * 1phx;
+                width: min(parent.width, title.text-width);
+                height: max(1px, round(0.9px * fs / 1phx) * 1phx);
+                background: chip.text;
+            }
+        }
+        if root.tag != "": Rectangle {
+            width: tag-text.preferred-width + 8px;
+            height: 16px * fs;
+            border-radius: 3px;
+            background: Theme.c.critical-bg;
+            tag-text := GText {
+                text: root.tag;
+                font-size: 10px * fs;
+                horizontal-alignment: center;
+                color: Theme.c.critical;
+                glow: false;
+            }
+        }
+    }
+    if kfs.has-focus && Overlay.keyboard: Rectangle {
+        x: 1px;
+        y: 1px;
+        width: root.width - 2px;
+        height: root.height - 2px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: Theme.c.focus-outer;
+    }
+}
+
+// The box that adds a to-do to a part: "＋ 添加" until it is clicked.
+component SideAdd inherits Rectangle {
+    in property <string> zone;
+    in property <bool> read-only;
+    callback add(string);
+    callback wants-keyboard();
+    callback done();
+    property <float> fs: Theme.desk.fs;
+    property <bool> editing;
+    border-radius: 4px;
+    background: editing ? Theme.c.solid-base : ata.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    border-width: editing ? 1px : 0;
+    border-color: Theme.c.control-stroke;
+    accessible-role: button;
+    accessible-label: root.zone == "month" ? @tr("添加每月待办") : @tr("添加无日期待办");
+    accessible-action-default => { if !root.read-only { root.editing = true; } }
+    if !editing: GText {
+        x: 6px;
+        width: parent.width - 12px;
+        height: parent.height;
+        text: @tr("＋ 添加");
+        font-size: 12px * fs;
+        color: Theme.c.text-tertiary;
+        overflow: elide;
+    }
+    ata := TouchArea {
+        enabled: !root.editing && !root.read-only;
+        clicked => { root.editing = true; }
+    }
+    if editing: Rectangle {
+        Rectangle {
+            y: parent.height - 2px;
+            height: 2px;
+            background: Theme.c.accent-fill;
+        }
+        if box.text == "": Text {
+            x: 6px;
+            width: parent.width - 12px;
+            height: parent.height;
+            text: @tr("回车保存");
+            font-size: 12px * fs;
+            color: Theme.c.text-tertiary;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: none;
+        }
+        box := TextInput {
+            x: 6px;
+            width: parent.width - 12px;
+            height: parent.height;
+            font-size: 12px * fs;
+            color: Theme.c.text-primary;
+            selection-background-color: Theme.c.accent-fill;
+            selection-foreground-color: Theme.c.text-on-accent;
+            vertical-alignment: center;
+            single-line: true;
+            accessible-label: root.zone == "month" ? @tr("添加每月待办") : @tr("添加无日期待办");
+            init => { self.focus(); }
+            accepted => {
+                if self.text != "" {
+                    root.add(self.text);
+                    self.text = "";
+                }
+            }
+            key-pressed(e) => {
+                if e.text == Key.Escape {
+                    root.editing = false;
+                    root.done();
+                    return accept;
+                }
+                reject
+            }
+            changed has-focus => {
+                if self.has-focus { root.wants-keyboard(); } else { root.editing = false; }
+            }
+        }
+    }
+}
+
+export component SidePanel inherits Rectangle {
+    in property <[SideRowData]> rows;
+    in property <bool> read-only;
+    callback toggle(ChipData);
+    callback open(ChipData);
+    callback menu(ChipData, length, length);
+    callback add(string, string);
+    callback wants-keyboard();
+    callback leave-focus();
+    callback collapse();
+    property <float> fs: Theme.desk.fs;
+    property <length> rh: round(24 * fs) * 1px;
+    border-radius: Theme.desk.radius;
+    background: Theme.desk.cell-bg;
+    accessible-role: list;
+    accessible-label: @tr("不定日待办");
+    // presses on the column don't reach the calendar's adjust handling below
+    TouchArea { }
+    flick := Flickable {
+        x: 4px;
+        y: 4px;
+        width: root.width - 8px;
+        height: root.height - 8px;
+        content-height: root.rows.length * rh;
+        mouse-drag-pan-enabled: false;
+        for r[i] in root.rows: Rectangle {
+            y: i * rh;
+            width: flick.width;
+            height: rh;
+            if r.kind == "head": Rectangle {
+                GText {
+                    x: 4px;
+                    width: parent.width - (i == 0 ? 30px : 8px);
+                    height: parent.height;
+                    text: r.text;
+                    font-size: 12px * fs;
+                    font-weight: 600;
+                    color: r.zone == "overdue" ? Theme.c.critical : Theme.c.text-secondary;
+                    overflow: elide;
+                }
+                // the line that parts it from the part above
+                if i > 0: Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Theme.c.divider;
+                }
+            }
+            if r.kind == "item": SideItem {
+                y: 1px;
+                height: rh - 2px;
+                chip: r.chip;
+                tag: r.tag;
+                read-only: root.read-only;
+                toggle => { root.toggle(r.chip); }
+                open => { root.open(r.chip); }
+                menu(x, y) => { root.menu(r.chip, x, y); }
+            }
+            if r.kind == "add": SideAdd {
+                y: 1px;
+                height: rh - 2px;
+                zone: r.zone;
+                read-only: root.read-only;
+                add(t) => { root.add(r.zone, t); }
+                wants-keyboard => { root.wants-keyboard(); }
+                done => { root.leave-focus(); }
+            }
+        }
+    }
+    // 收起: at the first title's right
+    Button {
+        x: root.width - self.width - 2px;
+        y: 4px + (rh - self.height) / 2;
+        width: 24px;
+        height: 22px;
+        variant: ButtonVariant.subtle;
+        size: ButtonSize.icon;
+        icon: Glyph.chevron-left;
+        accessible-label: @tr("收起待办栏");
+        tip: self.accessible-label;
+        clicked => { root.collapse(); }
+    }
+}

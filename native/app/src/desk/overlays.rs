@@ -132,7 +132,7 @@ pub fn day_list(doc: &Doc, date: &str, today: &str, t: &Tokens) -> (String, Stri
     let chips = occs
         .into_iter()
         .map(|occ| {
-            let ch = Chip { key: format!("{}@{}", occ.task.id, occ.date), occ, col: 0, span: 1, lane: 0, cont_left: false, cont_right: false, multi_day: false, visible: true };
+            let ch = Chip { multi_day: false, ..Chip::alone(occ) };
             super::vm::chip_data(doc, &ch, today, t)
         })
         .collect();

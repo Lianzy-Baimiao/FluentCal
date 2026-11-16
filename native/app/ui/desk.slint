@@ -10,12 +10,13 @@ import { Overlay, OverlayRoot, Tip, TipLayer, Flyout, DialogHost, DialogBody, Pl
 import { Menu, MenuEntry } from "menu.slint";
 import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
-import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData } from "desk_overlays.slint";
+import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData, ChangesPanel, ChangeRowData } from "desk_overlays.slint";
 import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
+import { SidePanel, SideRowData } from "desk_side.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
 import { Swatch } from "theme.slint";
-export { MenuEntry, SearchHitData }
-export { ChipData, ListRowData }
+export { MenuEntry, SearchHitData, ChangeRowData }
+export { ChipData, ListRowData, SideRowData }
 
 // The day grid has the keyboard (0.2: a focused .cell): the selected day's cell keeps the
 // focus while the arrow keys move the selection (roving tab stop).
@@ -290,8 +291,9 @@ component WeekRow inherits Rectangle {
         menu(x, y) => { root.cell-menu(c.date, x, y); }
     }
     for ch in week.chips: TaskChip {
-        property <length> l: ch.cont-left ? 0 : 2px;
-        property <length> r: ch.cont-right ? 0 : 2px;
+        property <length> l: ch.cont-left || ch.join-left ? 0 : 2px;
+        // joined days meet across the gap between the cells
+        property <length> r: ch.join-right ? -gap : ch.cont-right ? 0 : 2px;
         x: area-x + ch.col * (cell-w + gap) + l;
         y: head-h + ch.lane * lane-h;
         width: ch.span * cell-w + (ch.span - 1) * gap - l - r;
@@ -537,6 +539,7 @@ component TitleBar inherits Rectangle {
     callback go-today();
     callback set-view(string);
     callback search();
+    callback changes();
     callback sync-now();
     callback toggle-lock();
     callback settings();
@@ -549,7 +552,8 @@ component TitleBar inherits Rectangle {
     // 设置 (and 同步) are the first to go when it gets narrow, as in 0.2.
     property <length> room: root.width - 6px - left.preferred-width;
     property <bool> mid: room > 300px;
-    property <bool> wide: room > 300px + 52px + 34px + (root.sync-enabled ? 34px : 0);
+    // 最近更改 comes with them (it is in the ⋯ menu too)
+    property <bool> wide: room > 300px + 52px + 34px + 34px + (root.sync-enabled ? 34px : 0);
     property <float> fs: Theme.desk.fs;
     height: 36px;
     TouchArea {
@@ -669,6 +673,15 @@ component TitleBar inherits Rectangle {
                 tip: self.accessible-label;
                 tip-bottom: true;
                 clicked => { root.search(); }
+            }
+            if wide: Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.delete;
+                accessible-label: @tr("最近更改（可撤销）");
+                tip: self.accessible-label;
+                tip-bottom: true;
+                clicked => { root.changes(); }
             }
             if root.sync-enabled && wide: sync-box := Rectangle {
                 property <bool> spin: root.sync-busy && root.spin-frames.length > 0;
@@ -897,6 +910,21 @@ export component DeskWindow inherits Window {
     callback sync-now();
     callback toggle-lock();
     callback settings();
+    // 不定日待办 (GitHub #7): the column left of the month and multi-week views
+    in property <bool> side-open;
+    in property <[SideRowData]> side-rows;
+    callback side-toggle(ChipData);
+    callback side-open-task(ChipData);
+    callback side-menu(ChipData, length, length);
+    callback side-add(string, string);
+    callback side-set(bool);
+    // 最近更改
+    in property <bool> changes-open;
+    in property <[ChangeRowData]> changes;
+    callback changes-toggle-open();
+    callback changes-close();
+    callback changes-revert(int);
+    callback changes-clear();
     callback more-menu(length, length, length, length);
     callback pick-month(length, length, length, length);
     callback start-move();
@@ -1033,6 +1061,7 @@ export component DeskWindow inherits Window {
                     go-today => { root.go-today(); }
                     set-view(v) => { root.set-view(v); }
                     search => { root.search(); }
+                    changes => { root.changes-toggle-open(); }
                     sync-now => { root.sync-now(); }
                     toggle-lock => { root.toggle-lock(); }
                     settings => { root.settings(); }
@@ -1066,8 +1095,26 @@ export component DeskWindow inherits Window {
                 }
                 body := Rectangle {
                 vertical-stretch: 1;
+                property <bool> grid-view: root.view != "gantt" && root.view != "list";
+                property <bool> side-shown: grid-view && root.side-open;
+                property <length> side-w: side-shown ? min(200px * Theme.desk.fs, self.width * 0.32) : 0;
+                if body.side-shown: SidePanel {
+                    x: 0;
+                    width: body.side-w;
+                    rows: root.side-rows;
+                    read-only: root.read-only;
+                    toggle(c) => { root.side-toggle(c); }
+                    open(c) => { root.side-open-task(c); }
+                    menu(c, x, y) => { root.side-menu(c, x, y); }
+                    add(z, t) => { root.side-add(z, t); }
+                    wants-keyboard => { root.wants-keyboard(); }
+                    leave-focus => { root.focus-root(); }
+                    collapse => { root.side-set(false); }
+                }
                 month := MonthView {
-                    visible: root.view != "gantt" && root.view != "list";
+                    x: body.side-shown ? body.side-w + Theme.desk.cell-gap + 2px : 0;
+                    width: parent.width - self.x;
+                    visible: body.grid-view;
                     weeks: root.weeks;
                     heads: root.heads;
                     show-week-no: root.show-week-no;
@@ -1096,6 +1143,19 @@ export component DeskWindow inherits Window {
                     changed grid-h => { root.capacity-changed(self.capacity); }
                     changed lane-top => { root.capacity-changed(self.capacity); }
                     changed lane-h => { root.capacity-changed(self.capacity); }
+                }
+                // the handle that opens the column, at the left of the weekday row
+                if body.grid-view && !root.side-open: Button {
+                    x: 0;
+                    y: 0;
+                    width: 16px;
+                    height: 20px;
+                    variant: ButtonVariant.subtle;
+                    size: ButtonSize.icon;
+                    icon: Glyph.chevron-right;
+                    accessible-label: @tr("展开待办栏（不定日待办）");
+                    tip: self.accessible-label;
+                    clicked => { root.side-set(true); }
                 }
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {
@@ -1140,6 +1200,17 @@ export component DeskWindow inherits Window {
             if !root.locked: Grip { x: 0; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthWest"; mouse-cursor: nesw-resize; resize(e) => { root.start-resize(e); } }
             if !root.locked: Grip { x: 0; y: 0; width: 16px; height: 16px; edge: "NorthWest"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
             if !root.locked: Grip { x: parent.width - 16px; y: parent.height - 16px; width: 16px; height: 16px; edge: "SouthEast"; mouse-cursor: nwse-resize; resize(e) => { root.start-resize(e); } }
+            if root.changes-open: ChangesPanel {
+                property <length> w: min(360px, parent.width - 16px);
+                x: parent.width - 8px - w;
+                y: 44px;
+                width: w;
+                max-h: parent.height - 56px;
+                rows: root.changes;
+                revert(id) => { root.changes-revert(id); }
+                clear => { root.changes-clear(); }
+                close => { root.changes-close(); }
+            }
             if root.search-open: SearchPanel {
                 property <length> w: min(360px, parent.width - 16px);
                 x: parent.width - 8px - w;

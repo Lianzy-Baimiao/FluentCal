@@ -128,7 +128,7 @@ pub fn tick(app: &mut App) {
 pub fn auto_postpone(app: &mut App) {
     let today = app.today();
     let edit = fluentcal_core::tasks::auto_postpone(&app.doc, &today, now_ms());
-    app.apply(edit, false);
+    app.apply_quiet(edit, false);
 }
 
 /// Statutory holidays for this and next year, at most every three days unless forced. The

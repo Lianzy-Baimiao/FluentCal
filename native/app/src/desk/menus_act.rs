@@ -26,7 +26,7 @@ impl App {
         let now = now_ms();
         let edit = match id {
             "done" => {
-                let done = occurrence_on(&t, date).map_or(t.done, |o| o.done);
+                let done = if fluentcal_core::flex::is_slot(date) { fluentcal_core::flex::slot_done(&t, date).is_some() } else { occurrence_on(&t, date).map_or(t.done, |o| o.done) };
                 Some(tasks::set_occurrence_done(&self.doc, &t, date, !done, now))
             }
             "duplicate" => Some(tasks::duplicate_task(&self.doc, &t, now).0),
@@ -71,6 +71,11 @@ impl App {
         match id {
             "new" => self.open_editor_new(None),
             "search" => self.desk_search(),
+            "changes" => self.desk_changes(),
+            "sidebar" => {
+                let v = !self.doc.settings.calendar.sidebar;
+                self.desk_side_set(v);
+            }
             "syncNow" => self.cloud.request(),
             "browser" => self.open_in_browser(),
             "showCompleted" => {

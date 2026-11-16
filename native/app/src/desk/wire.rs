@@ -31,6 +31,15 @@ pub fn wire(w: &DeskWindow) {
     w.on_more(|d, x, y, bw, bh| run(move |a| a.desk_day_list(&d, (x, y, bw, bh))));
     w.on_wheel(|dy, ctrl| run(move |a| a.desk_wheel(dy, ctrl)));
     w.on_search(|| run(|a| a.desk_search()));
+    w.on_side_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
+    w.on_side_open_task(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
+    w.on_side_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
+    w.on_side_add(|z, t| run(move |a| a.desk_side_add(&z, &t)));
+    w.on_side_set(|on| run(move |a| a.desk_side_set(on)));
+    w.on_changes_toggle_open(|| run(|a| a.desk_changes()));
+    w.on_changes_close(|| run(|a| a.desk_changes_close()));
+    w.on_changes_revert(|id| run(move |a| a.desk_changes_toggle(id)));
+    w.on_changes_clear(|| run(|a| a.desk_changes_clear()));
     w.on_sync_now(|| run(|a| a.cloud.request()));
     w.on_toggle_lock(|| run(|a| a.desk_toggle_lock()));
     w.on_settings(|| run(|a| a.open_settings(None)));

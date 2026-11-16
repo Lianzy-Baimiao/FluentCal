@@ -184,9 +184,18 @@ pub fn delete_task(doc: &Doc, id: &str, now_ms: i64) -> Edit {
     e
 }
 
+/// `date`: the occurrence; for a to-do without a day (flex.rs) its slot (done today), or the
+/// day it was done (to untick it there).
 pub fn set_occurrence_done(doc: &Doc, t: &Task, date: &str, done: bool, now_ms: i64) -> Edit {
     let mut t = t.clone();
-    if t.repeat.is_some() {
+    if crate::flex::is_flex(&t) {
+        if crate::flex::is_slot(date) {
+            let today = crate::date::today();
+            crate::flex::set_slot(&mut t, date, done.then_some(today.as_str()));
+        } else if !done {
+            crate::flex::clear_day(&mut t, date);
+        }
+    } else if t.repeat.is_some() {
         let mut set: BTreeSet<String> = t.done_dates.take().unwrap_or_default().into_iter().collect();
         if done {
             set.insert(date.to_owned());
@@ -228,6 +237,12 @@ pub fn move_task(doc: &Doc, t: &Task, start: &str, now_ms: i64) -> Edit {
 /// the series and a standalone copy is created on the new date.
 pub fn move_occurrence(doc: &Doc, occ: &Occurrence, start: &str, now_ms: i64) -> Edit {
     let t = occ.task;
+    if crate::flex::is_flex(t) {
+        // the day it was done
+        let mut t = t.clone();
+        crate::flex::move_day(&mut t, &occ.date, start);
+        return save_task(doc, t, now_ms);
+    }
     if t.repeat.is_none() {
         return move_task(doc, t, start, now_ms);
     }
@@ -291,7 +306,7 @@ pub fn duplicate_task(doc: &Doc, t: &Task, now_ms: i64) -> (Edit, Task) {
 pub fn auto_postpone(doc: &Doc, now: &str, now_ms: i64) -> Edit {
     let mut e = Edit::default();
     for t in doc.tasks.values() {
-        if t.done || t.repeat.is_some() || t.start != task_end(t) {
+        if t.done || t.repeat.is_some() || t.flex.is_some() || t.start != task_end(t) {
             continue;
         }
         if !t.auto_postpone.unwrap_or(doc.settings.tasks.auto_postpone) {

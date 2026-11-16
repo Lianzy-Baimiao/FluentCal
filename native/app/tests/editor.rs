@@ -280,3 +280,26 @@ fn a_task_deleted_elsewhere() {
     assert!(t.editor().is_none());
     assert_eq!(t.task("a").unwrap()["title"], "周报初稿");
 }
+
+/// GitHub #10: the progress slider's thumb follows the mouse from the first press on (the
+/// title has the focus then), also when the hand drifts up or down on the way (the form
+/// scrolls with the wheel; a drag must not pan it).
+#[test]
+fn progress_slider_follows_a_drag() {
+    let t = start("slider", &[json!({ "id": "a", "title": "长任务", "start": "2026-11-10", "end": "2026-11-20" })]);
+    let w = t.open(|a| a.open_editor_task("a", None));
+    let s = ElementHandle::find_by_element_type_name(&w, "Slider").next().expect("the progress slider");
+    let (p, size) = (s.absolute_position(), s.size());
+    let at = |dx: f32, dy: f32| LogicalPosition::new(p.x + 1.0 + dx, p.y + size.height / 2.0 + dy);
+    let button = PointerEventButton::Left;
+    w.window().dispatch_event(WindowEvent::PointerMoved { position: at(0.0, 0.0) });
+    w.window().dispatch_event(WindowEvent::PointerPressed { position: at(0.0, 0.0), button });
+    for i in 1..=9 {
+        wait(10);
+        w.window().dispatch_event(WindowEvent::PointerMoved { position: at(i as f32 * 10.0, i as f32 * 1.5) });
+    }
+    w.window().dispatch_event(WindowEvent::PointerReleased { position: at(90.0, 13.5), button });
+    settle();
+    t.ctrl(&w, "s");
+    assert_eq!(t.task("a").unwrap()["progress"], 50);
+}

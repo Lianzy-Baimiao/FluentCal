@@ -166,6 +166,10 @@ pub fn to_ics(tasks: &[Task], groups: &BTreeMap<String, Group>, now: &str, now_m
     let mut lines: Vec<String> =
         ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//FluentCal//Desktop Calendar//ZH", "CALSCALE:GREGORIAN", "X-WR-CALNAME:FluentCal"].map(String::from).into();
     for t in tasks {
+        // no day, no event
+        if t.flex.is_some() {
+            continue;
+        }
         let g = t.group_id.as_ref().and_then(|g| groups.get(g)).map(|g| g.name.as_str());
         if t.repeat.is_none() {
             lines.extend(event_lines(t, "", &t.start, task_end(t), g, None, now_ms));

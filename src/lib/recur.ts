@@ -108,13 +108,35 @@ function* starts(rule: RepeatRule, start: ISODate, from: ISODate): Generator<ISO
 }
 
 /** Expands a task into occurrences overlapping [rangeStart, rangeEnd] (inclusive). */
+/**
+ * 每天 (每隔 N 天, the working-day rules) on a task that runs from a start to an end date means
+ * once a day over those days (GitHub #12): each occurrence is one day and the series stops on
+ * the end date. Returns that end date.
+ */
+export function dailyRangeEnd(task: Task): ISODate | undefined {
+  const rule = task.repeat;
+  if (!rule) return undefined;
+  const every =
+    rule.freq === "daily" ? Math.max(1, rule.interval ?? 1) : rule.freq === "workday" || rule.freq === "legalWorkday" ? 1 : 0;
+  if (!every) return undefined;
+  const end = task.end < task.start ? task.start : task.end;
+  return diffDays(task.start, end) >= every ? end : undefined;
+}
+
 export function occurrences(task: Task, rangeStart: ISODate, rangeEnd: ISODate, limit = 400): Occurrence[] {
+  // a to-do without a day (GitHub #7) is on the calendar where it was done
+  if (task.flex === "month" || task.flex === "someday") {
+    const days = [...new Set(Object.values(task.flexDone ?? {}))].filter((d) => d >= rangeStart && d <= rangeEnd).sort();
+    return days.map((d) => ({ task, date: d, start: d, end: d, done: true }));
+  }
   const rule = task.repeat;
   if (!rule) {
     if (task.end < rangeStart || task.start > rangeEnd) return [];
     return [{ task, date: task.start, start: task.start, end: task.end, done: task.done }];
   }
-  const span = Math.max(0, diffDays(task.start, task.end));
+  const range = dailyRangeEnd(task);
+  const span = range ? 0 : Math.max(0, diffDays(task.start, task.end));
+  const rangeUntil = rule.count === undefined ? range : undefined;
   const from = addDays(rangeStart, -span);
   const ex = new Set(task.exDates ?? []);
   const done = new Set(task.doneDates ?? []);
@@ -125,6 +147,7 @@ export function occurrences(task: Task, rangeStart: ISODate, rangeEnd: ISODate, 
     if (++steps > MAX_STEPS) break;
     if (s < task.start) continue;
     if (rule.until && s > rule.until) break;
+    if (rangeUntil && s > rangeUntil) break;
     if (s > rangeEnd) break;
     n++;
     if (rule.count !== undefined && n > rule.count) break;

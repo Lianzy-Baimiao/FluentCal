@@ -137,6 +137,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         style,
         desk: DeskLive::new(w, ui),
         history: Default::default(),
+        changes: fluentcal_core::changelog::ChangeLog::new(Some(local.join("changes.json"))),
         reminders,
         local_dir: local,
         data_dir,
@@ -280,7 +281,7 @@ fn seed_if_first_run(app: &mut App) {
         let mut edit = Edit::default();
         groups.iter().for_each(|g| edit.put("groups", &g.id, g.to_value()));
         tasks.iter().for_each(|t| edit.put_task(t));
-        app.apply(edit, false);
+        app.apply_quiet(edit, false);
     }
     app.patch_settings(serde_json::json!({ "general": { "seeded": true } }));
 }

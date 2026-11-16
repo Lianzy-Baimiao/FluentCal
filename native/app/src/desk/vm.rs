@@ -7,7 +7,7 @@ use crate::theme::color;
 use crate::{CellData, ChipData, CountdownData, ListRowData, WeekData, WeekdayHead};
 use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub};
 use fluentcal_core::countdown::countdowns;
-use fluentcal_core::date::{add_days, add_months, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
+use fluentcal_core::date::{add_days, add_months, diff_days, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
 use fluentcal_core::lunar::{almanac, display_info as day_info, Kind};
 use fluentcal_core::model::Task;
 use fluentcal_core::recur::{describe_rule, occurrences, Occurrence};
@@ -309,7 +309,8 @@ pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRo
 /// time, and the dates, rule (所有) and group after the title.
 fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> ListRowData {
     let task = o.task;
-    let ch = Chip { key: format!("{}@{}", task.id, o.date), occ: o.clone(), col: 0, span: 1, lane: 0, cont_left: false, cont_right: false, multi_day: o.start != o.end, visible: true };
+    let ch = Chip::alone(o.clone());
+    let (due, due_kind) = due_label(o, all, today);
     let mut meta = Vec::new();
     if o.start != o.end {
         meta.push(format_range(&o.start, &o.end, today));
@@ -327,11 +328,93 @@ fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> L
         meta: meta.join(" · ").into(),
         // 所有 shows a repeating task for its whole series
         checkable: !(all && task.repeat.is_some()),
+        due: due.into(),
+        due_kind: due_kind.into(),
         ..Default::default()
     }
 }
 
+/// The column of to-dos without a day (GitHub #7): a flat list of titles, to-dos and add boxes.
+pub fn side_rows(doc: &Doc, today: &str, t: &Tokens) -> Vec<crate::SideRowData> {
+    use fluentcal_core::flex;
+    let s = flex::side(doc.tasks.values(), today);
+    let show_done = doc.settings.tasks.show_completed;
+    let head = |zone: &str, text: String| crate::SideRowData { kind: "head".into(), zone: zone.into(), text: text.into(), ..Default::default() };
+    let add = |zone: &str| crate::SideRowData { kind: "add".into(), zone: zone.into(), ..Default::default() };
+    let item = |zone: &str, task: &Task, slot: &str, done: bool, tag: &str| {
+        let occ = Occurrence { task, date: slot.to_owned(), start: today.to_owned(), end: today.to_owned(), done };
+        let mut chip = chip_data(doc, &Chip::alone(occ), today, t);
+        let mut tip = vec![task.title.clone(), flex::describe(task).to_owned()];
+        if let Some(d) = flex::slot_done(task, slot) {
+            tip.push(trf("完成于 {0}", &[format_friendly(d, today)]));
+        }
+        if let Some(n) = task.notes.as_deref().filter(|n| !n.is_empty()) {
+            tip.push(n.chars().take(120).collect());
+        }
+        chip.tip = tip.join("\n").into();
+        crate::SideRowData { kind: "item".into(), zone: zone.into(), chip, tag: tag.into(), ..Default::default() }
+    };
+    let (_, m, _) = parts(today);
+    let mut rows = vec![head("month", trf("本 {0} 月待办（不定日）", &[m.to_string()]))];
+    rows.extend(s.month.iter().filter(|(_, d)| show_done || d.is_none()).map(|(task, d)| item("month", task, &s.month_slot, d.is_some(), "")));
+    rows.push(add("month"));
+    if !s.overdue.is_empty() {
+        rows.push(head("overdue", tr("上月逾期").into()));
+        rows.extend(s.overdue.iter().map(|task| item("overdue", task, &s.overdue_slot, false, tr("逾期"))));
+    }
+    rows.push(head("someday", tr("无日期待办").into()));
+    rows.extend(s.someday.iter().map(|task| item("someday", task, flex::SOMEDAY_SLOT, false, "")));
+    rows.push(add("someday"));
+    rows
+}
+
+/// What stands at the right of a task in the list (GitHub #9): how far away it is, and whether
+/// it is late. "今天", "3 天后", "还剩 2 天" (a running task, to its end), "5 天前" (done, or a
+/// past day of a series), "逾期 5 天" (past its end and not done). The kind: "" | "today" |
+/// "overdue". 所有 shows a repeating task for its series: the next time it comes.
+pub fn due_label(o: &Occurrence, all: bool, today: &str) -> (String, &'static str) {
+    let series = all && o.task.repeat.is_some();
+    let (start, end) = if series {
+        match fluentcal_core::recur::next_occurrence(o.task, today) {
+            Some(d) => (d.clone(), d),
+            None => return (String::new(), ""),
+        }
+    } else {
+        (o.start.clone(), o.end.clone())
+    };
+    let (to_start, to_end) = (diff_days(today, &start), diff_days(today, &end));
+    if to_start > 0 {
+        return (if to_start == 1 { tr("明天").into() } else { trf("{0} 天后", &[to_start.to_string()]) }, "");
+    }
+    if to_end < 0 {
+        let n = (-to_end).to_string();
+        return if o.done { (trf("{0} 天前", &[n]), "") } else { (trf("逾期 {0} 天", &[n]), "overdue") };
+    }
+    if o.done {
+        return (String::new(), "");
+    }
+    if to_end == 0 {
+        return (tr("今天").into(), "today");
+    }
+    (trf("还剩 {0} 天", &[to_end.to_string()]), "")
+}
+
+/// A bar's progress (GitHub #10): "40%" after the title, and how much of this piece of the bar
+/// is done (0–1, from its left). Tasks with a progress: several days, not repeating, not done.
+fn bar_progress(ch: &Chip) -> (String, f32) {
+    let task = ch.occ.task;
+    if !ch.multi_day || task.repeat.is_some() || task.is_milestone() || task.done || task.progress <= 0.0 {
+        return (String::new(), 0.0);
+    }
+    let total = (diff_days(&ch.occ.start, &ch.occ.end) + 1).max(1) as f64;
+    let done_days = total * task.progress.clamp(0.0, 100.0) / 100.0;
+    let before = diff_days(&ch.occ.start, &ch.seg_start).max(0) as f64;
+    let fill = ((done_days - before) / ch.seg_days.max(1) as f64).clamp(0.0, 1.0);
+    (format!("{}%", task.progress), fill as f32)
+}
+
 pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
+    let (pct, fill) = bar_progress(ch);
     let task = ch.occ.task;
     let col = task_color(task.color.as_deref(), t);
     let mut tip = vec![task.title.clone(), format_range(&ch.occ.start, &ch.occ.end, today) + &task.time.as_deref().map_or(String::new(), |tm| format!(" {tm}"))];
@@ -369,5 +452,10 @@ pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
         bar_hover: color(col.bar.mix(0.88, t.text_primary)),
         check_ring: color(col.bar.mix(0.7, t.text_secondary)),
         tip: SharedString::from(tip.join("\n")),
+        linked: ch.linked,
+        join_left: ch.join_left,
+        join_right: ch.join_right,
+        pct: pct.into(),
+        fill,
     }
 }

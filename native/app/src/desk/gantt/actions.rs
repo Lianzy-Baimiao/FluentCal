@@ -63,7 +63,15 @@ impl App {
     pub fn gantt_row_check(&mut self, r: &GRow) {
         self.history.boundary();
         let Some(t) = self.doc.tasks.get(r.id.as_str()).cloned() else { return };
-        let edit = tasks::set_occurrence_done(&self.doc, &t, &t.start, !t.done, now_ms());
+        use fluentcal_core::flex;
+        let edit = match flex::kind(&t) {
+            // this month's turn / the to-do itself
+            Some(k) => {
+                let slot = if k == flex::MONTH { flex::month_slot(&self.today()) } else { flex::SOMEDAY_SLOT.to_owned() };
+                tasks::set_occurrence_done(&self.doc, &t, &slot, flex::slot_done(&t, &slot).is_none(), now_ms())
+            }
+            None => tasks::set_occurrence_done(&self.doc, &t, &t.start, !t.done, now_ms()),
+        };
         self.apply(edit, true);
     }
 

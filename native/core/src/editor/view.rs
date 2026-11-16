@@ -38,6 +38,8 @@ pub struct View {
     /// "共 5 天 · 农历九月初三" (EditorApp spanText).
     pub span: String,
     pub show_progress: bool,
+    /// A to-do without a day: what it is instead of dates ("每月一次（不定日）"); "" otherwise.
+    pub flex: String,
     pub show_postpone: bool,
     pub postpone: bool,
     /// RepeatEditor: the frequency ("" = none), "每 N <unit>" ("" = no interval).
@@ -114,8 +116,9 @@ impl Editor {
         groups.push(opt("__new__", tr("新建分组…")));
         View {
             span: trf("{0}农历{1}", &[format!("{}", if t.is_milestone() || n == 1 { String::new() } else { trf("共 {0} 天 · ", &[n.to_string()]) }), format!("{}", lunar)]),
-            show_progress: rule.is_none(),
-            show_postpone: rule.is_none() && t.start == t.end,
+            show_progress: rule.is_none() && t.flex.is_none(),
+            show_postpone: rule.is_none() && t.start == t.end && t.flex.is_none(),
+            flex: crate::flex::describe(t).to_owned(),
             postpone: t.auto_postpone.unwrap_or(doc.settings.tasks.auto_postpone),
             freq: super::choice_of(rule),
             interval: rule.and_then(|r| r.interval).unwrap_or(1),

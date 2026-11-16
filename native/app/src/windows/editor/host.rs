@@ -127,6 +127,7 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
         group: d.group_id.clone().unwrap_or_default().into(),
         color: d.color.clone().unwrap_or_default().into(),
         show_progress: v.show_progress,
+        flex: v.flex.into(),
         progress: d.progress as f32,
         done: d.done,
         countdown: d.countdown == Some(true),

@@ -64,7 +64,9 @@ pub fn compute_reminders(tasks: &[Task], now_ms: i64, all_day_time: &str, horizo
         let until = local_of_ms(now_ms + horizon_ms + max_offset * 60_000, offset_min).0;
         let time = t.time.as_deref().filter(|s| !s.is_empty()).unwrap_or(if all_day_time.is_empty() { "09:00" } else { all_day_time });
         let Some(minute) = hhmm(time) else { continue };
-        for o in occurrences(t, &from, &until, 200) {
+        // a monthly to-do without a day is reminded before the month ends
+        let occs = if crate::flex::is_flex(t) { crate::flex::due_occurrences(t, &from, &until) } else { occurrences(t, &from, &until, 200) };
+        for o in occs {
             if o.done {
                 continue;
             }

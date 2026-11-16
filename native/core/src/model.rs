@@ -103,6 +103,13 @@ pub struct Task {
     pub countdown: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_postpone: Option<bool>,
+    /// 不定日待办 (GitHub #7, flex.rs): "month" = once every month on whichever day,
+    /// "someday" = no date at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flex: Option<String>,
+    /// Flex tasks: the day each slot was done ("2026-11" → "2026-11-20"; "" for someday).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flex_done: Option<std::collections::BTreeMap<String, String>>,
     /// First-run sample data; dropped once the user renames it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sample: Option<bool>,

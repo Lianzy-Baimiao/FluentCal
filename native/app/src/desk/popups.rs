@@ -36,6 +36,7 @@ pub struct Popups {
     /// The day the "+N" list shows.
     pub day_list: Option<String>,
     pub search_open: bool,
+    pub changes_open: bool,
     /// The warning bar (data folder missing, data file repaired).
     pub notice: String,
 }
@@ -220,12 +221,72 @@ impl App {
         self.desk_refresh_view();
     }
 
+    // ------------------------------------------------------------- 最近更改 (GitHub #11)
+
+    /// The title bar's button: opens or closes the panel (and closes the search panel, which
+    /// has the same place).
+    pub fn desk_changes(&mut self) {
+        if self.desk.popups.changes_open {
+            return self.desk_changes_close();
+        }
+        if self.desk.popups.search_open {
+            self.desk_search_close();
+        }
+        self.desk.popups.changes_open = true;
+        self.desk.window.set_changes_open(true);
+        self.desk_changes_refresh();
+    }
+
+    pub fn desk_changes_refresh(&mut self) {
+        if !self.desk.popups.changes_open {
+            return;
+        }
+        let (now, off) = (now_ms(), fluentcal_core::date::utc_offset_minutes());
+        let rows: Vec<crate::ChangeRowData> = self
+            .changes
+            .list()
+            .into_iter()
+            .map(|c| crate::ChangeRowData { id: c.id as i32, text: c.text().into(), when: fluentcal_core::changelog::when_text(c.at, now, off).into(), undone: c.undone })
+            .collect();
+        self.desk.window.set_changes(slint::ModelRc::new(slint::VecModel::from(rows)));
+    }
+
+    pub fn desk_changes_close(&mut self) {
+        self.desk.popups.changes_open = false;
+        self.desk.window.set_changes_open(false);
+    }
+
+    /// 撤销 / 恢复 of one change.
+    pub fn desk_changes_toggle(&mut self, id: i32) {
+        self.history.boundary();
+        let doc = &self.doc;
+        let Some(r) = self.changes.toggle(id as u64, |c, i| doc.raw(c, i)) else { return };
+        if r.edit.is_empty() {
+            self.notify(fluentcal_core::i18n::tr("这项更改之后又有改动，无法撤销"), false);
+        } else {
+            let skipped = r.skipped;
+            self.apply_quiet(r.edit, true);
+            if skipped > 0 {
+                self.notify(&trf("{0} 项之后又有改动，保持不变", &[skipped.to_string()]), false);
+            }
+        }
+        self.desk_changes_refresh();
+    }
+
+    pub fn desk_changes_clear(&mut self) {
+        self.changes.clear();
+        self.desk_changes_refresh();
+    }
+
     // ------------------------------------------------------------- search
 
     /// Ctrl+F / the title bar's search button: opens or closes the panel.
     pub fn desk_search(&mut self) {
         if self.desk.popups.search_open {
             return self.desk_search_close();
+        }
+        if self.desk.popups.changes_open {
+            self.desk_changes_close();
         }
         self.desk.popups.search_open = true;
         let w = &self.desk.window;

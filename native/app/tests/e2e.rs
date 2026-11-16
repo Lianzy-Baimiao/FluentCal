@@ -1083,3 +1083,148 @@ fn rows_follow_their_tasks() {
     assert!(ws.iter().all(|w| w.row_h == 0.0), "equal rows again");
     assert!(ws[row_of(&ws, busy)].more.iter().any(|m| m > 0));
 }
+
+/// GitHub #9, #10, #12: what the list shows at the right of a task; a bar's progress; 每天 from
+/// a start to an end date as joined days in one lane.
+#[test]
+fn due_labels_bar_progress_and_day_series() {
+    use fluentcal_core::date::{add_days, start_of_week};
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let monday = start_of_week(&today, 1);
+    let tasks = [
+        json!({ "id": "late", "title": "交报告", "start": add_days(&today, -5) }),
+        json!({ "id": "past", "title": "体检", "start": add_days(&today, -3), "done": true, "progress": 100 }),
+        json!({ "id": "now", "title": "交房租", "start": today }),
+        json!({ "id": "soon", "title": "开会", "start": add_days(&today, 3) }),
+        json!({ "id": "run", "title": "装修", "start": add_days(&today, -2), "end": add_days(&today, 2) }),
+        json!({ "id": "bar", "title": "项目", "start": monday, "end": add_days(&monday, 3), "progress": 50 }),
+        json!({ "id": "sign", "title": "签到", "start": monday, "end": add_days(&monday, 4), "repeat": { "freq": "daily", "interval": 1 } }),
+    ];
+    let t = start("due", Some(doc_with(&tasks, json!({ "calendar": { "weekStart": 1, "fitRows": true }, "tasks": { "autoPostpone": false } }))));
+    // month view: the bar, half done; the series, five joined days in one lane
+    let chips: Vec<_> = t.w.get_weeks().iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).collect();
+    let bar = chips.iter().find(|c| c.title == "项目").unwrap();
+    assert_eq!((bar.pct.as_str(), bar.fill), ("50%", 0.5));
+    let sign: Vec<_> = chips.iter().filter(|c| c.title == "签到").collect();
+    assert_eq!(sign.len(), 5, "once a day, Monday to Friday");
+    assert!(sign.iter().all(|c| c.linked && c.span == 1 && c.lane == sign[0].lane && !c.multi_day));
+    assert!(!sign[0].join_left && sign[0].join_right && sign[4].join_left && !sign[4].join_right);
+    // each day has its own check box
+    let el = ElementHandle::find_by_accessible_label(&t.w, "签到").filter(|e| e.accessible_role() == Some(R::Groupbox)).nth(1).unwrap();
+    t.click_at(t.at(&el, 9.0, el.size().height / 2.0));
+    assert_eq!(t.task("签到")["doneDates"], json!([add_days(&monday, 1)]));
+
+    // the list
+    let tab = |t: &T, label: &str| {
+        let e = ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::Tab)).unwrap_or_else(|| panic!("no tab {label:?}"));
+        let s = e.size();
+        t.click_at(t.at(&e, s.width / 2.0, s.height / 2.0));
+    };
+    tab(&t, "列表");
+    tab(&t, "所有");
+    let due = |t: &T, title: &str| {
+        let r = t.w.get_list_rows().iter().find(|r| r.kind == "item" && r.chip.title == title).unwrap_or_else(|| panic!("no row {title:?}"));
+        (r.due.to_string(), r.due_kind.to_string())
+    };
+    assert_eq!(due(&t, "交报告"), ("逾期 5 天".to_owned(), "overdue".to_owned()));
+    assert_eq!(due(&t, "体检"), ("3 天前".to_owned(), String::new()));
+    assert_eq!(due(&t, "交房租"), ("今天".to_owned(), "today".to_owned()));
+    assert_eq!(due(&t, "开会"), ("3 天后".to_owned(), String::new()));
+    assert_eq!(due(&t, "装修"), ("还剩 2 天".to_owned(), String::new()));
+    let row = ElementHandle::find_by_accessible_label(&t.w, "交房租").find(|e| e.accessible_role() == Some(R::ListItem)).unwrap();
+    assert!(row.accessible_description().is_some_and(|d| d.ends_with("今天")));
+    tab(&t, "近期");
+    tab(&t, "月");
+}
+
+/// GitHub #11: 最近更改 lists what was added, changed and deleted; a change is taken back
+/// there long after its toast is gone (also after a restart: it is kept in a file), and can be
+/// done again.
+#[test]
+fn recent_changes_can_be_taken_back() {
+    let today = fluentcal_core::date::today();
+    let tasks = [json!({ "id": "a", "title": "周报", "start": today }), json!({ "id": "b", "title": "买菜", "start": today })];
+    let t = start("changes", Some(doc_with(&tasks, json!({}))));
+    with(|a| {
+        let task = a.doc.tasks["a"].clone();
+        a.desk_remove_task(&task, None);
+        let b = a.doc.tasks["b"].clone();
+        let edit = fluentcal_core::tasks::set_occurrence_done(&a.doc, &b, &b.start, true, 5);
+        a.apply(edit, true);
+        a.desk_close_toast();
+    })
+    .unwrap();
+    settle();
+    assert!(t.tasks().iter().all(|x| x["title"] != "周报"));
+    t.click("最近更改（可撤销）");
+    let rows: Vec<String> = t.w.get_changes().iter().map(|r| r.text.to_string()).collect();
+    assert_eq!(rows, ["完成“买菜”", "删除“周报”"]);
+    // the older change first: the newer one stays
+    t.click("撤销 删除“周报”");
+    assert_eq!(t.task("周报")["start"], json!(today));
+    assert_eq!(t.task("买菜")["done"], json!(true));
+    assert!(t.w.get_changes().iter().any(|r| r.undone && r.text == "删除“周报”"));
+    t.click("恢复 删除“周报”");
+    assert!(t.tasks().iter().all(|x| x["title"] != "周报"));
+    // kept in this PC's folder
+    let file = with(|a| a.local_dir.join("changes.json")).unwrap();
+    let saved: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
+    assert_eq!(saved.as_array().unwrap().len(), 2);
+    // a change that was changed again since can't be taken back
+    with(|a| {
+        let b = a.doc.tasks["b"].clone();
+        let edit = fluentcal_core::tasks::save_task(&a.doc, fluentcal_core::model::Task { title: "买水果".into(), ..b }, 9);
+        a.apply_quiet(edit, false);
+    })
+    .unwrap();
+    settle();
+    t.click("撤销 完成“买菜”");
+    assert_eq!(t.task("买水果")["done"], json!(true));
+    t.click("清空记录");
+    assert_eq!(t.w.get_changes().row_count(), 0);
+    t.click("关闭");
+    assert!(!t.w.get_changes_open());
+}
+
+/// GitHub #7: the column of to-dos without a day. Opened from its handle; a monthly to-do is
+/// added, ticked (the calendar shows it done today), unticked from the calendar; last month's
+/// open one is marked 逾期; one without a date leaves the column when done.
+#[test]
+fn todo_column_without_days() {
+    use fluentcal_core::date::{add_months, start_of_month};
+    let today = fluentcal_core::date::today();
+    let last = add_months(&start_of_month(&today), -1);
+    let tasks = [json!({ "id": "old", "title": "交物业费", "start": last, "flex": "month" }), json!({ "id": "idea", "title": "整理相册", "start": last, "flex": "someday" })];
+    let t = start("side", Some(doc_with(&tasks, json!({ "calendar": { "fitRows": true } }))));
+    assert!(!t.w.get_side_open() && !t.has("交物业费"));
+    t.click("展开待办栏（不定日待办）");
+    assert!(with(|a| a.doc.settings.calendar.sidebar).unwrap());
+    let rows = |t: &T| t.w.get_side_rows().iter().map(|r| format!("{}:{}:{}{}", r.kind, r.zone, if r.kind == "item" { r.chip.title.to_string() } else { String::new() }, r.tag)).collect::<Vec<_>>();
+    assert_eq!(rows(&t), ["head:month:", "item:month:交物业费", "add:month:", "head:overdue:", "item:overdue:交物业费逾期", "head:someday:", "item:someday:整理相册", "add:someday:"]);
+    // add a monthly one
+    t.click("添加每月待办");
+    t.type_text("洗车");
+    t.key(&slint::SharedString::from(Key::Return));
+    t.key(&slint::SharedString::from(Key::Escape));
+    let car = t.task("洗车");
+    assert_eq!((car["flex"].as_str(), car["start"].as_str()), (Some("month"), Some(start_of_month(&today).as_str())));
+    // tick it: done today, on the calendar too
+    let item = |t: &T, label: &str, n: usize| ElementHandle::find_by_accessible_label(&t.w, label).filter(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::ListItem)).nth(n).unwrap_or_else(|| panic!("no {label:?}"));
+    let row = item(&t, "洗车", 0);
+    t.click_at(t.at(&row, 10.0, row.size().height / 2.0));
+    assert_eq!(t.task("洗车")["flexDone"][&today[..7]], json!(today));
+    let chips: Vec<_> = t.w.get_weeks().iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).filter(|c| c.title == "洗车").collect();
+    assert!(chips.len() == 1 && chips[0].done && chips[0].date == today.as_str());
+    // untick it on the calendar
+    with(|a| a.desk_chip_toggle(&car["id"].as_str().unwrap().to_owned(), &a.today(), true)).unwrap();
+    settle();
+    assert!(t.task("洗车").get("flexDone").is_none());
+    // the one without a date: done, gone from the column
+    let row = item(&t, "整理相册", 0);
+    t.click_at(t.at(&row, 10.0, row.size().height / 2.0));
+    assert_eq!(t.task("整理相册")["done"], json!(true));
+    assert!(!rows(&t).iter().any(|r| r.contains("整理相册")));
+    t.click("收起待办栏");
+    assert!(!t.w.get_side_open());
+}

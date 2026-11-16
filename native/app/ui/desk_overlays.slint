@@ -383,3 +383,116 @@ export component SearchPanel inherits Rectangle {
         }
     }
 }
+
+export struct ChangeRowData { id: int, text: string, when: string, undone: bool }
+
+// 最近更改 (GitHub #11): the last changes, newest first, each with 撤销 (恢复 once it is taken
+// back). A panel at the card's top right, like the search panel.
+export component ChangesPanel inherits Rectangle {
+    in property <[ChangeRowData]> rows;
+    in property <length> max-h;
+    callback revert(int);
+    callback clear();
+    callback close();
+    property <length> fixed: 1px + 12px + 32px + 8px + 12px + 1px;
+    property <length> list-h: root.rows.length > 0 ? min(root.rows.length * 36px, max(36px, root.max-h - fixed)) : 28px;
+    height: fixed + list-h;
+    border-radius: 8px;
+    background: Theme.flyout-solid;
+    border-width: 1px;
+    border-color: Theme.c.card-stroke;
+    accessible-role: groupbox;
+    accessible-label: @tr("最近更改");
+    // presses on the panel don't reach the calendar below
+    TouchArea { }
+    VerticalLayout {
+        padding: 13px;
+        spacing: 8px;
+        HorizontalLayout {
+            height: 32px;
+            spacing: 4px;
+            Text {
+                horizontal-stretch: 1;
+                text: @tr("最近更改");
+                font-size: 14px;
+                font-weight: 600;
+                vertical-alignment: center;
+                color: Theme.c.text-primary;
+            }
+            if root.rows.length > 0: Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.small;
+                text: @tr("清空记录");
+                clicked => { root.clear(); }
+            }
+            Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.close;
+                tip: @tr("关闭");
+                accessible-label: @tr("关闭");
+                clicked => { root.close(); }
+            }
+        }
+        if root.rows.length == 0: Text {
+            height: 28px;
+            text: @tr("还没有更改。添加、修改、删除任务后会记在这里，可以随时撤销。");
+            font-size: 12px;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            color: Theme.c.text-tertiary;
+        }
+        if root.rows.length > 0: Flickable {
+            height: root.list-h;
+            content-height: root.rows.length * 36px;
+            mouse-drag-pan-enabled: false;
+            accessible-role: list;
+            accessible-label: @tr("最近更改");
+            for r[i] in root.rows: Rectangle {
+                y: i * 36px;
+                width: parent.width;
+                height: 36px;
+                accessible-role: list-item;
+                accessible-label: r.text;
+                accessible-description: r.when;
+                HorizontalLayout {
+                    padding-left: 4px;
+                    spacing: 8px;
+                    cross-axis-alignment: center;
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        min-width: 0;
+                        height: 20px;
+                        t := Text {
+                            width: parent.width;
+                            text: r.text;
+                            overflow: elide;
+                            vertical-alignment: center;
+                            color: r.undone ? Theme.c.text-tertiary : Theme.c.text-primary;
+                        }
+                        if r.undone: Rectangle {
+                            x: 0;
+                            y: round((parent.height / 2 + 1px) / 1phx) * 1phx;
+                            width: min(parent.width, t.preferred-width);
+                            height: 1px;
+                            background: Theme.c.text-tertiary;
+                        }
+                    }
+                    Text {
+                        text: r.when;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        color: Theme.c.text-secondary;
+                    }
+                    Button {
+                        variant: ButtonVariant.subtle;
+                        size: ButtonSize.small;
+                        text: r.undone ? @tr("恢复") : @tr("撤销");
+                        accessible-label: (r.undone ? @tr("恢复") : @tr("撤销")) + " " + r.text;
+                        clicked => { root.revert(r.id); }
+                    }
+                }
+            }
+        }
+    }
+}

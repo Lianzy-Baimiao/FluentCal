@@ -11,7 +11,8 @@ use fluentcal_core::recur::occurrence_on;
 pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
     let Some(t) = app.doc.tasks.get(id) else { return Vec::new() };
     let s = &app.doc.settings;
-    let done = occurrence_on(t, date).map_or(t.done, |o| o.done);
+    let flex = fluentcal_core::flex::is_flex(t);
+    let done = if fluentcal_core::flex::is_slot(date) { fluentcal_core::flex::slot_done(t, date).is_some() } else { occurrence_on(t, date).map_or(t.done, |o| o.done) };
     let mut v = vec![
         shortcut(item("done", if done { tr("标记为未完成") } else { tr("标记为完成") }, "completed"), "Space"),
         swatches("color:", t.color.as_deref(), true),
@@ -19,7 +20,7 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
         shortcut(item("edit", tr("编辑…"), "edit"), "Enter"),
         item("duplicate", tr("复制一份"), "copy"),
     ];
-    if t.repeat.is_none() {
+    if t.repeat.is_none() && !flex {
         v.push(item("postpone", tr("推迟一天"), "forward"));
         if t.start == t.end {
             v.push(check("autoPostpone", tr("未完成时自动顺延"), t.auto_postpone.unwrap_or(s.tasks.auto_postpone)));
@@ -62,6 +63,8 @@ pub fn more(app: &App) -> Vec<Entry> {
     if app.sync.enabled {
         v.push(item("syncNow", tr("立即同步"), "sync"));
     }
+    v.push(item("changes", tr("最近更改"), "delete"));
+    v.push(check("sidebar", tr("不定日待办栏"), s.calendar.sidebar));
     v.push(item("browser", tr("在浏览器中查看"), "globe"));
     v.push(sep());
     v.push(check("showCompleted", tr("显示已完成任务"), s.tasks.show_completed));

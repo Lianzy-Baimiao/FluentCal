@@ -140,6 +140,8 @@ export component NavView {
         width: root.width - root.pane-w;
         height: root.height;
         content-height: page.preferred-height;
+        // the wheel scrolls; a drag belongs to the sliders on the page
+        mouse-drag-pan-enabled: false;
         page := VerticalLayout {
             width: parent.width;
             padding-left: root.compact ? 16px : 28px;

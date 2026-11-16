@@ -45,7 +45,8 @@ pub fn all_tasks<'a>(tasks: impl IntoIterator<Item = &'a Task>, today: &str, sho
     let mut by_day: BTreeMap<String, Vec<Occurrence<'a>>> = BTreeMap::new();
     for t in tasks {
         let done = t.repeat.is_none() && t.done;
-        if (!show_done && done) || t.start.is_empty() {
+        // to-dos without a day have their own column
+        if (!show_done && done) || t.start.is_empty() || t.flex.is_some() {
             continue;
         }
         let o = Occurrence { task: t, date: t.start.clone(), start: t.start.clone(), end: task_end(t).to_owned(), done };

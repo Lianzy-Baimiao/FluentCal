@@ -28,6 +28,38 @@ pub fn task_end(t: &Task) -> &str {
     if t.end.is_empty() || t.end < t.start { &t.start } else { &t.end }
 }
 
+/// 每天 (每隔 N 天, the working-day rules) on a task that runs from a start to an end date means
+/// once a day over those days (GitHub #12): each occurrence is one day and the series stops
+/// on the end date. Bars of that length starting every day would overlap, which nobody
+/// means. Returns that end date.
+pub fn daily_range_end(task: &Task) -> Option<&str> {
+    let rule = task.repeat.as_ref()?;
+    let every = match rule.freq? {
+        Freq::Daily => rule.interval.unwrap_or(1).max(1) as i32,
+        Freq::Workday | Freq::LegalWorkday => 1,
+        _ => return None,
+    };
+    let end = task_end(task);
+    (diff_days(&task.start, end) >= every).then_some(end)
+}
+
+/// Writes a `daily_range_end` task the way it is read: one day long, repeating until the end
+/// date (or as often as its count says).
+pub fn normalize_daily_range(t: &mut Task) {
+    let Some(end) = daily_range_end(t).map(str::to_owned) else { return };
+    t.end = t.start.clone();
+    if let Some(r) = t.repeat.as_mut().filter(|r| r.count.is_none()) {
+        r.until = Some(r.until.take().filter(|u| *u < end).unwrap_or(end));
+    }
+}
+
+/// Occurrences on consecutive days of such a series are drawn joined, as one stretch of days:
+/// a repeating task with an end, one day each time.
+pub fn is_day_series(task: &Task) -> bool {
+    task.repeat.as_ref().is_some_and(|r| r.freq.is_some() && r.freq != Some(Freq::Ebbinghaus) && (r.until.is_some() || r.count.is_some() || daily_range_end(task).is_some()))
+        && (task_end(task) == task.start || daily_range_end(task).is_some())
+}
+
 /// Calls `f` with the occurrence start dates of a rule, in order, from `start`, until it
 /// returns Break (or the rule ends).
 fn starts(rule: &RepeatRule, start: &str, from: &str, f: &mut dyn FnMut(String) -> ControlFlow<()>) {
@@ -129,6 +161,10 @@ fn starts(rule: &RepeatRule, start: &str, from: &str, f: &mut dyn FnMut(String) 
 
 /// Expands a task into occurrences overlapping [range_start, range_end] (inclusive).
 pub fn occurrences<'a>(task: &'a Task, range_start: &str, range_end: &str, limit: usize) -> Vec<Occurrence<'a>> {
+    // a to-do without a day (GitHub #7) is on the calendar where it was done
+    if crate::flex::is_flex(task) {
+        return crate::flex::done_occurrences(task, range_start, range_end);
+    }
     let end = task_end(task);
     let Some(rule) = &task.repeat else {
         if end < range_start || task.start.as_str() > range_end {
@@ -136,7 +172,9 @@ pub fn occurrences<'a>(task: &'a Task, range_start: &str, range_end: &str, limit
         }
         return vec![Occurrence { task, date: task.start.clone(), start: task.start.clone(), end: end.to_owned(), done: task.done }];
     };
-    let span = diff_days(&task.start, end).max(0);
+    let range = daily_range_end(task);
+    let span = if range.is_some() { 0 } else { diff_days(&task.start, end).max(0) };
+    let range_until = range.filter(|_| rule.count.is_none());
     let from = add_days(range_start, -span);
     let ex: HashSet<&str> = task.ex_dates.iter().flatten().map(String::as_str).collect();
     let done: HashSet<&str> = task.done_dates.iter().flatten().map(String::as_str).collect();
@@ -150,7 +188,7 @@ pub fn occurrences<'a>(task: &'a Task, range_start: &str, range_end: &str, limit
         if s < task.start {
             return ControlFlow::Continue(());
         }
-        if rule.until.as_deref().is_some_and(|u| s.as_str() > u) || s.as_str() > range_end {
+        if rule.until.as_deref().is_some_and(|u| s.as_str() > u) || range_until.is_some_and(|u| s.as_str() > u) || s.as_str() > range_end {
             return ControlFlow::Break(());
         }
         n += 1;

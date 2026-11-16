@@ -2,7 +2,7 @@
 //! task chip or multi-day bar takes, and what is hidden behind "+N".
 
 use crate::date::{add_days, diff_days};
-use crate::recur::Occurrence;
+use crate::recur::{is_day_series, occurrence_on, Occurrence};
 use std::cmp::Ordering;
 
 /// A task occurrence clipped to one week row.
@@ -19,6 +19,37 @@ pub struct Chip<'a> {
     pub cont_right: bool,
     pub multi_day: bool,
     pub visible: bool,
+    /// A day of a series with an end (每天 from … to …, GitHub #12) whose day before / after
+    /// is one too: the days share a lane and are drawn joined.
+    pub linked: bool,
+    pub join_left: bool,
+    pub join_right: bool,
+    /// The first day this chip covers (the occurrence's start, or the week's).
+    pub seg_start: String,
+    /// The days it stands for: its columns in a week row, the whole task elsewhere.
+    pub seg_days: usize,
+}
+
+impl<'a> Chip<'a> {
+    /// A chip outside the week rows (the list, the "+N" day list): the whole occurrence.
+    pub fn alone(occ: Occurrence<'a>) -> Chip<'a> {
+        Chip {
+            key: format!("{}@{}", occ.task.id, occ.date),
+            col: 0,
+            span: 1,
+            lane: 0,
+            cont_left: false,
+            cont_right: false,
+            multi_day: occ.start != occ.end,
+            visible: true,
+            linked: false,
+            join_left: false,
+            join_right: false,
+            seg_start: occ.start.clone(),
+            seg_days: (diff_days(&occ.start, &occ.end) + 1).max(1) as usize,
+            occ,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -62,9 +93,37 @@ pub fn layout_week<'a>(week_start: &str, occs: Vec<Occurrence<'a>>, capacity: Op
     let mut sorted: Vec<Occurrence> = occs.into_iter().filter(|o| o.end.as_str() >= week_start && o.start <= week_end).collect();
     sorted.sort_by(|a, b| sort_key(a, b, completed_last));
 
+    // Days of a series with an end that follow each other take one lane together, like a bar
+    // (GitHub #12): the stretch is placed as a whole, where its first day comes in the order.
+    let mut runs: Vec<Vec<Occurrence>> = Vec::new();
+    let mut units: Vec<(Occurrence, Option<usize>)> = Vec::with_capacity(sorted.len());
+    {
+        let mut series: Vec<Occurrence> = Vec::new();
+        for occ in sorted {
+            if occ.start == occ.end && is_day_series(occ.task) {
+                series.push(occ);
+            } else {
+                units.push((occ, None));
+            }
+        }
+        series.sort_by(|a, b| a.task.id.cmp(&b.task.id).then_with(|| a.start.cmp(&b.start)));
+        for occ in series {
+            match runs.last_mut().filter(|r| r.last().is_some_and(|l| l.task.id == occ.task.id && add_days(&l.start, 1) == occ.start)) {
+                Some(r) => r.push(occ),
+                None => runs.push(vec![occ]),
+            }
+        }
+        for (i, r) in runs.iter().enumerate() {
+            let (first, last) = (&r[0], &r[r.len() - 1]);
+            let whole = Occurrence { task: first.task, date: first.date.clone(), start: first.start.clone(), end: last.start.clone(), done: r.iter().all(|o| o.done) };
+            units.push((whole, Some(i)));
+        }
+        units.sort_by(|a, b| sort_key(&a.0, &b.0, completed_last));
+    }
+
     let mut used: [Vec<bool>; 7] = Default::default();
-    let mut chips = Vec::with_capacity(sorted.len());
-    for occ in sorted {
+    let mut chips = Vec::with_capacity(units.len());
+    for (occ, run) in units {
         let s = if occ.start.as_str() < week_start { week_start.to_owned() } else { occ.start.clone() };
         let e = if occ.end > week_end { week_end.clone() } else { occ.end.clone() };
         let col = diff_days(week_start, &s) as usize;
@@ -79,17 +138,48 @@ pub fn layout_week<'a>(week_start: &str, occs: Vec<Occurrence<'a>>, capacity: Op
             }
             u[lane] = true;
         }
-        chips.push(Chip {
-            key: format!("{}@{}", occ.task.id, occ.date),
-            cont_left: occ.start.as_str() < week_start,
-            cont_right: occ.end > week_end,
-            multi_day: occ.start != occ.end,
-            occ,
-            col,
-            span,
-            lane,
-            visible: true,
-        });
+        let Some(run) = run else {
+            chips.push(Chip {
+                key: format!("{}@{}", occ.task.id, occ.date),
+                cont_left: occ.start.as_str() < week_start,
+                cont_right: occ.end > week_end,
+                multi_day: occ.start != occ.end,
+                occ,
+                col,
+                span,
+                lane,
+                visible: true,
+                linked: false,
+                join_left: false,
+                join_right: false,
+                seg_start: s,
+                seg_days: span,
+            });
+            continue;
+        };
+        let days = std::mem::take(&mut runs[run]);
+        let n = days.len();
+        for (k, day) in days.into_iter().enumerate() {
+            // at the week's edges: the series may go on in the next row
+            let before = k > 0 || occurrence_on(day.task, &add_days(&day.start, -1)).is_some();
+            let after = k + 1 < n || occurrence_on(day.task, &add_days(&day.start, 1)).is_some();
+            chips.push(Chip {
+                key: format!("{}@{}", day.task.id, day.date),
+                cont_left: false,
+                cont_right: false,
+                multi_day: false,
+                col: col + k,
+                span: 1,
+                lane,
+                visible: true,
+                linked: true,
+                join_left: before,
+                join_right: after,
+                seg_start: day.start.clone(),
+                seg_days: 1,
+                occ: day,
+            });
+        }
     }
 
     let mut out = WeekLayout { chips, ..Default::default() };

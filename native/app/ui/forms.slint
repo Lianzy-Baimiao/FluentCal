@@ -424,6 +424,10 @@ export component Slider {
     }
     fs := FocusScope {
         enabled: root.enabled;
+        // It lies over the track: taking the focus itself, it would swallow the press that
+        // gives it the focus, and the thumb wouldn't follow that drag (GitHub #10). The track
+        // focuses it on a press.
+        focus-on-click: false;
         key-pressed(e) => {
             let big = max(root.step, (root.maximum - root.minimum) / 10);
             let d = e.text == Key.RightArrow || e.text == Key.UpArrow ? root.step

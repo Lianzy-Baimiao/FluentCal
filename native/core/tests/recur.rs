@@ -132,3 +132,103 @@ fn tasks_round_trip_without_losing_fields() {
     assert_eq!(back["order"], serde_json::json!(3), "whole numbers stay integers");
     assert_eq!(back["progress"], serde_json::json!(40));
 }
+
+/// GitHub #12: 每天 on a task from 11-14 to 11-20 is once a day on those seven days, not a
+/// seven-day bar starting every day.
+#[test]
+fn daily_over_a_date_range_is_once_a_day_until_the_end() {
+    let t = mk("2026-11-14", Some("2026-11-20"), Some(rule(Freq::Daily)));
+    let o = occurrences(&t, "2026-11-01", "2026-12-31", 400);
+    assert_eq!(o.len(), 7);
+    assert!(o.iter().all(|x| x.start == x.end));
+    assert_eq!((o[0].date.as_str(), o[6].date.as_str()), ("2026-11-14", "2026-11-20"));
+    assert!(is_day_series(&t));
+    // an earlier 直到 still ends it; a count counts
+    let until = mk("2026-11-14", Some("2026-11-20"), Some(RepeatRule { until: Some("2026-11-16".into()), ..rule(Freq::Daily) }));
+    assert_eq!(dates(&until, "2026-11-01", "2026-12-31").len(), 3);
+    let count = mk("2026-11-14", Some("2026-11-20"), Some(RepeatRule { count: Some(10), ..rule(Freq::Daily) }));
+    assert_eq!(dates(&count, "2026-11-01", "2026-12-31").len(), 10);
+    // saved the way it is read
+    let mut n = t.clone();
+    normalize_daily_range(&mut n);
+    assert_eq!((n.end.as_str(), n.repeat.as_ref().unwrap().until.as_deref()), ("2026-11-14", Some("2026-11-20")));
+    assert_eq!(dates(&n, "2026-11-01", "2026-12-31"), dates(&t, "2026-11-01", "2026-12-31"));
+    // bars that don't overlap stay bars: three days every week, two days every three days
+    let weekly = mk("2026-11-14", Some("2026-11-16"), Some(rule(Freq::Weekly)));
+    assert!(daily_range_end(&weekly).is_none());
+    let third = mk("2026-11-14", Some("2026-11-15"), Some(RepeatRule { interval: Some(3), ..rule(Freq::Daily) }));
+    assert!(daily_range_end(&third).is_none() && !is_day_series(&third));
+    // an endless 每天 is no stretch of days
+    assert!(!is_day_series(&mk("2026-11-14", None, Some(rule(Freq::Daily)))));
+}
+
+/// GitHub #12: the days of such a series share a lane and are joined, in the next week too.
+#[test]
+fn a_day_series_takes_one_lane_and_joins_its_days() {
+    use fluentcal_core::week::layout_week;
+    let series = Task { id: "s".into(), ..mk("2026-11-14", Some("2026-11-20"), Some(rule(Freq::Daily))) };
+    let other = Task { id: "o".into(), order: -1.0, ..mk("2026-11-17", None, None) };
+    let tasks = [series, other];
+    let occs = |a: &str, b: &str| tasks.iter().flat_map(|t| occurrences(t, a, b, 400)).collect::<Vec<_>>();
+    // week of Sunday 11-15: the series runs Sunday to Friday
+    let w = layout_week("2026-11-15", occs("2026-11-01", "2026-11-30"), None, false);
+    let s: Vec<_> = w.chips.iter().filter(|c| c.occ.task.id == "s").collect();
+    assert_eq!(s.len(), 6);
+    assert!(s.iter().all(|c| c.lane == 0 && c.linked && c.span == 1));
+    assert_eq!(s.iter().map(|c| c.col).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5]);
+    // joined to Saturday 11-14 in the row above, ends on Friday
+    assert!(s[0].join_left && s[0].join_right && s[5].join_left && !s[5].join_right);
+    // the plain task of Tuesday goes under it
+    assert_eq!(w.chips.iter().find(|c| c.occ.task.id == "o").map(|c| (c.col, c.lane, c.linked)), Some((2, 1, false)));
+    let first = layout_week("2026-11-08", occs("2026-11-01", "2026-11-30"), None, false);
+    let c = first.chips.iter().find(|c| c.occ.task.id == "s").unwrap();
+    assert!((c.col, c.join_left, c.join_right) == (6, false, true));
+}
+
+/// GitHub #7: to-dos without a day. A monthly one has a slot each month; ticking it records
+/// the day, where the calendar then shows it done. Last month's left open is overdue.
+#[test]
+fn todos_without_a_day() {
+    use fluentcal_core::flex;
+    let mut rent = Task { id: "rent".into(), ..flex::new_task(flex::MONTH, "交物业费", "2026-10-20") };
+    let mut idea = Task { id: "idea".into(), ..flex::new_task(flex::SOMEDAY, "整理相册", "2026-10-20") };
+    assert_eq!((rent.start.as_str(), idea.start.as_str()), ("2026-10-01", "2026-10-20"));
+    // not on the calendar until done
+    assert!(occurrences(&rent, "2026-01-01", "2026-12-31", 400).is_empty());
+    {
+        let all = [rent.clone(), idea.clone()];
+        let s = flex::side(all.iter(), "2026-11-16");
+        assert_eq!((s.month.len(), s.overdue.len(), s.someday.len()), (1, 1, 1));
+        assert_eq!((s.month_slot.as_str(), s.overdue_slot.as_str()), ("m:2026-11", "m:2026-10"));
+    }
+    // done this month on the 16th: on the calendar that day; October stays overdue
+    flex::set_slot(&mut rent, "m:2026-11", Some("2026-11-16"));
+    let o = occurrences(&rent, "2026-11-01", "2026-11-30", 400);
+    assert_eq!((o.len(), o[0].date.as_str(), o[0].done), (1, "2026-11-16", true));
+    {
+        let all = [rent.clone()];
+        let s = flex::side(all.iter(), "2026-11-16");
+        assert_eq!((s.month[0].1, s.overdue.len()), (Some("2026-11-16"), 1));
+        // next month it is open again, and November isn't overdue
+        let d = flex::side(all.iter(), "2026-12-02");
+        assert_eq!((d.month[0].1, d.overdue.len()), (None, 0));
+    }
+    // dragged to another day; unticked there
+    flex::move_day(&mut rent, "2026-11-16", "2026-11-18");
+    assert_eq!(flex::slot_done(&rent, "m:2026-11"), Some("2026-11-18"));
+    flex::clear_day(&mut rent, "2026-11-18");
+    assert!(rent.flex_done.is_none());
+    // Gantt: the open month as a bar; reminders count from the month's last day
+    assert_eq!(flex::bars(&rent, "2026-01-01", "2026-12-31", "2026-11-16"), vec![("m:2026-11".to_owned(), "2026-11-01".to_owned(), "2026-11-30".to_owned(), false)]);
+    let due = flex::due_occurrences(&rent, "2026-11-28", "2026-12-02");
+    assert_eq!((due.len(), due[0].start.as_str()), (1, "2026-11-30"));
+    // someday: done once, then gone from the column
+    flex::set_slot(&mut idea, flex::SOMEDAY_SLOT, Some("2026-11-16"));
+    assert!(idea.done);
+    let all = [idea.clone()];
+    assert!(flex::side(all.iter(), "2026-11-16").someday.is_empty());
+    assert_eq!(occurrences(&idea, "2026-11-01", "2026-11-30", 400).len(), 1);
+    // the fields survive a round trip
+    let back: Task = serde_json::from_value(rent.to_value()).unwrap();
+    assert_eq!(back.flex.as_deref(), Some("month"));
+}

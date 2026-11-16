@@ -75,7 +75,7 @@ pub fn compute(doc: &Doc, today: &str, t: &Tokens, ungrouped_collapsed: bool) ->
         });
     }
     let dw = day_width(&g.scale);
-    let single: Vec<Task> = tasks.iter().filter(|t| t.repeat.is_none()).cloned().collect();
+    let single: Vec<Task> = tasks.iter().filter(|t| t.repeat.is_none() && t.flex.is_none()).cloned().collect();
     let (rs, re) = chart_range(&single, today, &g.scale);
     let (lo, hi) = (add_days(today, -3 * 366), add_days(today, 5 * 366));
     let range = (if rs < lo { lo } else { rs }, if re > hi { hi } else { re });
@@ -128,8 +128,18 @@ fn row(r: &Row, t: &Tokens, ungrouped_collapsed: bool) -> GRow {
         },
         Row::Task { task, .. } => {
             let c = task_color(task.color.as_deref(), t);
-            let dates = if task.start == task.end { md(&task.start) } else { format!("{}–{}", md(&task.start), md(&task.end)) };
-            let pct = if task.is_milestone() || task.repeat.is_some() { String::new() } else { format!("{}%", if task.done { 100.0 } else { task.progress }) };
+            let flex = fluentcal_core::flex::kind(task);
+            let dates = match flex {
+                Some(fluentcal_core::flex::MONTH) => tr("每月").to_owned(),
+                Some(_) => "—".to_owned(),
+                None if task.start == task.end => md(&task.start),
+                None => format!("{}–{}", md(&task.start), md(&task.end)),
+            };
+            let flex_done = match flex {
+                Some(fluentcal_core::flex::MONTH) => fluentcal_core::flex::open_month(task, &fluentcal_core::date::today()).is_none(),
+                _ => task.done,
+            };
+            let pct = if task.is_milestone() || task.repeat.is_some() || flex.is_some() { String::new() } else { format!("{}%", if task.done { 100.0 } else { task.progress }) };
             GRow {
                 kind: "task".into(),
                 key: r.key().into(),
@@ -138,10 +148,10 @@ fn row(r: &Row, t: &Tokens, ungrouped_collapsed: bool) -> GRow {
                 color: color(c.bar),
                 check_ring: color(c.bar.mix(0.7, t.text_secondary)),
                 meta: dates.into(),
-                meta_tip: trf("{0} 天", &[format!("{}", diff_days(&task.start, &task.end) + 1)]).into(),
+                meta_tip: if flex.is_some() { fluentcal_core::flex::describe(task).into() } else { trf("{0} 天", &[format!("{}", diff_days(&task.start, &task.end) + 1)]).into() },
                 pct: pct.into(),
-                checked: task.done,
-                done: task.done && task.repeat.is_none(),
+                checked: flex_done,
+                done: flex_done && task.repeat.is_none(),
                 repeat: task.repeat.is_some(),
                 milestone: task.is_milestone(),
                 real: true,
@@ -156,8 +166,12 @@ fn row(r: &Row, t: &Tokens, ungrouped_collapsed: bool) -> GRow {
 fn bars_of(doc: &Doc, task: &Task, row: usize, range: &(String, String), dw: f64, today: &str, t: &Tokens, out: &mut Vec<Bar>) {
     let key = task.color.clone().filter(|c| !c.is_empty()).or_else(|| group_of(doc, task.group_id.as_deref()).map(|g| g.color.clone()));
     let c = task_color(key.as_deref(), t);
-    let rep = task.repeat.is_some();
-    let occ: Vec<(String, String, String, bool)> = if rep {
+    let flex = fluentcal_core::flex::is_flex(task);
+    // bars of a to-do without a day aren't dragged either: they are where it was done
+    let rep = task.repeat.is_some() || flex;
+    let occ: Vec<(String, String, String, bool)> = if flex {
+        fluentcal_core::flex::bars(task, &range.0, &range.1, today)
+    } else if rep {
         occurrences(task, &range.0, &range.1, 3000).into_iter().map(|o| (o.date, o.start, o.end, o.done)).collect()
     } else {
         vec![(task.start.clone(), task.start.clone(), task.end.clone(), task.done)]
@@ -167,7 +181,7 @@ fn bars_of(doc: &Doc, task: &Task, row: usize, range: &(String, String), dw: f64
         let x = diff_days(&range.0, &start) as f64 * dw;
         let w = (diff_days(&start, &end) + 1) as f64 * dw;
         let progress = if done { 100.0 } else if rep { 0.0 } else { task.progress };
-        let status = if task.is_milestone() { tr("里程碑").to_owned() } else if rep { tr("重复任务（双击编辑整个系列）").to_owned() } else { trf("进度 {0}%", &[format!("{}", progress)]) };
+        let status = if task.is_milestone() { tr("里程碑").to_owned() } else if flex { fluentcal_core::flex::describe(task).to_owned() } else if rep { tr("重复任务（双击编辑整个系列）").to_owned() } else { trf("进度 {0}%", &[format!("{}", progress)]) };
         let mut tip = vec![task.title.clone(), trf("{0} · {1} 天", &[format!("{}", format_range(&start, &end, today)), format!("{}", diff_days(&start, &end) + 1)]), status];
         if !deps.is_empty() {
             tip.push(trf("前置：{0}", &[format!("{}", deps.join("、"))]));

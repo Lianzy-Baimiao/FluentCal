@@ -40,6 +40,9 @@ pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Opt
     let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, room, t).iter().collect();
     sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
     push_list(w, doc, ui, today, t);
+    let side = doc.settings.calendar.sidebar;
+    w.set_side_open(side);
+    sync::rows(&w.get_side_rows(), if side { vm::side_rows(doc, today, t) } else { Vec::new() }, |m| w.set_side_rows(m));
     let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
     sync::rows(&w.get_countdowns(), cds, |m| w.set_countdowns(m));
 }

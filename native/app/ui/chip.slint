@@ -30,6 +30,13 @@ export struct ChipData {
     bar-hover: color,
     check-ring: color,
     tip: string,
+    // One day of a series with an end (GitHub #12): tinted, joined to the day before / after.
+    linked: bool,
+    join-left: bool,
+    join-right: bool,
+    // A bar's progress (GitHub #10): "40%" after the title; the done part of this piece, 0-1.
+    pct: string,
+    fill: float,
 }
 
 // Keys on a focused chip that need Rust (Delete, the menu key): one global for every chip,
@@ -64,14 +71,16 @@ export component TaskChip inherits Rectangle {
     property <bool> bar: chip.multi-day;
     property <bool> hover: ta.has-hover;
     property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.c.text-primary : chip.text;
-    property <length> l-radius: chip.cont-left ? 0 : 4px;
-    property <length> r-radius: chip.cont-right ? 0 : 4px;
+    property <bool> link: chip.linked && !bar;
+    property <length> l-radius: chip.cont-left || (link && chip.join-left) ? 0 : 4px;
+    property <length> r-radius: chip.cont-right || (link && chip.join-right) ? 0 : 4px;
     border-top-left-radius: l-radius;
     border-bottom-left-radius: l-radius;
     border-top-right-radius: r-radius;
     border-bottom-right-radius: r-radius;
     background: bar && chip.done ? chip.bar.transparentize(0.68)
         : bar ? (hover ? chip.bar-hover : chip.bar)
+        : link ? chip.bar.transparentize(chip.done ? 0.86 : hover ? 0.66 : 0.76)
         : hover ? Theme.c.subtle-fill-hover : transparent;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
     opacity: dragging ? 0.35 : 1;
@@ -80,6 +89,12 @@ export component TaskChip inherits Rectangle {
     accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
     // A tab stop (0.2: tabindex 0): Enter opens, Space toggles, Delete deletes, the menu key /
     // Shift+F10 opens the menu; other keys go on to the calendar.
+    // the done part of a bar, darker (as in the Gantt chart)
+    if bar && chip.fill > 0: Rectangle {
+        x: 0;
+        width: parent.width * chip.fill;
+        background: #00000038;
+    }
     kfs := FocusScope {
         focus-on-click: false;
         changed has-focus => {
@@ -200,6 +215,13 @@ export component TaskChip inherits Rectangle {
                     height: max(1px, round(0.9px * k / 1phx) * 1phx);
                     background: fg;
                 }
+            }
+            if chip.pct != "": GText {
+                text: chip.pct;
+                color: fg;
+                font-size: root.text-size;
+                opacity: 0.85;
+                glow: root.glow;
             }
             if chip.repeat: Icon {
                 glyph: Glyph.repeat;

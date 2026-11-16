@@ -3,6 +3,7 @@
 //! no Tauri, so all of it is tested with plain `cargo test`.
 
 pub mod agenda;
+pub mod changelog;
 pub mod cloud;
 pub mod color;
 pub mod countdown;
@@ -10,6 +11,7 @@ pub mod datadir;
 pub mod date;
 pub mod editor;
 pub mod export;
+pub mod flex;
 pub mod gantt;
 pub mod history;
 pub mod i18n;

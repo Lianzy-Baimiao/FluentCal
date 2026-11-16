@@ -22,6 +22,9 @@ export struct ListRowData {
     meta: string,
     // 所有 lists a repeating task once, for its whole series: no check box
     checkable: bool,
+    // at the right (GitHub #9): "3 天后", "逾期 5 天"; "" | "today" | "overdue"
+    due: string,
+    due-kind: string,
 }
 
 // One task: check box, time, colour, title, details. Double click opens it, right click its
@@ -31,6 +34,8 @@ component ListItem inherits Rectangle {
     in property <string> when;
     in property <string> meta;
     in property <bool> checkable;
+    in property <string> due;
+    in property <string> due-kind;
     in property <bool> read-only;
     callback toggle();
     callback open();
@@ -42,7 +47,7 @@ component ListItem inherits Rectangle {
     background: Theme.desk.cell-bg;
     accessible-role: list-item;
     accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
-    accessible-description: meta != "" ? when + " · " + meta : when;
+    accessible-description: (meta != "" ? when + " · " + meta : when) + (due != "" ? " · " + due : "");
     Rectangle {
         border-radius: 4px;
         background: ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
@@ -176,6 +181,19 @@ component ListItem inherits Rectangle {
             size: 11px * fs;
             color: Theme.c.text-secondary;
         }
+        if root.due != "": Rectangle {
+            property <bool> late: root.due-kind == "overdue";
+            width: due-text.preferred-width + (late ? 12px : 0);
+            height: 20px * fs;
+            border-radius: 4px;
+            background: late ? Theme.c.critical-bg : transparent;
+            due-text := GText {
+                text: root.due;
+                font-size: 12px * fs;
+                horizontal-alignment: center;
+                color: late ? Theme.c.critical : root.due-kind == "today" ? Theme.c.accent-text : Theme.c.text-secondary;
+            }
+        }
     }
     FocusRing { show: kfs.has-focus && Overlay.keyboard; radius: 4px; }
 }
@@ -268,6 +286,8 @@ export component AgendaList inherits Rectangle {
                 when: r.when;
                 meta: r.meta;
                 checkable: r.checkable;
+                due: r.due;
+                due-kind: r.due-kind;
                 read-only: root.read-only;
                 toggle => { root.toggle(r.chip); }
                 open => { root.open(r.chip); }

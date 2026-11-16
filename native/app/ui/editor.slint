@@ -40,6 +40,8 @@ export struct EditorData {
     group: string,
     color: string,
     show-progress: bool,
+    // a to-do without a day (GitHub #7): what it is, instead of dates and a rule
+    flex: string,
     progress: float,
     done: bool,
     countdown: bool,
@@ -163,6 +165,9 @@ export component EditorWindow inherits Window {
                     max-height: root.missing ? 0 : 100000px;
                     content-height: page.preferred-height;
                     content-width: self.width;
+                    // The wheel scrolls the form; a drag belongs to what is under it (GitHub #10: the
+                    // progress slider's thumb couldn't be dragged, the form took the drag to pan).
+                    mouse-drag-pan-enabled: false;
                     page := VerticalLayout {
                         width: body.width;
                         padding-top: 20px;
@@ -196,7 +201,15 @@ export component EditorWindow inherits Window {
                             }
                         }
                         Card {
-                            Row {
+                            if root.data.flex != "": Row {
+                                label: @tr("日期");
+                                Text {
+                                    text: root.data.flex;
+                                    color: Theme.c.text-primary;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            if root.data.flex == "": Row {
                                 label: @tr("日期");
                                 VerticalLayout {
                                     spacing: 8px;
@@ -248,7 +261,7 @@ export component EditorWindow inherits Window {
                                     changed-value(v) => { root.edit("time", v); }
                                 }
                             }
-                            TopRow {
+                            if root.data.flex == "": TopRow {
                                 label: @tr("重复");
                                 VerticalLayout {
                                     spacing: 8px;

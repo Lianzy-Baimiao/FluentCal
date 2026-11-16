@@ -172,6 +172,24 @@ impl App {
         }
     }
 
+    /// The to-do column's add boxes (GitHub #7): `zone` "month" (once every month, on whichever
+    /// day) or "someday" (no date).
+    pub fn desk_side_add(&mut self, zone: &str, text: &str) {
+        let title = text.trim();
+        if title.is_empty() || self.desk.window.get_read_only() {
+            return;
+        }
+        self.history.boundary();
+        let kind = if zone == "month" { fluentcal_core::flex::MONTH } else { fluentcal_core::flex::SOMEDAY };
+        let p = fluentcal_core::flex::new_task(kind, title, &self.today());
+        let (edit, _) = tasks::add_task(&self.doc, p, None, now_ms());
+        self.apply(edit, true);
+    }
+
+    pub fn desk_side_set(&mut self, on: bool) {
+        self.patch_settings(json!({ "calendar": { "sidebar": on } }));
+    }
+
     /// "+N" count of a shown day.
     fn desk_overflow_on(&self, date: &str) -> Option<i32> {
         let weeks = self.desk.window.get_weeks();

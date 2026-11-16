@@ -76,6 +76,8 @@ section!(Calendar {
     /// Busy weeks get taller rows and quiet ones shorter, in the month and multi-week views
     /// (GitHub #6); off: equal rows.
     fit_rows: bool = false,
+    /// The column of to-dos without a day, left of the month and multi-week views (GitHub #7).
+    sidebar: bool = false,
     weeks_rows: u32 = 5,
     weeks_past: u32 = 1,
     show_lunar: bool = true,

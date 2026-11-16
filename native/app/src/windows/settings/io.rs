@@ -45,7 +45,7 @@ impl App {
                 if let Err(e) = app.store.backup_create() {
                     return app.settings_say(Severity::Error, &trf("导入前备份失败，已取消导入：{0}", &[format!("{}", e)]));
                 }
-                app.apply(plan_edit(&plan), false);
+                app.apply_quiet(plan_edit(&plan), false);
                 app.settings_say(Severity::Success, &trf("已合并：新增 {0} 个，更新 {1} 个，保留本机 {2} 个。", &[format!("{}", plan.added), format!("{}", plan.updated), format!("{}", plan.kept)]));
             } else {
                 // The file's tasks, groups and day colours; this PC's settings and holidays.

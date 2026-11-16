@@ -82,6 +82,8 @@ impl Editor {
         if t.is_milestone() || t.end < t.start {
             t.end = t.start.clone();
         }
+        // 每天 from a start to an end date: once a day until then (GitHub #12)
+        crate::recur::normalize_daily_range(t);
         let t = t.clone();
         if self.is_new {
             return Effect::close(save_task(doc, t, now_ms));

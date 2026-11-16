@@ -27,6 +27,10 @@ export interface RepeatRule {
 }
 
 export interface Task {
+  /** 不定日待办 (GitHub #7): "month" = once every month on whichever day, "someday" = no date. */
+  flex?: string;
+  /** Flex tasks: the day each slot was done ("2026-11" → "2026-11-20"; "" for someday). */
+  flexDone?: Record<string, string>;
   id: string;
   title: string;
   notes?: string;

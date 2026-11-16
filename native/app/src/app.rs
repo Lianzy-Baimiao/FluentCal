@@ -29,6 +29,8 @@ pub struct App {
     pub desk: DeskLive,
     /// The desk window's undo history (0.2: each window had its own).
     pub history: History,
+    /// 最近更改 (GitHub #11): the last changes, to take one back later.
+    pub changes: fluentcal_core::changelog::ChangeLog,
     pub reminders: Arc<Reminders>,
     /// Per-PC folder (app state, cloud state); the data may live elsewhere (`data_dir`).
     pub local_dir: PathBuf,
@@ -129,7 +131,18 @@ impl App {
     }
 
     /// Writes an edit (recorded for the desk's undo when `undoable`) and updates the windows.
+    /// It goes into 最近更改.
     pub fn apply(&mut self, edit: Edit, undoable: bool) {
+        if !edit.is_empty() {
+            let doc = &self.doc;
+            self.changes.record(&edit, |c, id| doc.raw(c, id), fluentcal_core::date::now_ms());
+        }
+        self.apply_quiet(edit, undoable);
+    }
+
+    /// `apply` for what the user didn't do by hand (sample data, overdue tasks moved to today,
+    /// an import) and for taking back a change of 最近更改: not listed there.
+    pub fn apply_quiet(&mut self, edit: Edit, undoable: bool) {
         if edit.is_empty() {
             return;
         }
