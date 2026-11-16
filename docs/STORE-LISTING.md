@@ -313,8 +313,15 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 点击“提交进行认证”后，概述页显示 **正在认证更新**，产品更新状态为 **正在认证（Submission 9）**；商店里仍是 Submission 8（0.3.9.0）。临时浏览器已关闭，配置文件已删除。是否上架以商店目录查询为准。
 - 2026-11-17 查询商店目录（CN）返回 `ice.FluentCal_0.3.10.0_x64__rz8m2sa64m4em`，确认 0.3.10.0 已上架。
 
-### 0.3.11.0 不定日待办栏、最近更改、每天一次连排、横条进度（2026-11-17，包已备好，尚未送审）
+### 0.3.11.0 不定日待办栏、最近更改、每天一次连排、横条进度（2026-11-17 07:24 送审，正在认证）
 
 - 对应 GitHub [v0.3.11](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.11)（提交 `592ac89`）。用户的授权是目标“完成 iss 的开发，发版，回复，包括微软商店的推送”。
 - 商店包：`release/FluentCal_0.3.11.0_x64.msix`，10,794,199 字节，SHA-256 `0381e1d9f81d8199cf69809b35f52239df96c43ca9839e07939ad7231d955e60`。包内 EXE 与独立 EXE 一致（`45ba054d…2776`）；清单与 0.3.10.0 相比只有版本号不同。更新说明在 `release/store-0.3.11/whats-new-*.txt`。
-- 登录：临时 Edge（CDP 9441）在隐藏桌面和可见桌面都停在登录页；点“登录选项 › 人脸、指纹、PIN 或安全密钥”后转到通行密钥验证，Windows 安全窗口等待本人确认（03:08 起，等了约 20 分钟没有人确认）。没有输入任何帐户信息。本人确认后从“开始更新”继续。
+- 登录：`release/store-0.3.11/` 的临时 Edge（CDP 9441）在隐藏桌面和可见桌面都停在登录页。点“登录选项 › 人脸、指纹、PIN 或安全密钥”后，Windows 安全中心弹出的是“选择通行密钥”，只有“iPhone、iPad 或 Android 设备”和“安全密钥”两项，这台电脑上没有能自动通过的通行密钥，所以不会像 0.3.10.0 那次自己完成。中间还有一次弯路：03:08 第一次请求留下的安全窗口过期后仍挂在屏幕上，挡住了后面的每次请求，页面显示“尝试使用密钥登录时出错”；关掉过期窗口后新窗口才正常弹出。最后由用户本人在可见的临时 Edge 里登录。全程没有由程序输入任何帐户信息。登录后先落在 LiteView 的产品页，只做了导航离开。时间为 UTC+8。
+- 在概述页点“开始更新”，创建 **Submission 10 / 1152921505702422277**。上传后只出现既有的 `runFullTrust` 受限能力提醒，设备系列只勾选 Windows 10/11 Desktop；保存后旧包 0.3.10.0 被移除，概述页只列出 **FluentCal_0.3.11.0_x64.msix / Validated**。
+- “此版本的新增功能”（`release/store-0.3.11/whats-new-*.txt`）：
+  - 简体中文：新增“不定日待办”栏：在月视图左侧展开，记每月做一次但不定哪天的事，以及完全没有日期的事；勾选后会记到当天的日期格里，上月没做完的标为“逾期”。新增“最近更改”：标题栏的垃圾桶图标列出最近的添加、修改和删除，可以随时撤销，重启后也在。“每天”加起止日期现在表示这几天每天一次，在月视图里连成一排、各自勾选。多日任务的横条上显示进度。列表视图每项右侧显示“3 天后”“逾期 5 天”。修复编辑窗口里进度滑块拖不动的问题。
+  - English: New to-do column: open it at the left of the month view for things to do once a month on no fixed day, and things with no date at all. Ticking one records it on today's cell; what was left open last month is marked Overdue. New "Recent changes": the bin icon in the title bar lists what you added, changed and deleted, and any of it can be undone later, even after a restart. A daily task with a start and an end date now means once on each of those days, shown joined in the month view, each with its own check box. Multi-day bars show their progress. The agenda shows "In 3 days" or "5 days overdue" beside each task. Fixed the progress slider in the task editor, which could not be dragged.
+  - 繁體中文：新增“不定日待辦”欄：在月檢視左側展開，記每月做一次但不定哪天的事，以及完全沒有日期的事；勾選後會記到當天的日期格裡，上月沒做完的標為“逾期”。新增“最近變更”：標題列的垃圾桶圖示列出最近的新增、修改和刪除，可以隨時復原，重啟後也在。“每天”加起訖日期現在表示這幾天每天一次，在月檢視裡連成一排、各自勾選。多日任務的橫條上顯示進度。列表檢視每項右側顯示“3 天後”“逾期 5 天”。修復編輯視窗裡進度滑桿拖不動的問題。
+- 三种语言的“此版本的新增功能”已按上文填写并保存，重新载入后逐字一致；“管理 Store 一览语言”页三种语言均为 **完成**。描述、功能、截图、关键词、定价、属性、年龄分级未改。提交选项仍是“在此提交通过认证后立即予以发布”，runFullTrust 用途说明 453 字符未变。
+- 2026-11-17 07:24 点击“提交进行认证”后，概述页显示 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**，产品更新状态为 **正在认证（Submission 10）**；商店里仍是 Submission 9（0.3.10.0）。临时浏览器已关闭，配置文件已删除。是否上架以商店目录查询为准。
