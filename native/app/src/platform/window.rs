@@ -93,3 +93,22 @@ pub fn set_mica(hwnd: HWND, dark: bool, mica: bool) {
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &t as *const _ as *const _, 4);
     }
 }
+
+/// The program's icon on a framed window's title bar and its taskbar button, Alt+Tab entry.
+/// winit registers its window class without an icon and Slint sets one only from the window's
+/// `icon` property, so the title bar showed Windows' blank default (0.3.12 and before).
+pub fn set_app_icon(hwnd: HWND) {
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows::Win32::UI::WindowsAndMessaging::*;
+    unsafe {
+        let hinst = GetModuleHandleW(None).unwrap_or_default();
+        // resource 1 of app.rc; LR_SHARED: Windows keeps and frees the handles
+        let res = windows::core::PCWSTR(1 as *const u16);
+        for (which, cx, cy) in [(ICON_SMALL, SM_CXSMICON, SM_CYSMICON), (ICON_BIG, SM_CXICON, SM_CYICON)] {
+            if let Ok(h) = LoadImageW(Some(hinst.into()), res, IMAGE_ICON, GetSystemMetrics(cx), GetSystemMetrics(cy), LR_DEFAULTCOLOR | LR_SHARED) {
+                SendMessageW(hwnd, WM_SETICON, Some(WPARAM(which as usize)), Some(LPARAM(h.0 as isize)));
+            }
+        }
+    }
+}

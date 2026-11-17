@@ -226,6 +226,11 @@ fn start_platform(app: &mut App, id: &str) {
     if let Some(s) = std::env::var("FLUENTCAL_TEST_QUIT").ok().and_then(|s| s.parse::<f64>().ok()) {
         slint::Timer::single_shot(Duration::from_secs_f64(s), || run(quit));
     }
+    // FLUENTCAL_TEST_OPEN=settings opens the settings window a second after the start (checks
+    // of the framed windows without the mouse).
+    if std::env::var("FLUENTCAL_TEST_OPEN").as_deref() == Ok("settings") {
+        slint::Timer::single_shot(Duration::from_secs(1), || run(|app| app.open_settings(None)));
+    }
 }
 
 /// Shows the (new) desk window: sized first, then pinned and moved into place once it exists.

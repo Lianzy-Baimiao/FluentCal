@@ -336,3 +336,9 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 三种语言的“此版本的新增功能”在 `release/store-0.3.12/whats-new-*.txt`，均已保存、重新打开逐字核对；管理语言页全部显示“完成”。内容说明输入焦点修复、回车后连续添加、退出输入后快捷键保留，以及开关移到左侧边缘中央。
 - 提交选项为“在此提交通过认证后立即予以发布”，保留现有 runFullTrust 用途说明。2026-11-17 **10:39（UTC+8）** 确认送审成功：页面显示 **正在认证更新 / 预处理 / 产品更新：正在认证（Submission 11）**，并注明通过认证后立即开始发布。此时尚未确认 0.3.12.0 上架。
 - 回执截图：`release/store-0.3.12/submission-11-certified-pending.jpg`；隔离启动结果与界面截图也在该目录。GitHub 安装包、独立 EXE 及校验文件均已发布，四个线上摘要与本地一致。
+
+### 0.3.13.0 设置、编辑窗口标题栏图标修复（2026-11-17，包已备好，尚未送审）
+
+- 对应 GitHub [v0.3.13](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.13)。用户在得知“0.3.12 的 Submission 11 还在认证、再提交需要本人登录”后回答“都做”。
+- 商店包：`release/FluentCal_0.3.13.0_x64.msix`，10,763,984 字节，SHA-256 `f2fd541c1dcc07cc36e02b0187f11f603dfd4af1db01cff36d97cee58108035a`。包内 EXE 与独立 EXE 一致（SHA-256 `8a1b048eff35fcbc512dfaaf42c820d84dbd5d2e514e3938a4bb6d4e1246d57e`），清单较 0.3.12.0 仅版本改变。更新说明在 `release/store-0.3.13/whats-new-*.txt`。
+- 未送审的原因：2026-11-17 11:40 查询商店目录（CN）仍是 `ice.FluentCal_0.3.11.0_x64__rz8m2sa64m4em`，0.3.12.0（Submission 11）还在认证，此时不能开始新的更新。等 0.3.12.0 上架后创建 Submission 12。

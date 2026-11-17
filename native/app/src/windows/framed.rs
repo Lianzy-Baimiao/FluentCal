@@ -69,7 +69,10 @@ where
         slint::CloseRequestResponse::HideWindow
     });
     let (dark, mica) = (app.tokens.dark, app.has_mica());
-    window::when_created(w.as_weak(), move |h| window::set_mica(h, dark, mica));
+    window::when_created(w.as_weak(), move |h| {
+        window::set_mica(h, dark, mica);
+        window::set_app_icon(h);
+    });
     desk::allow_foreground();
     if let Err(e) = w.show() {
         eprintln!("[window] show: {e}");
