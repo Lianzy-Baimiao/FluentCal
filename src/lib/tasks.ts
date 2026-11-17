@@ -2,6 +2,7 @@ import type { Group, ISODate, Task } from '@/types';
 import { doc, put } from '@/stores/doc';
 import { addDays, diffDays, today } from './date';
 import type { Occurrence } from './recur';
+import { clearDay, flexKind, isSlot, setSlot } from './flex';
 
 import { uid } from './uid';
 
@@ -51,7 +52,13 @@ export function deleteTask(id: string): Promise<void> {
   return put('tasks', items);
 }
 
+/** `date`: the occurrence; for a to-do without a day (flex.ts) its slot (done today), or the
+ * day it was done (to untick it there). */
 export function setOccurrenceDone(t: Task, date: ISODate, done: boolean): Promise<void> {
+  if (flexKind(t)) {
+    if (isSlot(date)) return saveTask(setSlot(t, date, done ? today() : undefined));
+    return done ? Promise.resolve() : saveTask(clearDay(t, date));
+  }
   if (t.repeat) {
     const set = new Set(t.doneDates ?? []);
     if (done) set.add(date);
@@ -113,7 +120,7 @@ export function duplicateTask(t: Task): Promise<Task> {
 export function autoPostpone(now: ISODate = today()): Promise<void> | undefined {
   const items: Record<string, Task> = {};
   for (const t of Object.values(doc.tasks)) {
-    if (t.done || t.repeat || t.start !== t.end) continue;
+    if (t.done || t.repeat || t.flex || t.start !== t.end) continue;
     if (!(t.autoPostpone ?? doc.settings.tasks.autoPostpone)) continue;
     const late = diffDays(t.end, now);
     if (late <= 0 || late > 30) continue;

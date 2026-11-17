@@ -1,6 +1,7 @@
 import type { ISODate, Task } from '@/types';
 import { parts, relativeDay, toISO } from './date';
 import { occurrences } from './recur';
+import { dueOccurrences } from './flex';
 
 export interface ReminderItem {
   key: string;
@@ -52,7 +53,8 @@ export function computeReminders(
     const maxOffset = Math.max(...t.reminders);
     const until = toISO(new Date(nowMs + horizonMs + maxOffset * 60_000));
     const [hh, mm] = (t.time || allDayTime || '09:00').split(':').map(Number);
-    for (const o of occurrences(t, from, until, 200)) {
+    // a to-do without a day reminds from the end of its month while it is open
+    for (const o of [...occurrences(t, from, until, 200), ...dueOccurrences(t, from, until)]) {
       if (o.done) continue;
       const [y, m, d] = parts(o.start);
       const base = new Date(y, m - 1, d, hh, mm).getTime();

@@ -31,7 +31,16 @@ import {
   replaceDoc,
   exportDoc,
 } from "@/stores/doc";
-import { clearSampleData, setOccurrenceDone } from "@/lib/tasks";
+import { addTask, clearSampleData, setOccurrenceDone } from "@/lib/tasks";
+import {
+  flexKind,
+  flexOpen,
+  flexSide,
+  monthSlot,
+  newFlex,
+  slotDone,
+  SOMEDAY_SLOT,
+} from "@/lib/flex";
 import { sampleData } from "@/lib/seed";
 import { planMerge, toCSV, toICS } from "@/lib/export";
 import { readDocument } from "@/mobile/data";
@@ -80,9 +89,11 @@ const activeTitle = computed(
 const taskCount = computed(
   () =>
     taskList.value.filter((t) =>
-      t.repeat
-        ? occurrences(t, now.value, now.value, 10).some((o) => !o.done)
-        : !t.done,
+      flexKind(t)
+        ? flexOpen(t, now.value)
+        : t.repeat
+          ? occurrences(t, now.value, now.value, 10).some((o) => !o.done)
+          : !t.done,
     ).length,
 );
 const hasSamples = computed(() => taskList.value.some((t) => t.sample));
@@ -97,13 +108,17 @@ const agendaDays = computed(() =>
     ? [
         {
           date: now.value,
-          items: filteredTasks.value.map((t) => ({
-            task: t,
-            date: t.start,
-            start: t.start,
-            end: t.end,
-            done: t.done,
-          })),
+          items: filteredTasks.value.map((t) => {
+            // a to-do without a day is ticked by its slot, not by a date
+            const slot = flexKind(t) === "month" ? monthSlot(now.value) : SOMEDAY_SLOT;
+            return {
+              task: t,
+              date: flexKind(t) ? slot : t.start,
+              start: t.start,
+              end: t.end,
+              done: flexKind(t) ? !!slotDone(t, slot) : t.done,
+            };
+          }),
         },
       ]
     : agenda(
@@ -192,6 +207,42 @@ function pickDay(d: ISODate) {
   selected.value = d;
   if (d.slice(0, 7) !== cursor.value.slice(0, 7))
     cursor.value = startOfMonth(d);
+}
+// 不定日待办 (GitHub #7), as in the desktop's column: this month's, what last month left open,
+// and the ones without a date.
+const flexText = ref<Record<string, string>>({ month: "", someday: "" });
+const flexGroups = computed(() => {
+  const s = flexSide(taskList.value, now.value);
+  const row = (task: Task, slot: string, done?: ISODate) => ({ task, slot, done });
+  return [
+    {
+      key: "month",
+      title: `本 ${parts(now.value)[1]} 月待办（不定日）`,
+      add: "month" as const,
+      items: s.month.map((x) => row(x.task, s.monthSlot, x.done)),
+    },
+    {
+      key: "overdue",
+      title: "上月逾期",
+      add: undefined,
+      items: s.overdue.map((t) => row(t, s.overdueSlot)),
+    },
+    {
+      key: "someday",
+      title: "无日期待办",
+      add: "someday" as const,
+      items: s.someday.map((t) => row(t, SOMEDAY_SLOT)),
+    },
+  ].filter((g) => g.add || g.items.length);
+});
+function flexToggle(task: Task, slot: string, done: boolean) {
+  void action(() => setOccurrenceDone(task, slot, done));
+}
+function flexAdd(kind: "month" | "someday") {
+  const title = flexText.value[kind].trim();
+  if (!title) return;
+  flexText.value[kind] = "";
+  void action(() => addTask(newFlex(kind, title, now.value)));
 }
 function occurrenceDone(o: Occurrence) {
   void action(() => setOccurrenceDone(o.task, o.date, !o.done));
@@ -451,6 +502,62 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <section
+            v-if="!search.trim()"
+            class="flex-card"
+            aria-label="不定日待办"
+          >
+            <template v-for="g in flexGroups" :key="g.key">
+              <h3 :class="{ overdue: g.key === 'overdue' }">{{ g.title }}</h3>
+              <div
+                v-for="x in g.items"
+                :key="`${g.key}:${x.task.id}`"
+                class="flex-item"
+                :class="{ done: !!x.done }"
+              >
+                <button
+                  type="button"
+                  class="check"
+                  :class="{ checked: !!x.done }"
+                  :aria-label="(x.done ? '取消完成 ' : '完成 ') + x.task.title"
+                  :aria-pressed="!!x.done"
+                  @click="flexToggle(x.task, x.slot, !x.done)"
+                >
+                  {{ x.done ? "✓" : "" }}</button
+                ><button
+                  type="button"
+                  class="flex-title"
+                  @click="openTask(x.task)"
+                >
+                  {{ x.task.title }}</button
+                ><small v-if="x.done"
+                  >{{ parts(x.done)[1] }}月{{ parts(x.done)[2] }}日完成</small
+                ><small v-else-if="g.key === 'overdue'" class="late">逾期</small>
+              </div>
+              <form
+                v-if="g.add"
+                class="flex-add"
+                @submit.prevent="flexAdd(g.add)"
+              >
+                <input
+                  v-model="flexText[g.add]"
+                  maxlength="200"
+                  enterkeyhint="done"
+                  placeholder="＋ 添加"
+                  :aria-label="
+                    g.add === 'month' ? '添加每月待办' : '添加无日期待办'
+                  "
+                /><button
+                  v-if="flexText[g.add].trim()"
+                  type="submit"
+                  class="flex-add-btn"
+                >
+                  添加
+                </button>
+              </form>
+            </template>
+          </section>
+
           <div
             v-if="!agendaDays.some((d) => d.items.length)"
             class="empty-state"
@@ -503,7 +610,8 @@ onBeforeUnmount(() => {
                   ><span>{{ displayTime(o.task) }}</span
                   ><span v-if="groupName(o.task)"
                     >· {{ groupName(o.task) }}</span
-                  ><span v-if="o.task.repeat">· 重复</span></span
+                  ><span v-if="o.task.repeat">· 重复</span
+                  ><span v-if="o.task.flex === 'month'">· 每月一次</span></span
                 ><span
                   v-if="!o.task.repeat && percent(o.task) > 0"
                   class="mini-progress"
@@ -1495,5 +1603,83 @@ h1 span {
 }
 .bottom-nav button .f-icon {
   min-height: 21px;
+}
+.flex-card {
+  margin: 0 0 18px;
+  padding: 6px 14px 10px;
+  border-radius: 14px;
+  background: var(--card-fill);
+  border: 1px solid var(--card-stroke);
+}
+.flex-card h3 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.flex-card h3.overdue,
+.flex-item .late {
+  color: var(--danger, #c42b1c);
+}
+.flex-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+.flex-item .check {
+  flex: none;
+}
+.flex-title {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flex-item.done .flex-title {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+.flex-item small {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.flex-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.flex-add input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--card-stroke);
+  border-radius: 8px;
+  background: var(--subtle-fill-hover);
+  color: inherit;
+  font: inherit;
+}
+.flex-add input:focus {
+  outline: none;
+  border-color: var(--accent-fill);
+}
+.flex-add-btn {
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-fill);
+  color: var(--text-on-accent, #fff);
+  font: inherit;
 }
 </style>

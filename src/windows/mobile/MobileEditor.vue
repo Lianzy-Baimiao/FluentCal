@@ -13,7 +13,8 @@ import {
 } from "@/lib/tasks";
 import { doc, groupList } from "@/stores/doc";
 import { mergeEdit } from "@/lib/merge";
-import { describeRule, occurrenceOn } from "@/lib/recur";
+import { dailyRangeEnd, describeRule, occurrenceOn } from "@/lib/recur";
+import { flexKind } from "@/lib/flex";
 
 const props = defineProps<{
   open: boolean;
@@ -35,6 +36,8 @@ const groupId = ref("");
 const progress = ref(0);
 const done = ref(false);
 const repeat = ref("");
+/** 每隔 N 天 (daily only); 1 = every day. */
+const interval = ref(1);
 const reminder = ref("");
 const milestone = ref(false);
 const error = ref("");
@@ -58,6 +61,7 @@ const state = () =>
     progress.value,
     done.value,
     repeat.value,
+    repeat.value === "daily" ? interval.value : 1,
     reminder.value,
     milestone.value,
   ]);
@@ -76,6 +80,7 @@ function load() {
   done.value =
     t?.repeat && props.date ? !!occurrenceOn(t, props.date)?.done : !!t?.done;
   repeat.value = t?.repeat?.freq ?? "";
+  interval.value = t?.repeat?.freq === "daily" ? Math.max(1, Math.floor(t.repeat.interval ?? 1)) : 1;
   reminder.value = JSON.stringify(t?.reminders ?? []);
   milestone.value = !!t?.milestone;
   error.value = "";
@@ -128,6 +133,23 @@ const dependencyNames = computed(() =>
   draft.value?.deps?.map((id) => doc.tasks[id]?.title ?? "已删除").join("、"),
 );
 const duration = computed(() => Math.max(0, diffDays(start.value, end.value)));
+/** A to-do without a day (GitHub #7): it has no dates, repeat or progress to edit. */
+const flex = computed(() => (draft.value ? flexKind(draft.value) : undefined));
+const every = () => Math.min(365, Math.max(1, Math.floor(Number(interval.value) || 1)));
+/** The rule as chosen: the stored one while its kind and interval are untouched. */
+function rule(base?: Task["repeat"]): Task["repeat"] {
+  if (!repeat.value) return undefined;
+  const n = repeat.value === "daily" ? every() : 1;
+  if (base && repeat.value === base.freq) {
+    if (base.freq !== "daily" || Math.max(1, Math.floor(base.interval ?? 1)) === n) return base;
+    return { ...base, interval: n };
+  }
+  return { freq: repeat.value as NonNullable<Task["repeat"]>["freq"], interval: n };
+}
+/** 每天 (每隔 N 天, the working-day rules) from a start to an end date = once a day (GitHub #12). */
+const dailyRange = computed(
+  () => !!dailyRangeEnd({ start: start.value, end: end.value, repeat: rule() } as Task),
+);
 function normalizeDates() {
   if (!start.value) start.value = today();
   if (!end.value || end.value < start.value) end.value = start.value;
@@ -177,14 +199,7 @@ async function save() {
         groupId: groupId.value || undefined,
         progress: done.value ? 100 : progress.value,
         done: done.value || progress.value >= 100,
-        repeat: repeat.value
-          ? repeat.value === base.repeat?.freq
-            ? base.repeat
-            : {
-                freq: repeat.value as NonNullable<Task["repeat"]>["freq"],
-                interval: 1,
-              }
-          : undefined,
+        repeat: rule(base.repeat),
         updatedAt: Date.now(),
       }
     : makeTask({
@@ -197,17 +212,18 @@ async function save() {
         groupId: groupId.value || undefined,
         progress: done.value ? 100 : progress.value,
         done: done.value || progress.value >= 100,
-        repeat: repeat.value
-          ? {
-              freq: repeat.value as NonNullable<Task["repeat"]>["freq"],
-              interval: 1,
-            }
-          : undefined,
+        repeat: rule(),
       });
   next.reminders = JSON.parse(reminder.value || "[]");
   next.milestone = milestone.value || undefined;
-  if (next.milestone) next.end = next.start;
-  if (next.repeat) {
+  if (base && flexKind(base)) {
+    // only what the form shows for it changes; when it was done is ticked in the list
+    for (const k of ["start", "end", "time", "repeat", "done", "progress", "milestone", "doneDates", "exDates"] as const)
+      (next as unknown as Record<string, unknown>)[k] = base[k];
+  } else if (next.milestone) next.end = next.start;
+  if (base && flexKind(base)) {
+    // nothing else
+  } else if (next.repeat) {
     next.done = false;
     next.progress = 0;
     const dates = new Set(base?.doneDates ?? []);
@@ -297,7 +313,15 @@ async function remove(all = false) {
             @keydown.enter.prevent="save"
           />
           <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <p v-if="flex" class="rule-note flex-note">
+            {{
+              flex === "month"
+                ? "每月一次，哪天做都行。在日程页的“不定日待办”里勾选完成，下个月会重新出现。"
+                : "没有日期的待办。在日程页的“不定日待办”里勾选完成。"
+            }}
+          </p>
           <div class="form-card">
+            <template v-if="!flex">
             <label class="field"
               ><span>开始</span
               ><input
@@ -329,12 +353,28 @@ async function remove(all = false) {
                 <option value="ebbinghaus">艾宾浩斯</option>
               </select></label
             >
+            <label v-if="repeat === 'daily'" class="field"
+              ><span>每隔几天</span
+              ><input
+                v-model.number="interval"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                max="365"
+                step="1"
+                aria-label="每隔几天"
+                @change="interval = every()"
+            /></label>
             <p
-              v-if="draft?.repeat && repeat === draft.repeat.freq"
+              v-if="draft?.repeat && rule(draft.repeat) === draft.repeat"
               class="rule-note"
             >
               {{ describeRule(draft.repeat, draft.start) }}（原规则保留）
             </p>
+            <p v-if="dailyRange" class="rule-note">
+              起止日期内每次占一天，到结束日期为止，每天各自勾选。
+            </p>
+            </template>
             <label class="field"
               ><span>提醒</span
               ><select v-model="reminder" aria-label="提醒">
@@ -402,7 +442,7 @@ async function remove(all = false) {
               </div>
             </div>
           </div>
-          <div class="form-card">
+          <div v-if="!flex" class="form-card">
             <template v-if="!repeat"
               ><div class="progress-label">
                 <span>进度</span><strong>{{ done ? 100 : progress }}%</strong>
@@ -443,6 +483,9 @@ async function remove(all = false) {
               placeholder="备注"
             />
           </div>
+          <p v-if="flex && dependencyNames" class="rule-note">
+            前置任务：{{ dependencyNames }}
+          </p>
           <button
             v-if="!isNew && !deleting"
             type="button"

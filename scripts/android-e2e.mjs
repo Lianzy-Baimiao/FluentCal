@@ -238,6 +238,81 @@ try {
       );
     },
   );
+  // 0.3.3: what the desktop added in 0.3.10 / 0.3.11
+  const byTitle = async (title) => Object.values((await stored()).tasks).find((t) => t.title === title);
+  const waitTask = (title, test) =>
+    page.waitForFunction(
+      ([key, title, test]) => {
+        const t = Object.values(JSON.parse(localStorage.getItem(key)).tasks).find((t) => t.title === title);
+        return new Function("t", `return ${test}`)(t);
+      },
+      [key, title, test],
+    );
+  await check("to-dos without a day: add, tick on today, untick, and they keep their dates when edited", async () => {
+    await nav("日程").click();
+    const card = page.getByRole("region", { name: "不定日待办" });
+    await card.getByLabel("添加每月待办").fill("洗车");
+    await card.getByLabel("添加每月待办").press("Enter");
+    await card.getByLabel("添加无日期待办").fill("换护照");
+    await card.getByRole("button", { name: "添加", exact: true }).click();
+    await waitTask("换护照", "!!t");
+    const car = await byTitle("洗车");
+    assert.equal(car.flex, "month");
+    assert.equal(car.start, today.slice(0, 8) + "01");
+    assert.equal((await byTitle("换护照")).flex, "someday");
+    assert.equal(await card.getByLabel("添加每月待办").inputValue(), "");
+    // ticking records today; the to-do stays in the list, struck through, and is on today's agenda
+    await card.getByRole("button", { name: "完成 洗车", exact: true }).click();
+    await waitTask("洗车", "!!t.flexDone");
+    assert.deepEqual((await byTitle("洗车")).flexDone, { [today.slice(0, 7)]: today });
+    assert.equal((await byTitle("洗车")).done, false);
+    await card.locator(".flex-item.done", { hasText: "洗车" }).waitFor();
+    await page.locator(".task-card.done", { hasText: "洗车" }).waitFor();
+    // unticked from the day it was done on
+    await page.locator(".task-card").getByRole("button", { name: "取消完成 洗车", exact: true }).click();
+    await waitTask("洗车", "!t.flexDone");
+    await card.getByRole("button", { name: "完成 洗车", exact: true }).waitFor();
+    // a to-do without a date is done as a whole and leaves the list
+    await card.getByRole("button", { name: "完成 换护照", exact: true }).click();
+    await waitTask("换护照", "t.done === true");
+    assert.deepEqual((await byTitle("换护照")).flexDone, { "": today });
+    assert.equal(await card.locator(".flex-item", { hasText: "换护照" }).count(), 0);
+    // the editor has no dates for it and leaves them alone
+    await card.locator(".flex-title", { hasText: "洗车" }).click();
+    assert.equal(await dialog().getByLabel("开始", { exact: true }).count(), 0);
+    assert.equal(await dialog().getByLabel("重复", { exact: true }).count(), 0);
+    await dialog().getByLabel("任务名称").fill("洗车和打蜡");
+    await save();
+    const renamed = await byTitle("洗车和打蜡");
+    assert.deepEqual([renamed.flex, renamed.start, renamed.end, renamed.done], ["month", car.start, car.start, false]);
+    // not a bar on its start day in the Gantt chart: the whole month while it is open
+    await nav("甘特").click();
+    await page.locator(".mg .task-name", { hasText: "洗车和打蜡" }).waitFor();
+    assert.match(await page.locator(".mg .task-name", { hasText: "洗车和打蜡" }).innerText(), /每月一次/);
+    assert.equal(await page.locator(".mg .task-name", { hasText: "换护照" }).count(), 0);
+    await nav("日程").click();
+  });
+  await check("every N days can be set, and a daily task with an end date is once a day", async () => {
+    await page.locator(".primary-round").click();
+    await dialog().getByLabel("任务名称").fill("背单词");
+    await dialog().getByLabel("重复", { exact: true }).selectOption("daily");
+    await dialog().getByLabel("每隔几天").fill("2");
+    const end = new Date(Date.parse(today) + 4 * 86400000).toISOString().slice(0, 10);
+    await dialog().getByLabel("结束", { exact: true }).fill(end);
+    await dialog().getByText("每次占一天").waitFor();
+    await save();
+    const t = await byTitle("背单词");
+    assert.deepEqual(t.repeat, { freq: "daily", interval: 2 });
+    assert.equal(t.end, end);
+    // today, +2, +4: three single days, each with its own tick
+    assert.equal(await page.locator(".task-card", { hasText: "背单词" }).count(), 3);
+    // reopening keeps the interval and the rule object
+    await page.locator(".task-main", { hasText: "背单词" }).first().click();
+    assert.equal(await dialog().getByLabel("每隔几天").inputValue(), "2");
+    await dialog().getByLabel("备注", { exact: true }).fill("每次 20 个");
+    await save();
+    assert.deepEqual((await byTitle("背单词")).repeat, { freq: "daily", interval: 2 });
+  });
   await mkdir("shots/android", { recursive: true });
   await page.locator('.toast').waitFor({ state: 'hidden' });
   await check(

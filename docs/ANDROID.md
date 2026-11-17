@@ -1,21 +1,24 @@
 # FluentCal Android 客户端
 
-Android 客户端（0.3.2）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
+Android 客户端（0.3.3）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
 
-下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.2.apk`，可直接覆盖升级并保留数据。
+下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.3.apk`，可直接覆盖升级并保留数据。
 
-**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.2-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
+**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.3-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
 
 0.3.1 修复扫码页面横屏问题（手机锁定竖屏），以及底部日程数字角标被按钮行高拉长的问题；角标固定高度，个位数为圆形、多位数为胶囊形，超过 99 显示 `99+`。
 
 0.3.2 修复顶部「回到今天」按钮：从日程、甘特或设置页点击会打开当月月历并选中今天，同时清除搜索、回到页面顶部并显示提示。按钮增加「今天」文字。
 
+0.3.3 跟上桌面 0.3.10 / 0.3.11 的数据：日程页新增“不定日待办”（每月一次不定哪天、无日期两类，和电脑端的待办栏是同一份数据）；“每天”可以设每隔几天；每天 / 每隔 N 天 / 工作日加起止日期表示这几天每次占一天、各自勾选。此前这些任务在手机上会显示成开始日期那天的普通任务或层层堆叠的长条。
+
 ## 功能与使用
 
 - **日程**：未来 30 天的安排、搜索全部任务、完成/取消完成、撤销。
+- **不定日待办**：日程页顶部的卡片，分“本 N 月待办（不定日）”“上月逾期”“无日期待办”。在输入框里写下名称按回车添加；每月待办勾选后记到当天、划线留在卡片里，下个月重新出现；无日期待办勾选后从卡片消失。点名称可改名称、颜色、分组、提醒和备注（提醒以月底为基准）。甘特图里未完成的每月待办按整月画条。
 - **月历**：农历、节气、节日、任务标记；点日期查看当天安排并创建任务。
 - **甘特图**：按日/周刻度、滑动时间轴、分组筛选、进度、里程碑和依赖线；点任务修改起止日期及进度。重复任务显示系列的初始安排。
-- **任务编辑**：日期、时间、重复、提醒、颜色、分组、进度、备注；重复任务支持仅删除这一次或删除整个系列。编辑普通字段时保留桌面端的复杂重复规则、排除日期、完成日期、依赖及其他字段。
+- **任务编辑**：日期、时间、重复（“每天”可设每隔几天）、提醒、颜色、分组、进度、备注；每天、每隔 N 天、工作日、法定工作日加上起止日期，表示这几天每次占一天、到结束日期为止；重复任务支持仅删除这一次或删除整个系列。编辑普通字段时保留桌面端的复杂重复规则、排除日期、完成日期、依赖及其他字段。
 - **本地数据**：Android 应用私有存储，离线启动和编辑；写入按顺序处理，保留上一份有效快照。浏览器开发使用单独的 `CapacitorStorage.fluentcal.mobile.doc.v1`，不与桌面 mock 数据混用。
 - **自动云同步**：WebDAV / GitHub / Gitee；启动、恢复前台、联网、本机编辑后和运行期间定时同步。支持首次合并/使用云端日历、离线补传、删除传播、并发冲突重试、连接测试、状态提示和手动重试。
 - **扫码连接**：电脑版「设置 → 同步」显示一次性二维码和 GitHub 下载入口，手机「设置 → 扫码连接电脑」直接获取已配置的云同步账号。二维码有效 5 分钟，获取一次即失效，离开桌面同步页/取消/刷新可撤销。
@@ -72,7 +75,7 @@ $env:ANDROID_HOME = 'C:\path\to\Android\Sdk'
 npm run android:apk      # Windows 一键生成可安装的 debug APK
 ```
 
-输出：`release/FluentCal-Android-0.3.2-debug.apk`（versionCode 5）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.1.apk` 构建正式签名包 `release/FluentCal-Android-0.3.2.apk` 并检查与上一正式版的签名兼容性。
+输出：`release/FluentCal-Android-0.3.3-debug.apk`（versionCode 6）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.2.apk` 构建正式签名包 `release/FluentCal-Android-0.3.3.apk` 并检查与上一正式版的签名兼容性。
 
 构建脚本提供 `.apk.sha256` 校验和，并会自动识别装在 `%USERPROFILE%\tools\fluentcal-android` 下的工具链；在其他机器上按上例设置环境变量。如果 Gradle 需要代理，可通过当前终端的 `JAVA_OPTS` 设置 `-Dhttps.proxyHost=地址 -Dhttps.proxyPort=端口`，不需要改项目配置。Windows 中文路径下 Gradle worker 使用 `file.encoding=COMPAT` 生成与 Java 启动器一致的参数文件，Java 源码编译显式使用 UTF-8。
 
@@ -93,7 +96,7 @@ npm test                 # 包括备份校验、并发持久化、写入失败�
 npm run android:e2e       # Edge 无头模式，运行手机交互测试并在 shots/android/ 生成截图
 npm run android:sync-e2e  # 两个隔离客户端连接模拟 WebDAV，测试真实界面与自动调度
 node scripts/android-navigation-e2e.mjs  # 角标 0/1/12/99+，320/390/768px，深浅主题
-powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.2.apk
+powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.3.apk
 npm run build            # 同时检查桌面网页资源可构建
 cd android
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain

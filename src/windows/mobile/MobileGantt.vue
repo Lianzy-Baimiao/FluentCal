@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { taskColor } from "@/fluent/theme";
 import { addDays, diffDays, parts } from "@/lib/date";
 import { buildRows } from "@/lib/gantt";
+import { flexKind, openMonth } from "@/lib/flex";
 import { doc, groupList, taskList } from "@/stores/doc";
 import { now } from "@/composables/now";
 import { isDark } from "@/composables/theme";
@@ -18,10 +19,13 @@ const width = computed(() => (scale.value === "day" ? 32 : 14));
 const end = computed(() => addDays(start.value, days.value - 1));
 const rows = computed(() =>
   buildRows(
-    taskList.value.filter((t) =>
-      `${t.title} ${t.notes ?? ""}`
-        .toLowerCase()
-        .includes(props.search.toLowerCase()),
+    taskList.value.filter(
+      (t) =>
+        // a to-do without a day has a bar only while this month's is open
+        (!flexKind(t) || !!openMonth(t, now.value)) &&
+        `${t.title} ${t.notes ?? ""}`
+          .toLowerCase()
+          .includes(props.search.toLowerCase()),
     ),
     groupList.value.map((g) => ({ ...g, collapsed: false })),
     {
@@ -41,7 +45,9 @@ const bar = (a: string, b: string) => ({
   left: `${Math.max(0, diffDays(start.value, a)) * width.value}px`,
   width: `${Math.max(0, Math.min(days.value, diffDays(start.value, b) + 1) - Math.max(0, diffDays(start.value, a))) * width.value}px`,
 });
-const visible = (t: Task) => t.end >= start.value && t.start <= end.value;
+/** Where a task's bar is: the whole month for a monthly to-do without a day. */
+const span = (t: Task) => openMonth(t, now.value) ?? { start: t.start, end: t.end };
+const visible = (t: Task) => span(t).end >= start.value && span(t).start <= end.value;
 const todayLeft = computed(
   () => diffDays(start.value, now.value) * width.value,
 );
@@ -180,7 +186,7 @@ const links = computed(() => {
                 {{ r.task.title
                 }}<small
                   >{{ r.task.done ? 100 : r.task.progress }}%{{
-                    r.task.repeat ? " · 重复" : ""
+                    r.task.repeat ? " · 重复" : r.task.flex ? " · 每月一次" : ""
                   }}</small
                 >
               </button>
@@ -190,7 +196,7 @@ const links = computed(() => {
                   class="bar"
                   :class="{ milestone: r.task.milestone }"
                   :style="{
-                    ...bar(r.task.start, r.task.end),
+                    ...bar(span(r.task).start, span(r.task).end),
                     '--bar': taskColor(r.task.color, isDark).bar,
                   }"
                   :aria-label="`编辑 ${r.task.title}`"
