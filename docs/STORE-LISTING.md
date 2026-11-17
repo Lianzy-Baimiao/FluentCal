@@ -346,5 +346,17 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
   - 简体中文：修复不定日待办栏输入框无法取得键盘焦点、无法输入的问题。按回车添加后可直接继续输入下一项；按 Esc、收起待办栏或切换视图后，日历快捷键继续生效。待办栏开关移到日历左侧边缘中央，不再遮挡星期和日期，展开与收起使用同一个开关。 修复设置窗口和编辑任务窗口标题栏左上角不显示程序图标的问题，现在标题栏、任务栏和 Alt+Tab 里都显示 FluentCal 的图标。
   - English: Fixed the to-do column's input boxes not receiving keyboard focus when the desktop calendar was inactive. Press Enter to add a to-do and keep typing the next one. Calendar shortcuts keep working after Esc, closing the column, or switching views. The column's handle now sits midway down the calendar's left edge, clear of weekday labels and dates; the same handle opens and closes it. Fixed the Settings and task editor windows showing a blank icon at the left of their title bar. The title bar, the taskbar and Alt+Tab now show FluentCal's icon.
   - 繁體中文：修復不定日待辦欄輸入框無法取得鍵盤焦點、無法輸入的問題。按 Enter 新增後可直接繼續輸入下一項；按 Esc、收起待辦欄或切換檢視後，日曆快捷鍵繼續生效。待辦欄開關移到日曆左側邊緣中央，不再遮擋星期和日期，展開與收起使用同一個開關。 修復設定視窗和編輯工作視窗標題列左上角不顯示程式圖示的問題，現在標題列、工作列和 Alt+Tab 裡都顯示 FluentCal 的圖示。
-- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 14:15 点击“提交进行认证”，概述页显示 **正在认证更新 / 预处理**；14:35 再看已是 **产品更新：正在发布（Submission 11）**。是否上架以商店目录查询为准。
+- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 14:15 点击“提交进行认证”，概述页显示 **正在认证更新 / 预处理**；14:35 再看已是 **产品更新：正在发布（Submission 11）**。是否上架以商店目录查询为准。2026-11-17 18:00 前后商店目录（CN）已返回 `ice.FluentCal_0.3.13.0_x64__rz8m2sa64m4em`，0.3.13.0 已上架。
 - 浏览器改为固定配置：Partner Center 专用的 Edge 配置文件放在 `%LOCALAPPDATA%\fluentcal-pc-edge`，用完只关浏览器、不删配置，登录状态保留；不加载扩展、不同步，默认在隐藏桌面上运行，屏幕上不出现窗口。脚本在 `C:\Users\30694\tools\fluentcal-store\`（`launch-edge-hidden.ps1`、`launch-edge.ps1`、`stop-edge.ps1`、`pc.py`）。14:33 用隐藏桌面重新启动验证过：直接进入产品概述页，无需登录。无头模式会被 Partner Center 以 Access Denied 拒绝，不能用。
+
+### 0.3.14.0 待办栏展开方式、多日任务显示第几天（2026-11-17 22:10 送审）
+
+- 送审前商店目录（CN）返回 0.3.13.0，Partner Center 概述页显示 Submission 11 已上架。新建 **Submission 12 / 1152921505702429699**。
+- 对应 GitHub [v0.3.14](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.14)（提交 `23808db`）。商店包：`release/FluentCal_0.3.14.0_x64.msix`，10,785,353 字节，SHA-256 `3f58a6daf8a6c7d6f1e53692a4768a2a7d0f988e3dd09e2bea87c3d1b62b4bf1`。包内 EXE 与独立 EXE 一致（SHA-256 `8da7a807c3214b2a43ceec3a0118df5fc7daf4bd01b94ad1facbc345159ced90`），清单较 0.3.13.0 仅版本改变。
+- 登录：固定配置的 Edge 在隐藏桌面上启动，先显示“会话已过期”，随后自行跳回产品概述页，没有要求输入任何内容。
+- 上传 0.3.14.0 后页面提示 0.3.13.0 保存后移除；确认分析结束后保存，概述页的包只剩 **FluentCal_0.3.14.0_x64.msix / Validated / 已更新**。只出现既有的 `runFullTrust` 提醒，设备系列只勾选 Windows 10/11 Desktop。
+- “此版本的新增功能”文本在 `release/store-0.3.14/whats-new-*.txt`，保存后重新载入逐字一致：
+  - 简体中文：不定日待办栏可以选择展开方式（设置 › 日历）：占用日历左侧、向左扩展窗口（日历大小不变）、或浮在日历上。跨多天的任务横条在名称后显示“第5-2天（40%）”，表示一共 5 天、今天是第 2 天；完成进度显示为“进度 60%”，0% 和 100% 也显示。这两项都可以在设置 › 日历里关闭。
+  - English: The to-do column can now open in three ways (Settings › Calendar): beside the calendar, by widening the window to the left so the calendar keeps its size, or floating over the calendar. Bars of multi-day tasks show "Day 2 of 5 (40%)" after the name, and progress reads "60% done", including 0% and 100%. Both can be turned off in Settings › Calendar.
+  - 繁體中文：不定日待辦欄可以選擇展開方式（設定 › 日曆）：佔用日曆左側、向左擴展視窗（日曆大小不變）、或浮在日曆上。跨多天的任務橫條在名稱後顯示“第5-2天（40%）”，表示一共 5 天、今天是第 2 天；完成進度顯示為“進度 60%”，0% 和 100% 也顯示。這兩項都可以在設定 › 日曆裡關閉。
+- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 22:10 点击“提交进行认证”，概述页显示 **正在认证更新 / 产品更新：正在认证（Submission 12）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.14/14-*.png`。
