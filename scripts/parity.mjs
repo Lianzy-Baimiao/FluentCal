@@ -35,6 +35,19 @@ const settingsWin = { width: 980, height: 700 };
 const settingsScene = (name, page, extra = {}) => ({
   name, window: 'settings', url: `?w=settings&theme=${extra.dark ? 'dark' : 'light'}&page=${page}`, page, size: settingsWin, ...extra,
 });
+// What 0.3.11 added, for the README / Store pictures only (0.2's reference render ignores it):
+// to-dos without a day (the column left of the month) and a task done once a day over a range.
+function storeExtras(d) {
+  const ts = NOW.getTime();
+  let order = 100;
+  const add = (id, t) => (d.tasks[id] = { id, end: t.start, progress: 0, done: false, order: ++order, createdAt: ts, updatedAt: ts, autoPostpone: false, ...t });
+  add('f-car', { title: '洗车', start: '2026-10-01', flex: 'month', flexDone: { '2026-10': '2026-10-09' } });
+  add('f-water', { title: '交水电费', start: '2026-10-01', flex: 'month' });
+  add('f-filter', { title: '换净水器滤芯', start: '2026-10-01', flex: 'month', flexDone: { '2026-10': '2026-10-06' } });
+  add('f-album', { title: '整理相册', start: '2026-10-08', flex: 'someday' });
+  add('f-passport', { title: '换护照', start: '2026-10-11', flex: 'someday' });
+  add('words', { title: '背单词', start: '2026-10-19', end: '2026-10-23', color: 'teal', repeat: { freq: 'daily' } });
+}
 // Gallery steps: [action, target, extra]. Targets are Playwright selectors on 0.2's page.
 const SCENES = [
   { name: 'month-light', url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } } },
@@ -57,8 +70,9 @@ const SCENES = [
   { name: 'desk-tip-head', url: '?w=desk&theme=dark', size: month, dark: true, settings: { theme: { mode: 'dark' } }, steps: [['hover', '.cell[data-date="2026-10-21"] .head'], ['wait', 700]] },
   { name: 'gantt-tip', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } }, steps: [['hover', '.bar[data-task="api"]'], ['wait', 700]] },
   // Microsoft Store screenshots (scripts/store-shots.sh, at 2×): the README's scenes. Only when named.
-  { name: 'store-month-light', store: true, url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' } } },
-  { name: 'store-month-dark', store: true, url: '?w=desk&theme=dark&accent=%238764B8', accent: '#8764B8', size: month, dark: true, settings: { theme: { mode: 'dark', accent: '#8764B8' }, desk: glass } },
+  { name: 'store-month-light', store: true, url: '?w=desk&theme=light', size: { width: 1040, height: 640 }, settings: { theme: { mode: 'light' }, calendar: { sidebar: true } }, doc: storeExtras },
+  { name: 'store-list', store: true, url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, calendar: { view: 'list' } }, doc: storeExtras },
+  { name: 'store-month-dark', store: true, url: '?w=desk&theme=dark&accent=%238764B8', accent: '#8764B8', size: month, dark: true, settings: { theme: { mode: 'dark', accent: '#8764B8' }, desk: glass }, doc: storeExtras },
   { name: 'store-gantt', store: true, url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } } },
   { ...settingsScene('store-settings-appearance', 'appearance', { dark: true }), store: true, size: { width: 980, height: 548 } },
   { name: 'gallery-light', window: 'gallery', url: '?w=gallery&theme=light', size: gallery },

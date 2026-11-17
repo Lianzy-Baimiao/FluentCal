@@ -10,7 +10,7 @@ An **Android client** is also available, with editable agendas, a calendar and a
 
 [Get it from the Microsoft Store](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [Download for Windows](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) · [Download Android APK](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)
 
-![FluentCal month view: lunar dates, solar terms, Chinese public holidays with off and work days, multi-day task bars and countdowns](docs/store/month-light.png)
+![FluentCal month view: the to-do column on the left, lunar dates, solar terms, Chinese public holidays with off and work days, multi-day task bars with progress, a daily task joined across its days, and countdowns](docs/store/month-light.png)
 
 ## Features
 
@@ -34,6 +34,10 @@ The screenshots show the Simplified Chinese interface.
 Dark theme, purple accent color and the "Clear glass" preset (the wallpaper shows through):
 
 ![Month view in the dark theme with the Clear glass preset](docs/store/month-dark.png)
+
+Agenda: upcoming tasks by day, each with how many days are left:
+
+![Agenda view](docs/store/list.png)
 
 Gantt chart: dependency arrows, progress, group summaries and milestones, from the same data as the calendar:
 

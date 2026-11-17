@@ -10,7 +10,7 @@
 
 [從微軟商店安裝](https://apps.microsoft.com/store/detail/9NTT06453DG5?cid=DevShareMCLPCB) · [下載 Windows 安裝包](https://github.com/Lianzy-Baimiao/FluentCal/releases/latest) · [下載 Android APK](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)
 
-![FluentCal 月檢視：農曆、節氣、法定節假日“休/班”、多日任務橫條和倒數日](docs/store/month-light.png)
+![FluentCal 月檢視：左側的不定日待辦欄，農曆、節氣、法定節假日“休/班”，帶進度的多日任務橫條，連成一排的每日任務和倒數日](docs/store/month-light.png)
 
 ## 功能
 
@@ -34,6 +34,10 @@
 深色主題、紫色強調色、“透明玻璃”預設（透出桌布）：
 
 ![深色、透明玻璃風格的月檢視](docs/store/month-dark.png)
+
+清單檢視：按天列出近期任務，每項標出還有幾天：
+
+![清單檢視](docs/store/list.png)
 
 甘特圖：依賴箭頭、進度、分組彙總、里程碑，和日曆是同一份資料：
 

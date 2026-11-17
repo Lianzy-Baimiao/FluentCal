@@ -5,7 +5,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-scenes=(store-month-light store-month-dark store-gantt store-settings-appearance)
+scenes=(store-month-light store-month-dark store-list store-gantt store-settings-appearance)
 PARITY_SCALE=2 node scripts/parity.mjs "${scenes[@]}"
 cd native
 exe="$(cargo build -q -p fluentcal-native --example snapshot --message-format=json \
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from PIL import Image
 root = Path(sys.argv[1])
-for s in ('store-month-light', 'store-month-dark', 'store-gantt', 'store-settings-appearance'):
+for s in ('store-month-light', 'store-month-dark', 'store-list', 'store-gantt', 'store-settings-appearance'):
     im = Image.open(root / 'native' / '.parity' / f'{s}.native.png').convert('RGB')
     if s == 'store-settings-appearance':
         im = im.crop((0, 0, im.width, 548 * 2))
