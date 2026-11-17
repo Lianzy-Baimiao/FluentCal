@@ -154,3 +154,22 @@ pub fn moved(r: Rect, from: &Mon, to: &Mon) -> Rect {
         h,
     }
 }
+
+/// The to-do column opens to the LEFT of the calendar (GitHub #7): the window grows by `ext`
+/// on its left and the calendar keeps its place and size. Against the screen's left edge the
+/// window stays on the screen (the calendar moves right by what is missing); a window wider
+/// than the screen gets a narrower calendar. `cal`: the calendar alone, as saved in bounds.
+pub fn with_side(cal: Rect, ext: u32, work: Rect) -> Rect {
+    let w = (cal.w + ext).min(work.w.max(cal.w));
+    let mut x = cal.x - ext as i32;
+    if x < work.x && cal.x >= work.x {
+        x = work.x;
+    }
+    Rect { x, y: cal.y, w, h: cal.h }
+}
+
+/// The calendar's own rect in a window that has the column on its left.
+pub fn without_side(win: Rect, ext: u32) -> Rect {
+    let ext = ext.min(win.w.saturating_sub(100));
+    Rect { x: win.x + ext as i32, y: win.y, w: win.w - ext, h: win.h }
+}

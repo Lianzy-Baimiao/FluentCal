@@ -34,7 +34,7 @@ export struct ChipData {
     linked: bool,
     join-left: bool,
     join-right: bool,
-    // A bar's progress (GitHub #10): "40%" after the title; the done part of this piece, 0-1.
+    // After a bar's title (GitHub #10, #13): "第5-2天（40%） 进度 60%"; the done part of this piece, 0-1.
     pct: string,
     fill: float,
 }
@@ -187,41 +187,59 @@ export component TaskChip inherits Rectangle {
                 opacity: 0.8;
                 glow: root.glow;
             }
-            title-box := Rectangle {
+            // The title, then a bar's days and progress. The title comes first: the label gets
+            // the room that is left, is cut short with "…" there, and goes when that is too
+            // little to say anything (a bar of one or two days, a long title).
+            words := Rectangle {
+                property <length> gap: 4px;
+                property <length> title-w: min(title-row.preferred-width, self.width);
+                property <length> label-w: max(0px, self.width - title-w - gap);
                 height: root.height;
                 min-width: 0;
                 horizontal-stretch: 1;
-                preferred-width: title-row.preferred-width;
-                opacity: chip.done ? (bar ? 0.7 : 0.6) : 1;
-                title-row := HorizontalLayout {
-                    if chip.milestone: GText {
-                        text: "◆ ";
-                        color: bar ? fg : chip.bar;
-                        font-size: root.text-size;
-                        glow: root.glow;
-                    }
-                    title := GText {
-                        text: chip.title;
-                        color: fg;
-                        font-size: root.text-size;
-                        overflow: elide;
-                        glow: root.glow;
-                    }
-                }
-                if chip.done: Rectangle {
+                preferred-width: title-row.preferred-width + (chip.pct != "" ? gap + label.preferred-width : 0);
+                title-box := Rectangle {
                     x: 0;
-                    y: round((parent.height / 2 + 0.8px * k) / 1phx) * 1phx;
-                    width: min(parent.width, title-row.preferred-width);
-                    height: max(1px, round(0.9px * k / 1phx) * 1phx);
-                    background: fg;
+                    width: words.title-w;
+                    height: parent.height;
+                    opacity: chip.done ? (bar ? 0.7 : 0.6) : 1;
+                    title-row := HorizontalLayout {
+                        if chip.milestone: GText {
+                            text: "◆ ";
+                            color: bar ? fg : chip.bar;
+                            font-size: root.text-size;
+                            glow: root.glow;
+                        }
+                        title := GText {
+                            text: chip.title;
+                            color: fg;
+                            font-size: root.text-size;
+                            overflow: elide;
+                            glow: root.glow;
+                        }
+                    }
+                    if chip.done: Rectangle {
+                        x: 0;
+                        y: round((parent.height / 2 + 0.8px * k) / 1phx) * 1phx;
+                        width: parent.width;
+                        height: max(1px, round(0.9px * k / 1phx) * 1phx);
+                        background: fg;
+                    }
                 }
-            }
-            if chip.pct != "": GText {
-                text: chip.pct;
-                color: fg;
-                font-size: root.text-size;
-                opacity: 0.85;
-                glow: root.glow;
+                label := GText {
+                    x: words.title-w + words.gap;
+                    width: words.label-w;
+                    height: parent.height;
+                    // "第5-2天…" at the least
+                    visible: chip.pct != "" && words.label-w >= min(self.preferred-width, 4.5 * root.text-size);
+                    text: chip.pct;
+                    color: fg;
+                    font-size: root.text-size;
+                    overflow: elide;
+                    opacity: 0.85;
+                    // only bars have one, and a bar's text has no glow
+                    glow: false;
+                }
             }
             if chip.repeat: Icon {
                 glyph: Glyph.repeat;

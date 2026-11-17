@@ -399,22 +399,41 @@ pub fn due_label(o: &Occurrence, all: bool, today: &str) -> (String, &'static st
     (trf("还剩 {0} 天", &[to_end.to_string()]), "")
 }
 
-/// A bar's progress (GitHub #10): "40%" after the title, and how much of this piece of the bar
-/// is done (0–1, from its left). Tasks with a progress: several days, not repeating, not done.
-fn bar_progress(ch: &Chip) -> (String, f32) {
+/// What a bar over several days says after its title, and how much of this piece of the bar
+/// is done (0–1, from its left):
+/// - "第5-2天（40%）" (GitHub #13): 5 days in all, today is the 2nd, 40 % of the time is gone;
+///   0 before it starts, all of them after it ended. Worked out, never typed.
+/// - "进度 60%" (GitHub #10, #13): what the user set, also 0 % and 100 %, so "not begun" and
+///   "done" can be told apart. Not for repeating tasks (each time has no progress of its own).
+/// Each has its switch in 设置 › 日历.
+fn bar_label(ch: &Chip, today: &str, days: bool, progress: bool) -> (String, f32) {
     let task = ch.occ.task;
-    if !ch.multi_day || task.repeat.is_some() || task.is_milestone() || task.done || task.progress <= 0.0 {
+    if !ch.multi_day || task.is_milestone() {
         return (String::new(), 0.0);
     }
-    let total = (diff_days(&ch.occ.start, &ch.occ.end) + 1).max(1) as f64;
-    let done_days = total * task.progress.clamp(0.0, 100.0) / 100.0;
-    let before = diff_days(&ch.occ.start, &ch.seg_start).max(0) as f64;
-    let fill = ((done_days - before) / ch.seg_days.max(1) as f64).clamp(0.0, 1.0);
-    (format!("{}%", task.progress), fill as f32)
+    let total = (diff_days(&ch.occ.start, &ch.occ.end) + 1).max(1);
+    let mut parts = Vec::new();
+    if days {
+        let gone = (diff_days(&ch.occ.start, today) + 1).clamp(0, total);
+        let pct = (gone as f64 * 100.0 / total as f64).round();
+        parts.push(trf("第{0}-{1}天（{2}%）", &[total.to_string(), gone.to_string(), pct.to_string()]));
+    }
+    let mut fill = 0.0;
+    if progress && task.repeat.is_none() {
+        let p = if task.done { 100.0 } else { task.progress.clamp(0.0, 100.0) };
+        parts.push(trf("进度 {0}%", &[p.to_string()]));
+        if !task.done {
+            let done_days = total as f64 * p / 100.0;
+            let before = diff_days(&ch.occ.start, &ch.seg_start).max(0) as f64;
+            fill = ((done_days - before) / ch.seg_days.max(1) as f64).clamp(0.0, 1.0);
+        }
+    }
+    (parts.join(" "), fill as f32)
 }
 
 pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
-    let (pct, fill) = bar_progress(ch);
+    let c = &doc.settings.calendar;
+    let (pct, fill) = bar_label(ch, today, c.bar_days, c.bar_progress);
     let task = ch.occ.task;
     let col = task_color(task.color.as_deref(), t);
     let mut tip = vec![task.title.clone(), format_range(&ch.occ.start, &ch.occ.end, today) + &task.time.as_deref().map_or(String::new(), |tm| format!(" {tm}"))];

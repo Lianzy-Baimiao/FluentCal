@@ -47,6 +47,11 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
         app.gantt_scroll_to(&today, 0.3);
     }
     app.desk_refresh();
+    // The to-do column opens to the left: the window grows or shrinks, the calendar stays.
+    let side = |s: &Settings| side_shown(s) && s.calendar.sidebar_mode == "left";
+    if (side(old) != side(&new) || app.side_ext > 0 && look(o) != look(n)) && window::hwnd(app.desk.window.window()).is_some() {
+        apply_layout(app, false);
+    }
     // Rows that follow their tasks need the grid's room; equal rows only the lanes.
     if old.calendar.fit_rows != new.calendar.fit_rows {
         app.desk_sync_capacity();
@@ -77,6 +82,22 @@ pub fn apply_desk_platform(app: &mut App) {
     pd::refresh();
 }
 
+/// The to-do column is shown (the month and multi-week views have it).
+pub fn side_shown(s: &Settings) -> bool {
+    s.calendar.sidebar && s.calendar.view != "gantt" && s.calendar.view != "list"
+}
+
+/// Physical px the window grows on its left for the to-do column (设置 › 日历 › 向左扩展窗口
+/// only), on the screen `r` is on:
+/// the column (desk.slint: 200px × the font scale) and its gap to the calendar.
+fn side_ext(app: &App, mons: &[layout::Mon], r: layout::Rect) -> u32 {
+    if !side_shown(&app.doc.settings) || app.doc.settings.calendar.sidebar_mode != "left" {
+        return 0;
+    }
+    let scale = layout::monitor_at(mons, r).and_then(|i| mons.get(i)).map_or(1.0, |m| m.scale);
+    ((200.0 * app.style.fs + app.style.cell_gap + 2.0) * scale).round() as u32
+}
+
 /// Where the desk window goes: home if its screen is there, else stay if reachable, else the
 /// default place. `startup`: the window isn't placed yet.
 pub fn apply_layout(app: &mut App, startup: bool) {
@@ -87,7 +108,15 @@ pub fn apply_layout(app: &mut App, startup: bool) {
     let home = app.store.setting("/desk/bounds").and_then(|v| Home::parse(&v));
     let hwnd = window::hwnd(app.desk.window.window());
     let current = if startup { None } else { hwnd.and_then(screens::window_rect) };
-    let Some(t) = layout::target(&mons, home.as_ref(), current) else { return };
+    // bounds is the calendar alone: the to-do column is added on its left
+    let current_cal = current.map(|c| layout::without_side(c, app.side_ext));
+    let Some(cal) = layout::target(&mons, home.as_ref(), current_cal) else { return };
+    let ext = side_ext(app, &mons, cal);
+    let t = match layout::monitor_at(&mons, cal).and_then(|i| mons.get(i)).filter(|_| ext > 0) {
+        Some(m) => layout::with_side(cal, ext, m.work),
+        None => cal,
+    };
+    app.side_ext = t.w.saturating_sub(cal.w);
     if Some(t) == current {
         return;
     }
@@ -112,6 +141,9 @@ pub fn save_home(app: &mut App) {
     }
     let Some(r) = screens::window_rect(h).filter(|r| r.x > -20000 && r.y > -20000 && r.w >= 100 && r.h >= 100) else { return };
     let mons = screens::monitors();
+    // what is remembered is the calendar alone, without the to-do column on its left
+    app.side_ext = side_ext(app, &mons, r).min(r.w.saturating_sub(100));
+    let r = layout::without_side(r, app.side_ext);
     let monitor = layout::monitor_at(&mons, r).map(|i| (mons[i].name.clone(), mons[i].rect, mons[i].scale));
     let home = Home { x: r.x, y: r.y, w: r.w, h: r.h, monitor };
     fluentcal_core::store::patch_settings_silent(&app.store, serde_json::json!({ "desk": { "bounds": home } }));

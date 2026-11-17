@@ -136,6 +136,12 @@ export interface Settings {
     monthRows: 'auto' | 'six';
     /** Busy weeks get taller rows (the PC calendar; the web view keeps equal rows). */
     fitRows: boolean;
+    /** Where the to-do column takes its room: beside the calendar, left of the window, or over it. */
+    sidebarMode: 'inline' | 'left' | 'float';
+    /** Bars over several days say which day it is (GitHub #13); native only so far. */
+    barDays: boolean;
+    /** … and the task's progress (GitHub #10, #13). */
+    barProgress: boolean;
     weeksRows: number;
     weeksPast: number;
     showLunar: boolean;

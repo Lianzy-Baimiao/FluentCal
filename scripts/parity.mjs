@@ -71,6 +71,8 @@ const SCENES = [
   { name: 'gantt-tip', url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } }, steps: [['hover', '.bar[data-task="api"]'], ['wait', 700]] },
   // Microsoft Store screenshots (scripts/store-shots.sh, at 2×): the README's scenes. Only when named.
   { name: 'store-month-light', store: true, url: '?w=desk&theme=light', size: { width: 1040, height: 640 }, settings: { theme: { mode: 'light' }, calendar: { sidebar: true } }, doc: storeExtras },
+  // the to-do column floating over the calendar (a check picture, not in the README)
+  { name: 'side-float', store: true, url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, calendar: { sidebar: true, sidebarMode: 'float' } }, doc: storeExtras },
   { name: 'store-list', store: true, url: '?w=desk&theme=light', size: month, settings: { theme: { mode: 'light' }, calendar: { view: 'list' } }, doc: storeExtras },
   { name: 'store-month-dark', store: true, url: '?w=desk&theme=dark&accent=%238764B8', accent: '#8764B8', size: month, dark: true, settings: { theme: { mode: 'dark', accent: '#8764B8' }, desk: glass }, doc: storeExtras },
   { name: 'store-gantt', store: true, url: '?w=desk&theme=light', size: { width: 1040, height: 548 }, settings: { theme: { mode: 'light' }, calendar: { view: 'gantt' }, gantt: { groupFilter: ['web', 'app'] } } },

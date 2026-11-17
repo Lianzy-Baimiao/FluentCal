@@ -1,7 +1,7 @@
 //! Where the desk window goes when screens change (layout.rs), with the user's real setup:
 //! 3840×2160 primary and 2560×1600 secondary to its right, both at 125%.
 
-use fluentcal_core::layout::{default_rect, moved, target, Home, Mon, Rect};
+use fluentcal_core::layout::{self, default_rect, moved, target, Home, Mon, Rect};
 use serde_json::json;
 
 fn mon(name: &str, x: i32, w: u32, h: u32, scale: f64, primary: bool) -> Mon {
@@ -82,4 +82,27 @@ fn moving_to_another_screen_and_back() {
     assert!(there.x + there.w as i32 >= 6400 - 40 && there.y <= 40, "top right of the secondary: {there:?}");
     let back = moved(there, &all[1], &all[0]);
     assert!((back.x - r.x).abs() <= 2 && (back.y - r.y).abs() <= 2, "{back:?}");
+}
+
+#[test]
+fn todo_column_opens_to_the_left_of_the_calendar() {
+    let work = Rect { x: 0, y: 0, w: 2560, h: 1400 };
+    let cal = Rect { x: 1000, y: 100, w: 880, h: 640 };
+    // the calendar keeps its place and size: only the left edge moves
+    let win = layout::with_side(cal, 210, work);
+    assert_eq!(win, Rect { x: 790, y: 100, w: 1090, h: 640 });
+    assert_eq!(win.x + win.w as i32, cal.x + cal.w as i32);
+    assert_eq!(layout::without_side(win, 210), cal);
+    // against the left edge of the screen there is no room: the window stays on the screen
+    let edge = Rect { x: 50, ..cal };
+    let win = layout::with_side(edge, 210, work);
+    assert_eq!((win.x, win.w), (0, 1090));
+    // a second screen to the left has room
+    let left = Rect { x: -1920, y: 0, w: 1920, h: 1040 };
+    assert_eq!(layout::with_side(Rect { x: -1000, ..cal }, 210, left).x, -1210);
+    // a calendar as wide as the screen: the window doesn't get wider than the screen
+    let wide = Rect { x: 0, y: 0, w: 2500, h: 640 };
+    assert_eq!(layout::with_side(wide, 210, work), Rect { x: 0, y: 0, w: 2560, h: 640 });
+    // closing never leaves less than a usable window
+    assert_eq!(layout::without_side(Rect { x: 0, y: 0, w: 250, h: 300 }, 210).w, 100);
 }

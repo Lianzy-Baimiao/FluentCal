@@ -1105,7 +1105,12 @@ fn due_labels_bar_progress_and_day_series() {
     // month view: the bar, half done; the series, five joined days in one lane
     let chips: Vec<_> = t.w.get_weeks().iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).collect();
     let bar = chips.iter().find(|c| c.title == "项目").unwrap();
-    assert_eq!((bar.pct.as_str(), bar.fill), ("50%", 0.5));
+    // "第4-N天（P%）": four days from Monday; today is the Nth of them (all four once it is over)
+    let gone = (fluentcal_core::date::diff_days(&monday, &today) + 1).clamp(0, 4);
+    assert_eq!((bar.pct.as_str(), bar.fill), (format!("第4-{gone}天（{}%） 进度 50%", gone * 25).as_str(), 0.5));
+    // a bar that hasn't begun, or is over; no progress set still says 进度 0%
+    let run = chips.iter().find(|c| c.title == "装修").unwrap();
+    assert_eq!(run.pct.as_str(), "第5-3天（60%） 进度 0%");
     let sign: Vec<_> = chips.iter().filter(|c| c.title == "签到").collect();
     assert_eq!(sign.len(), 5, "once a day, Monday to Friday");
     assert!(sign.iter().all(|c| c.linked && c.span == 1 && c.lane == sign[0].lane && !c.multi_day));
@@ -1286,4 +1291,149 @@ fn todo_column_handle_is_beside_the_calendar() {
     assert!(right_of(&handle) <= panel.absolute_position().x + 0.01, "left of the column: {} vs {}", right_of(&handle), panel.absolute_position().x);
     t.click("收起待办栏");
     assert!(!t.w.get_side_open());
+}
+
+/// 0.3.14 (GitHub #13): a bar over several days says which day it is, "第N-X天（P%）", worked out
+/// from today: 0 before it begins, all its days once it is over. The progress follows, also
+/// 0 % and 100 %. Each part has its switch in 设置 › 日历.
+#[test]
+fn bars_say_which_day_it_is() {
+    use fluentcal_core::date::add_days;
+    let today = fluentcal_core::date::today();
+    let tasks = [
+        json!({ "id": "cat", "title": "看望小猫", "start": add_days(&today, -1), "end": add_days(&today, 3), "progress": 60 }),
+        json!({ "id": "next", "title": "出差", "start": add_days(&today, 2), "end": add_days(&today, 4) }),
+        json!({ "id": "over", "title": "培训", "start": add_days(&today, -4), "end": add_days(&today, -2), "done": true, "progress": 100 }),
+        json!({ "id": "one", "title": "开会", "start": today }),
+        json!({ "id": "camp", "title": "集训", "start": add_days(&today, -1), "end": today, "repeat": { "freq": "monthly", "interval": 1 } }),
+    ];
+    let label = |t: &T, title: &str| {
+        let weeks = t.w.get_weeks();
+        let chips: Vec<_> = weeks.iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).collect();
+        let c = chips.iter().find(|c| c.title == title).unwrap_or_else(|| panic!("no chip {title:?}"));
+        c.pct.to_string()
+    };
+    // the multi-week view starts a week back, so all of them are on it wherever today is
+    let cal = json!({ "view": "weeks", "weeksRows": 4, "weeksPast": 1 });
+    let t = start("bar-days", Some(doc_with(&tasks, json!({ "calendar": cal, "tasks": { "autoPostpone": false } }))));
+    assert_eq!(label(&t, "看望小猫"), "第5-2天（40%） 进度 60%");
+    assert_eq!(label(&t, "出差"), "第3-0天（0%） 进度 0%", "not begun");
+    assert_eq!(label(&t, "培训"), "第3-3天（100%） 进度 100%", "over and done");
+    assert_eq!(label(&t, "开会"), "", "one day: nothing to count");
+    assert_eq!(label(&t, "集训"), "第2-2天（100%）", "a repeating task has days but no progress of its own");
+    // the progress off: the days stay, and no part of the bar is darker
+    with(|a| a.patch_settings(json!({ "calendar": { "barProgress": false } }))).unwrap();
+    settle();
+    assert_eq!(label(&t, "看望小猫"), "第5-2天（40%）");
+    let weeks = t.w.get_weeks();
+    assert!(weeks.iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).all(|c| c.fill == 0.0));
+    // the days off too: bars as before 0.3.11
+    with(|a| a.patch_settings(json!({ "calendar": { "barDays": false } }))).unwrap();
+    settle();
+    assert_eq!(label(&t, "看望小猫"), "");
+    // only the progress
+    with(|a| a.patch_settings(json!({ "calendar": { "barProgress": true } }))).unwrap();
+    settle();
+    assert_eq!(label(&t, "看望小猫"), "进度 60%");
+    assert_eq!(label(&t, "出差"), "进度 0%");
+}
+
+/// 0.3.14: on a bar the title comes first. What follows it (the days, the progress) gets the room
+/// that is left: whole on a long bar, cut short on a shorter one, gone where it could say nothing
+/// (a long title on a short bar).
+#[test]
+fn a_bar_keeps_its_title() {
+    use fluentcal_core::date::{add_days, start_of_week};
+    use i_slint_backend_testing::AccessibleRole as R;
+    let monday = start_of_week(&fluentcal_core::date::today(), 1);
+    let tasks = [
+        json!({ "id": "wide", "title": "项目", "start": monday, "end": add_days(&monday, 4), "progress": 50 }),
+        // Sunday, then Monday and Tuesday of the next week: a piece of one day, one of two
+        json!({ "id": "cross", "title": "联调", "start": add_days(&monday, 6), "end": add_days(&monday, 8) }),
+        json!({ "id": "long", "title": "和设计过一遍下季度全部页面稿", "start": add_days(&monday, 10), "end": add_days(&monday, 11) }),
+        json!({ "id": "longer", "title": "和设计过一遍下个季度的全部页面与交互稿", "start": add_days(&monday, 12), "end": add_days(&monday, 13) }),
+    ];
+    let cal = json!({ "view": "weeks", "weeksRows": 4, "weeksPast": 0, "weekStart": 1 });
+    let t = start("bar-title", Some(doc_with(&tasks, json!({ "calendar": cal, "tasks": { "autoPostpone": false } }))));
+    // each piece of a task's bar, left to right, top to bottom: (the bar, its title, its label if shown)
+    let pieces = |title: &str| {
+        let mut bars: Vec<_> = ElementHandle::find_by_accessible_label(&t.w, title).filter(|e| e.accessible_role() == Some(R::Groupbox)).collect();
+        bars.sort_by(|a, b| (a.absolute_position().y, a.absolute_position().x).partial_cmp(&(b.absolute_position().y, b.absolute_position().x)).unwrap());
+        bars.into_iter()
+            .map(|bar| {
+                let texts: Vec<_> = bar.query_descendants().match_predicate(|e| e.accessible_role() == Some(R::Text)).find_all();
+                let name = title.to_owned();
+                let text = texts.iter().find(|e| e.accessible_label().is_some_and(|l| l == name)).expect("the title").clone();
+                let label = texts.iter().find(|e| e.accessible_label().is_some_and(|l| l.starts_with('第'))).cloned();
+                (bar, text, label)
+            })
+            .collect::<Vec<_>>()
+    };
+    let right = |e: &ElementHandle| e.absolute_position().x + e.size().width;
+    // the bar's text ends 4px before its right edge
+    let edge = |bar: &ElementHandle| right(bar) - 4.0;
+    // five days: the title and the whole label, with room to spare
+    let wide = pieces("项目");
+    let (bar, title, label) = &wide[0];
+    let label = label.as_ref().expect("a long bar shows its label");
+    let two_chars = title.size().width;
+    assert!(two_chars > 20.0, "the title is there ({two_chars})");
+    assert_eq!(label.absolute_position().x, right(title) + 4.0, "the label follows the title");
+    assert!(right(label) < edge(bar) - 100.0, "the whole label: {} of {}", right(label), edge(bar));
+    // a piece of one day, then one of two: the title whole on both; the label cut where the
+    // first ends, whole on the second
+    let cross = pieces("联调");
+    assert_eq!(cross.len(), 2, "Sunday, then the next week");
+    let widths: Vec<f32> = cross
+        .iter()
+        .map(|(bar, title, label)| {
+            assert_eq!(title.size().width, two_chars, "the title is whole on a piece {} wide", bar.size().width);
+            let label = label.as_ref().expect("room for some of the label");
+            assert!(right(label) <= edge(bar), "inside the bar");
+            label.size().width
+        })
+        .collect();
+    assert!(widths[0] >= 54.0 && widths[0] < widths[1], "cut short on the day, whole on the two: {widths:?}");
+    assert_eq!(right(cross[0].2.as_ref().unwrap()), edge(&cross[0].0), "cut where the bar ends");
+    assert!(right(cross[1].2.as_ref().unwrap()) < edge(&cross[1].0) - 20.0, "room to spare");
+    // two days and a long title: the title whole, no room left for a label worth reading
+    let long = pieces("和设计过一遍下季度全部页面稿");
+    let (bar, title, label) = &long[0];
+    assert_eq!(title.size().width, two_chars * 7.0, "14 characters, whole");
+    assert!(label.is_none() && edge(bar) - right(title) < 58.0, "no label in {}", edge(bar) - right(title));
+    // a title longer than the bar: cut where the bar ends, no label
+    let longer = pieces("和设计过一遍下个季度的全部页面与交互稿");
+    let (bar, title, label) = &longer[0];
+    assert!(title.size().width < two_chars * 9.5 && right(title) == edge(bar), "{} to {}", title.size().width, edge(bar));
+    assert!(label.is_none());
+}
+
+/// 0.3.14: where the to-do column takes its room (设置 › 日历). Beside the calendar (as before,
+/// the default) the days begin right of it; floating, the days keep their place and the column
+/// lies over them, and its add box still takes the keys.
+#[test]
+fn todo_column_beside_or_over_the_calendar() {
+    let t = start("side-modes", Some(doc_with(&[], json!({}))));
+    let closed = t.w.get_grid_x();
+    t.click("展开待办栏（不定日待办）");
+    let panel = t.find("不定日待办");
+    let right = panel.absolute_position().x + panel.size().width;
+    assert!(t.w.get_grid_x() >= right, "beside: the days begin right of the column ({} vs {right})", t.w.get_grid_x());
+    with(|a| a.patch_settings(json!({ "calendar": { "sidebarMode": "float" } }))).unwrap();
+    settle();
+    assert_eq!(t.w.get_grid_x(), closed, "floating: the days are where they were");
+    let panel = t.find("不定日待办");
+    assert!(panel.absolute_position().x + panel.size().width > closed + 50.0, "the column lies over the first days");
+    t.click("添加无日期待办");
+    t.type_text("换护照");
+    t.key("\n");
+    assert_eq!(t.task("换护照")["flex"], json!("someday"));
+    t.key(&slint::SharedString::from(Key::Escape));
+    // the window grows instead (shell::side_ext, checked on a real window): the layout inside is as beside
+    with(|a| a.patch_settings(json!({ "calendar": { "sidebarMode": "left" } }))).unwrap();
+    settle();
+    let panel = t.find("不定日待办");
+    assert!(t.w.get_grid_x() >= panel.absolute_position().x + panel.size().width);
+    t.click("收起待办栏");
+    assert_eq!(t.w.get_grid_x(), closed);
 }

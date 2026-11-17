@@ -42,6 +42,7 @@ pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Opt
     push_list(w, doc, ui, today, t);
     let side = doc.settings.calendar.sidebar;
     w.set_side_open(side);
+    w.set_side_mode(doc.settings.calendar.sidebar_mode.as_str().into());
     let rows = if side { vm::side_rows(doc, today, t) } else { Vec::new() };
     let add_row = |zone: &str| rows.iter().position(|r| r.kind == "add" && r.zone == zone).unwrap_or(0) as i32;
     w.set_side_add_month_row(add_row("month"));

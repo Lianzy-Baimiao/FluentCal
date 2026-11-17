@@ -147,6 +147,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         reminder_timer: Default::default(),
         theme_timer: Default::default(),
         last_monitor: None,
+        side_ext: 0,
         day: today,
         web: Default::default(),
         reminder_win: None,
@@ -230,6 +231,17 @@ fn start_platform(app: &mut App, id: &str) {
     // of the framed windows without the mouse).
     if std::env::var("FLUENTCAL_TEST_OPEN").as_deref() == Ok("settings") {
         slint::Timer::single_shot(Duration::from_secs(1), || run(|app| app.open_settings(None)));
+    }
+    // FLUENTCAL_TEST_OPEN=side opens or closes the to-do column 3 s after the start, and
+    // switches to the Gantt chart at 6 s (checks of the window's place without the mouse).
+    if std::env::var("FLUENTCAL_TEST_OPEN").as_deref() == Ok("side") {
+        slint::Timer::single_shot(Duration::from_secs(3), || {
+            run(|app| {
+                let on = !app.doc.settings.calendar.sidebar;
+                app.desk_side_set(on);
+            })
+        });
+        slint::Timer::single_shot(Duration::from_secs(6), || run(|app| app.desk_set_view("gantt")));
     }
 }
 

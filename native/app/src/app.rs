@@ -41,6 +41,8 @@ pub struct App {
     pub reminder_timer: slint::Timer,
     pub theme_timer: slint::Timer,
     pub last_monitor: Option<usize>,
+    /// Physical px the desk window is wider on its left for the to-do column (shell::apply_layout).
+    pub side_ext: u32,
     /// The date the clock last saw (a new day moves the calendar along).
     pub day: String,
     pub web: crate::webcmd::WebState,

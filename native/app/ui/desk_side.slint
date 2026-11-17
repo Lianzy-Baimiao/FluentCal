@@ -253,6 +253,9 @@ export component SidePanel inherits Rectangle {
     in property <int> add-month-row;
     in property <int> add-someday-row;
     in property <bool> read-only;
+    // Over the calendar instead of beside it: a solid panel with an outline, so what is under
+    // it doesn't show through.
+    in property <bool> floating;
     callback toggle(ChipData);
     callback open(ChipData);
     callback menu(ChipData, length, length);
@@ -262,7 +265,9 @@ export component SidePanel inherits Rectangle {
     property <float> fs: Theme.desk.fs;
     property <length> rh: round(24 * fs) * 1px;
     border-radius: Theme.desk.radius;
-    background: Theme.desk.cell-bg;
+    background: floating ? Theme.c.solid-base : Theme.desk.cell-bg;
+    border-width: floating ? 1px : 0;
+    border-color: Theme.c.control-strong-fill.transparentize(0.6);
     accessible-role: list;
     accessible-label: @tr("不定日待办");
     // presses on the column don't reach the calendar's adjust handling below

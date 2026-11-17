@@ -912,6 +912,9 @@ export component DeskWindow inherits Window {
     callback settings();
     // 不定日待办 (GitHub #7): the column left of the month and multi-week views
     in property <bool> side-open;
+    // "inline" (beside the calendar, which gets narrower) | "left" (the window is wider on its
+    // left: shell::side_ext) | "float" (over the calendar's left part)
+    in property <string> side-mode: "inline";
     in property <[SideRowData]> side-rows;
     in property <int> side-add-month-row;
     in property <int> side-add-someday-row;
@@ -1099,23 +1102,13 @@ export component DeskWindow inherits Window {
                 vertical-stretch: 1;
                 property <bool> grid-view: root.view != "gantt" && root.view != "list";
                 property <bool> side-shown: grid-view && root.side-open;
-                property <length> side-w: side-shown ? min(200px * Theme.desk.fs, self.width * 0.32) : 0;
-                if body.side-shown: SidePanel {
-                    x: 0;
-                    width: body.side-w;
-                    rows: root.side-rows;
-                    add-month-row: root.side-add-month-row;
-                    add-someday-row: root.side-add-someday-row;
-                    read-only: root.read-only;
-                    toggle(c) => { root.side-toggle(c); }
-                    open(c) => { root.side-open-task(c); }
-                    menu(c, x, y) => { root.side-menu(c, x, y); }
-                    add(z, t) => { root.side-add(z, t); }
-                    wants-keyboard => { root.wants-keyboard(); }
-                    leave-focus => { root.focus-root(); }
-                }
+                // "left": the window is this much wider while the column is shown, so the calendar
+                // keeps its width; the cap is for a window that couldn't grow.
+                property <length> side-w: !side-shown ? 0 : min(200px * Theme.desk.fs, self.width * (root.side-mode == "inline" ? 0.32 : root.side-mode == "left" ? 0.45 : 0.6));
+                // the room the column takes from the calendar: none when it floats over it
+                property <length> side-room: side-shown && root.side-mode != "float" ? side-w + Theme.desk.cell-gap + 2px : 0;
                 month := MonthView {
-                    x: body.side-shown ? body.side-w + Theme.desk.cell-gap + 2px : 0;
+                    x: body.side-room;
                     width: parent.width - self.x;
                     visible: body.grid-view;
                     weeks: root.weeks;
@@ -1146,6 +1139,22 @@ export component DeskWindow inherits Window {
                     changed grid-h => { root.capacity-changed(self.capacity); }
                     changed lane-top => { root.capacity-changed(self.capacity); }
                     changed lane-h => { root.capacity-changed(self.capacity); }
+                }
+                // After the month so that it lies over it when it floats (设置 › 日历).
+                if body.side-shown: SidePanel {
+                    x: 0;
+                    width: body.side-w;
+                    floating: root.side-mode == "float";
+                    rows: root.side-rows;
+                    add-month-row: root.side-add-month-row;
+                    add-someday-row: root.side-add-someday-row;
+                    read-only: root.read-only;
+                    toggle(c) => { root.side-toggle(c); }
+                    open(c) => { root.side-open-task(c); }
+                    menu(c, x, y) => { root.side-menu(c, x, y); }
+                    add(z, t) => { root.side-add(z, t); }
+                    wants-keyboard => { root.wants-keyboard(); }
+                    leave-focus => { root.focus-root(); }
                 }
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {

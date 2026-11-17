@@ -78,6 +78,14 @@ section!(Calendar {
     fit_rows: bool = false,
     /// The column of to-dos without a day, left of the month and multi-week views (GitHub #7).
     sidebar: bool = false,
+    /// Where the to-do column takes its room: "inline" = beside the calendar inside the
+    /// window (the calendar gets narrower), "left" = the window grows to the left and the
+    /// calendar keeps its size, "float" = over the calendar's left part.
+    sidebar_mode: String = "inline".into(),
+    /// Bars of tasks over several days say which day it is: "第5-2天（40%）" (GitHub #13).
+    bar_days: bool = true,
+    /// … and how far the task is: "进度 60%", the done part darker (GitHub #10, #13).
+    bar_progress: bool = true,
     weeks_rows: u32 = 5,
     weeks_past: u32 = 1,
     show_lunar: bool = true,
