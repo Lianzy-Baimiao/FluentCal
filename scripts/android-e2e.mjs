@@ -251,6 +251,10 @@ try {
   await check("to-dos without a day: add, tick on today, untick, and they keep their dates when edited", async () => {
     await nav("日程").click();
     const card = page.getByRole("region", { name: "不定日待办" });
+    // one line until it is opened, so the day's tasks stay near the top
+    assert.equal(await card.getByLabel("添加每月待办").count(), 0);
+    assert((await card.boundingBox()).height <= 50, "the folded card is one line");
+    await card.getByRole("button", { name: "展开不定日待办", exact: true }).click();
     await card.getByLabel("添加每月待办").fill("洗车");
     await card.getByLabel("添加每月待办").press("Enter");
     await card.getByLabel("添加无日期待办").fill("换护照");
@@ -286,6 +290,17 @@ try {
     const renamed = await byTitle("洗车和打蜡");
     assert.deepEqual([renamed.flex, renamed.start, renamed.end, renamed.done], ["month", car.start, car.start, false]);
     // not a bar on its start day in the Gantt chart: the whole month while it is open
+    // folded: the line says what is left; the choice is kept across a restart
+    await card.getByRole("button", { name: "收起不定日待办", exact: true }).click();
+    assert.equal(await card.locator(".flex-item").count(), 0);
+    assert.match(await card.innerText(), /1 项未完成/);
+    await card.getByRole("button", { name: "展开不定日待办", exact: true }).click();
+    await page.reload();
+    await card.locator(".flex-item", { hasText: "洗车和打蜡" }).waitFor();
+    await card.getByRole("button", { name: "收起不定日待办", exact: true }).click();
+    await page.reload();
+    await card.getByRole("button", { name: "展开不定日待办", exact: true }).waitFor();
+    assert.equal(await card.locator(".flex-item").count(), 0);
     await nav("甘特").click();
     await page.locator(".mg .task-name", { hasText: "洗车和打蜡" }).waitFor();
     assert.match(await page.locator(".mg .task-name", { hasText: "洗车和打蜡" }).innerText(), /每月一次/);

@@ -235,6 +235,19 @@ const flexGroups = computed(() => {
     },
   ].filter((g) => g.add || g.items.length);
 });
+// The card is one line until it is opened (it would take a quarter of the screen); whether
+// it is open is this phone's own choice, kept across starts.
+const FLEX_OPEN_KEY = "fluentcal.mobile.flexOpen";
+const flexOpened = ref(localStorage.getItem(FLEX_OPEN_KEY) === "1");
+function flexFold() {
+  flexOpened.value = !flexOpened.value;
+  localStorage.setItem(FLEX_OPEN_KEY, flexOpened.value ? "1" : "0");
+}
+const flexSummary = computed(() => {
+  const s = flexSide(taskList.value, now.value);
+  const open = s.month.filter((x) => !x.done).length + s.someday.length;
+  return { open, overdue: s.overdue.length };
+});
 function flexToggle(task: Task, slot: string, done: boolean) {
   void action(() => setOccurrenceDone(task, slot, done));
 }
@@ -505,8 +518,30 @@ onBeforeUnmount(() => {
           <section
             v-if="!search.trim()"
             class="flex-card"
+            :class="{ folded: !flexOpened }"
             aria-label="不定日待办"
           >
+            <button
+              type="button"
+              class="flex-head"
+              :aria-expanded="flexOpened"
+              :aria-label="flexOpened ? '收起不定日待办' : '展开不定日待办'"
+              @click="flexFold"
+            >
+              <strong>不定日待办</strong
+              ><span class="flex-count">{{
+                flexSummary.open ? `${flexSummary.open} 项未完成` : "没有未完成"
+              }}</span
+              ><span v-if="flexSummary.overdue" class="flex-late"
+                >逾期 {{ flexSummary.overdue }}</span
+              ><FIcon
+                name="chevronRight"
+                :size="14"
+                class="flex-chevron"
+                :class="{ open: flexOpened }"
+              />
+            </button>
+            <template v-if="flexOpened">
             <template v-for="g in flexGroups" :key="g.key">
               <h3 :class="{ overdue: g.key === 'overdue' }">{{ g.title }}</h3>
               <div
@@ -555,6 +590,7 @@ onBeforeUnmount(() => {
                   添加
                 </button>
               </form>
+            </template>
             </template>
           </section>
 
@@ -1606,7 +1642,7 @@ h1 span {
 }
 .flex-card {
   margin: 0 0 18px;
-  padding: 6px 14px 10px;
+  padding: 0 14px 10px;
   border-radius: 14px;
   background: var(--card-fill);
   border: 1px solid var(--card-stroke);
@@ -1681,5 +1717,51 @@ h1 span {
   background: var(--accent-fill);
   color: var(--text-on-accent, #fff);
   font: inherit;
+}
+
+.flex-card.folded {
+  padding-bottom: 0;
+}
+.flex-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.flex-head strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.flex-count {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flex-late {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 11px;
+  color: var(--danger, #c42b1c);
+  background: color-mix(in srgb, var(--danger, #c42b1c) 12%, transparent);
+}
+.flex-chevron {
+  flex: none;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+.flex-chevron.open {
+  transform: rotate(90deg);
 }
 </style>
