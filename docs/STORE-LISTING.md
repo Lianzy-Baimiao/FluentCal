@@ -328,7 +328,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 三种语言的“此版本的新增功能”已按上文填写并保存，重新载入后逐字一致；“管理 Store 一览语言”页三种语言均为 **完成**。描述、功能、截图、关键词、定价、属性、年龄分级未改。提交选项仍是“在此提交通过认证后立即予以发布”，runFullTrust 用途说明 453 字符未变。
 - 2026-11-17 07:24 点击“提交进行认证”后，概述页显示 **正在认证更新 / 预处理 / 产品在通过认证后立即开始发布**，产品更新状态为 **正在认证（Submission 10）**；商店里仍是 Submission 9（0.3.10.0）。临时浏览器已关闭，配置文件已删除。是否上架以商店目录查询为准。
 
-### 0.3.12.0 待办栏输入焦点与开关布局修复（2026-11-17，已送审）
+### 0.3.12.0 待办栏输入焦点与开关布局修复（2026-11-17 送审，用户取消，未上架）
 
 - 对应 GitHub [v0.3.12](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.12)，修复提交 `d7aa6f7`。接续 Claude 会话 `5e464884-61c6-42f1-be1a-c5a621167e19` 的现有改动；用户要求“收一下尾，推送发版，用内置浏览器推送微软商店”。
 - 商店包：`release/FluentCal_0.3.12.0_x64.msix`，10,763,515 字节，SHA-256 `4f9f1e222e77256612339dd9b914f1aafcc1475afca1ed4c0c41cd7619d8c0d1`。包内 EXE 与独立 EXE 一致（SHA-256 `ad49864b779a13e3557dbd7202aa2f2bf9fd7d65ce353ed73c72c215e4654303`），清单较 0.3.11.0 仅版本改变。原生关于页、Windows 文件/产品版本均为 0.3.12。
@@ -337,8 +337,14 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 提交选项为“在此提交通过认证后立即予以发布”，保留现有 runFullTrust 用途说明。2026-11-17 **10:39（UTC+8）** 确认送审成功：页面显示 **正在认证更新 / 预处理 / 产品更新：正在认证（Submission 11）**，并注明通过认证后立即开始发布。此时尚未确认 0.3.12.0 上架。
 - 回执截图：`release/store-0.3.12/submission-11-certified-pending.jpg`；隔离启动结果与界面截图也在该目录。GitHub 安装包、独立 EXE 及校验文件均已发布，四个线上摘要与本地一致。
 
-### 0.3.13.0 设置、编辑窗口标题栏图标修复（2026-11-17，包已备好，尚未送审）
+### 0.3.13.0 待办栏输入修复、开关布局、窗口标题栏图标（2026-11-17 14:15 送审）
 
-- 对应 GitHub [v0.3.13](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.13)。用户在得知“0.3.12 的 Submission 11 还在认证、再提交需要本人登录”后回答“都做”。
-- 商店包：`release/FluentCal_0.3.13.0_x64.msix`，10,763,984 字节，SHA-256 `f2fd541c1dcc07cc36e02b0187f11f603dfd4af1db01cff36d97cee58108035a`。包内 EXE 与独立 EXE 一致（SHA-256 `8a1b048eff35fcbc512dfaaf42c820d84dbd5d2e514e3938a4bb6d4e1246d57e`），清单较 0.3.12.0 仅版本改变。更新说明在 `release/store-0.3.13/whats-new-*.txt`。
-- 未送审的原因：2026-11-17 11:40 查询商店目录（CN）仍是 `ice.FluentCal_0.3.11.0_x64__rz8m2sa64m4em`，0.3.12.0（Submission 11）还在认证，此时不能开始新的更新。等 0.3.12.0 上架后创建 Submission 12。
+- 0.3.12.0 没有上架：用户在认证期间取消了 Submission 11 的认证请求，要求“拿 0.3.13 换进去”。Submission 11 / 1152921505702423094 回到草稿，本节是在同一个提交里换包。
+- 对应 GitHub [v0.3.13](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.13)（提交 `ab18f4d`）。商店包：`release/FluentCal_0.3.13.0_x64.msix`，10,763,984 字节，SHA-256 `f2fd541c1dcc07cc36e02b0187f11f603dfd4af1db01cff36d97cee58108035a`。包内 EXE 与独立 EXE 一致（SHA-256 `8a1b048eff35fcbc512dfaaf42c820d84dbd5d2e514e3938a4bb6d4e1246d57e`），清单较 0.3.12.0 仅版本改变。
+- 登录：用户在临时 Edge 里手动登录。上传 0.3.13.0 后页面提示 0.3.12.0 “保存后移除（已有版本更高、面向相同用户的包）”；第一次点 Save 时包还在分析，没有生效，重新打开程序包页再保存后，概述页的包只剩 **FluentCal_0.3.13.0_x64.msix / Validated / 已更新**。只出现既有的 `runFullTrust` 提醒，设备系列只勾选 Windows 10/11 Desktop。
+- “此版本的新增功能”合并了 0.3.12 和 0.3.13 两版的说明（商店用户是从 0.3.11.0 直接升到 0.3.13.0），文本在 `release/store-0.3.13/combined-*.txt`，保存后重新载入逐字一致：
+  - 简体中文：修复不定日待办栏输入框无法取得键盘焦点、无法输入的问题。按回车添加后可直接继续输入下一项；按 Esc、收起待办栏或切换视图后，日历快捷键继续生效。待办栏开关移到日历左侧边缘中央，不再遮挡星期和日期，展开与收起使用同一个开关。 修复设置窗口和编辑任务窗口标题栏左上角不显示程序图标的问题，现在标题栏、任务栏和 Alt+Tab 里都显示 FluentCal 的图标。
+  - English: Fixed the to-do column's input boxes not receiving keyboard focus when the desktop calendar was inactive. Press Enter to add a to-do and keep typing the next one. Calendar shortcuts keep working after Esc, closing the column, or switching views. The column's handle now sits midway down the calendar's left edge, clear of weekday labels and dates; the same handle opens and closes it. Fixed the Settings and task editor windows showing a blank icon at the left of their title bar. The title bar, the taskbar and Alt+Tab now show FluentCal's icon.
+  - 繁體中文：修復不定日待辦欄輸入框無法取得鍵盤焦點、無法輸入的問題。按 Enter 新增後可直接繼續輸入下一項；按 Esc、收起待辦欄或切換檢視後，日曆快捷鍵繼續生效。待辦欄開關移到日曆左側邊緣中央，不再遮擋星期和日期，展開與收起使用同一個開關。 修復設定視窗和編輯工作視窗標題列左上角不顯示程式圖示的問題，現在標題列、工作列和 Alt+Tab 裡都顯示 FluentCal 的圖示。
+- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 14:15 点击“提交进行认证”，概述页显示 **正在认证更新 / 预处理**；14:35 再看已是 **产品更新：正在发布（Submission 11）**。是否上架以商店目录查询为准。
+- 浏览器改为固定配置：Partner Center 专用的 Edge 配置文件放在 `%LOCALAPPDATA%\fluentcal-pc-edge`，用完只关浏览器、不删配置，登录状态保留；不加载扩展、不同步，默认在隐藏桌面上运行，屏幕上不出现窗口。脚本在 `C:\Users\30694\tools\fluentcal-store\`（`launch-edge-hidden.ps1`、`launch-edge.ps1`、`stop-edge.ps1`、`pc.py`）。14:33 用隐藏桌面重新启动验证过：直接进入产品概述页，无需登录。无头模式会被 Partner Center 以 Access Denied 拒绝，不能用。
