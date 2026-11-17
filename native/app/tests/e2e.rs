@@ -1228,3 +1228,62 @@ fn todo_column_without_days() {
     t.click("收起待办栏");
     assert!(!t.w.get_side_open());
 }
+
+/// 0.3.12: the to-do column's add box asks for the keyboard itself. The calendar on the
+/// desktop is inactive (a click doesn't activate it), and Slint starts watching `has-focus`
+/// only after the box's `init` gave it the focus, so nothing else would ask and the keys (and
+/// the input method) stayed with another window. Entries are typed one after another (the box
+/// isn't rebuilt when the list grows), and the calendar has the keys again afterwards.
+#[test]
+fn todo_column_box_takes_the_keyboard() {
+    let t = start("side-keyboard", Some(doc_with(&[], json!({ "calendar": { "sidebar": true } }))));
+    let requests = std::rc::Rc::new(std::cell::Cell::new(0));
+    let requested = requests.clone();
+    t.w.on_wants_keyboard(move || requested.set(requested.get() + 1));
+    t.ev(WindowEvent::WindowActiveChanged(false));
+    settle();
+    t.click("添加每月待办");
+    assert!(requests.get() > 0, "the add box must request the keyboard while the desktop window is inactive");
+    t.ev(WindowEvent::WindowActiveChanged(true));
+    settle();
+    t.type_text("洗车");
+    t.key("\n");
+    t.type_text("交水费");
+    t.key("\n");
+    assert_eq!(t.task("洗车")["flex"], json!("month"));
+    assert_eq!(t.task("交水费")["flex"], json!("month"), "the next entry is typed right away");
+    // Esc closes the box; the shortcuts work again
+    t.key(&slint::SharedString::from(Key::Escape));
+    t.ctrl("z");
+    assert!(t.tasks().iter().all(|x| x["title"] != "交水费"), "Ctrl+Z reaches the calendar after Esc");
+    // the other box, then the column is closed while it is open: the keys stay with the calendar
+    t.click("添加无日期待办");
+    t.type_text("整理相册");
+    t.key("\n");
+    assert_eq!(t.task("整理相册")["flex"], json!("someday"));
+    t.click("收起待办栏");
+    assert!(!t.w.get_side_open());
+    t.ctrl("z");
+    assert!(t.tasks().iter().all(|x| x["title"] != "整理相册"), "Ctrl+Z reaches the calendar after the column closed");
+}
+
+/// 0.3.12: the column's handle lies in the card's left margin: it covers neither the weekday
+/// row (it used to sit on "一") nor a day, whether the column is open or not.
+#[test]
+fn todo_column_handle_is_beside_the_calendar() {
+    let t = start("side-handle", Some(doc_with(&[], json!({}))));
+    let right_of = |e: &ElementHandle| e.absolute_position().x + e.size().width;
+    let handle = t.find("展开待办栏（不定日待办）");
+    assert!(right_of(&handle) <= t.w.get_grid_x() + 0.01, "the handle ends where the days begin: {} vs {}", right_of(&handle), t.w.get_grid_x());
+    let monday = t.find("一");
+    assert!(right_of(&handle) <= monday.absolute_position().x, "the handle doesn't reach the weekday row's first label");
+    assert!(handle.size().width >= 8.0 && handle.size().height >= 40.0, "big enough to click: {:?}", handle.size());
+    // open: the same handle closes it, and still lies left of the column
+    t.click("展开待办栏（不定日待办）");
+    assert!(t.w.get_side_open());
+    let handle = t.find("收起待办栏");
+    let panel = t.find("不定日待办");
+    assert!(right_of(&handle) <= panel.absolute_position().x + 0.01, "left of the column: {} vs {}", right_of(&handle), panel.absolute_position().x);
+    t.click("收起待办栏");
+    assert!(!t.w.get_side_open());
+}

@@ -1,11 +1,12 @@
 // 不定日待办 (GitHub #7): a column left of the month and multi-week views with the to-dos that
 // have no day. Three parts: this month's (once every month, on whichever day; done ones stay,
-// struck through), last month's left open (逾期), and those without any date. Each part ends
-// in a box to add one. Rows have one height; Rust gives them as a flat list.
+// struck through), last month's left open (逾期), and those without any date. The first and
+// the last end in a box to add one. Rows have one height; Rust gives them as a flat list.
+// The column is opened and closed with a handle in the card's margin (SideHandle).
 
 import { Theme } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
-import { GText, Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { GText } from "controls.slint";
 import { Tip, Overlay } from "overlay.slint";
 import { ChipData, ChipKeys } from "chip.slint";
 
@@ -157,7 +158,8 @@ component SideItem inherits Rectangle {
     }
 }
 
-// The box that adds a to-do to a part: "＋ 添加" until it is clicked.
+// The box that adds a to-do to a part: "＋ 添加" until it is clicked. It stays open after an
+// entry, for the next one (Esc or a click elsewhere closes it).
 component SideAdd inherits Rectangle {
     in property <string> zone;
     in property <bool> read-only;
@@ -214,7 +216,14 @@ component SideAdd inherits Rectangle {
             vertical-alignment: center;
             single-line: true;
             accessible-label: root.zone == "month" ? @tr("添加每月待办") : @tr("添加无日期待办");
-            init => { self.focus(); }
+            init => {
+                // The calendar on the desktop is inactive: a click doesn't activate it, so the
+                // keys (and the input method) are with another window. `changed has-focus`
+                // below starts watching after this init and never sees the focus given here,
+                // so ask for the keyboard now, as the quick-add box of a day does.
+                root.wants-keyboard();
+                self.focus();
+            }
             accepted => {
                 if self.text != "" {
                     root.add(self.text);
@@ -238,6 +247,11 @@ component SideAdd inherits Rectangle {
 
 export component SidePanel inherits Rectangle {
     in property <[SideRowData]> rows;
+    // Where the two add boxes are in `rows`. They are drawn here, not by their rows: a row is
+    // rewritten when the list above it grows, and a box rebuilt under the keyboard would close
+    // after every entry and take the focus with it.
+    in property <int> add-month-row;
+    in property <int> add-someday-row;
     in property <bool> read-only;
     callback toggle(ChipData);
     callback open(ChipData);
@@ -245,7 +259,6 @@ export component SidePanel inherits Rectangle {
     callback add(string, string);
     callback wants-keyboard();
     callback leave-focus();
-    callback collapse();
     property <float> fs: Theme.desk.fs;
     property <length> rh: round(24 * fs) * 1px;
     border-radius: Theme.desk.radius;
@@ -268,7 +281,7 @@ export component SidePanel inherits Rectangle {
             if r.kind == "head": Rectangle {
                 GText {
                     x: 4px;
-                    width: parent.width - (i == 0 ? 30px : 8px);
+                    width: parent.width - 8px;
                     height: parent.height;
                     text: r.text;
                     font-size: 12px * fs;
@@ -293,28 +306,74 @@ export component SidePanel inherits Rectangle {
                 open => { root.open(r.chip); }
                 menu(x, y) => { root.menu(r.chip, x, y); }
             }
-            if r.kind == "add": SideAdd {
-                y: 1px;
-                height: rh - 2px;
-                zone: r.zone;
-                read-only: root.read-only;
-                add(t) => { root.add(r.zone, t); }
-                wants-keyboard => { root.wants-keyboard(); }
-                done => { root.leave-focus(); }
-            }
+        }
+        SideAdd {
+            x: 0;
+            y: root.add-month-row * rh + 1px;
+            width: flick.width;
+            height: rh - 2px;
+            zone: "month";
+            read-only: root.read-only;
+            add(t) => { root.add("month", t); }
+            wants-keyboard => { root.wants-keyboard(); }
+            done => { root.leave-focus(); }
+        }
+        SideAdd {
+            x: 0;
+            y: root.add-someday-row * rh + 1px;
+            width: flick.width;
+            height: rh - 2px;
+            zone: "someday";
+            read-only: root.read-only;
+            add(t) => { root.add("someday", t); }
+            wants-keyboard => { root.wants-keyboard(); }
+            done => { root.leave-focus(); }
         }
     }
-    // 收起: at the first title's right
-    Button {
-        x: root.width - self.width - 2px;
-        y: 4px + (rh - self.height) / 2;
-        width: 24px;
-        height: 22px;
-        variant: ButtonVariant.subtle;
-        size: ButtonSize.icon;
-        icon: Glyph.chevron-left;
-        accessible-label: @tr("收起待办栏");
-        tip: self.accessible-label;
-        clicked => { root.collapse(); }
+}
+
+// The column's handle: a slim tab in the card's left margin, beside the middle of the
+// calendar. A click opens the column, another closes it. It lies outside the days, so it
+// covers neither the weekday row nor a task (as a button over the first column did), and
+// takes no room from the calendar.
+export component SideHandle inherits Rectangle {
+    in property <bool> open;
+    callback clicked();
+    property <int> tip-token: -1;
+    property <string> label: open ? @tr("收起待办栏") : @tr("展开待办栏（不定日待办）");
+    property <bool> hover: ta.has-hover;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    tab := Rectangle {
+        x: 1px;
+        y: (root.height - self.height) / 2;
+        width: root.width - 2px;
+        height: min(48px, root.height);
+        border-radius: self.width / 2;
+        // a faint grip that shows up on the desk's own background, stronger under the pointer
+        background: Theme.c.control-strong-fill.transparentize(ta.pressed ? 0.74 : hover ? 0.64 : 0.84);
+        animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
+    }
+    Icon {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        glyph: root.open ? Glyph.chevron-left : Glyph.chevron-right;
+        size: 8px;
+        color: hover ? Theme.c.text-primary : Theme.c.text-secondary;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        changed has-hover => {
+            if self.has-hover {
+                root.tip-token = Tip.enter(root.label, root.absolute-position.x, tab.absolute-position.y, root.width, tab.height, false);
+            } else {
+                Tip.leave(root.tip-token);
+            }
+        }
+        clicked => {
+            Tip.leave(root.tip-token);
+            root.clicked();
+        }
     }
 }

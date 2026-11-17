@@ -47,6 +47,9 @@ impl App {
 
     pub fn desk_set_view(&mut self, view: &str) {
         self.history.boundary();
+        // The view that goes takes its focused item with it (a task, the to-do column's add
+        // box): the keys go back to the calendar first.
+        self.desk.window.invoke_focus_root();
         self.patch_settings(json!({ "calendar": { "view": view } }));
     }
 
@@ -187,6 +190,11 @@ impl App {
     }
 
     pub fn desk_side_set(&mut self, on: bool) {
+        // Closing it removes whatever has the focus in it (an add box): the keys go back to
+        // the calendar first, or the shortcuts would be gone with it.
+        if !on {
+            self.desk.window.invoke_focus_root();
+        }
         self.patch_settings(json!({ "calendar": { "sidebar": on } }));
     }
 

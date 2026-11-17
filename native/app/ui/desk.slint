@@ -12,7 +12,7 @@ import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
 import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData, ChangesPanel, ChangeRowData } from "desk_overlays.slint";
 import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
-import { SidePanel, SideRowData } from "desk_side.slint";
+import { SidePanel, SideHandle, SideRowData } from "desk_side.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
 import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData, ChangeRowData }
@@ -913,6 +913,8 @@ export component DeskWindow inherits Window {
     // 不定日待办 (GitHub #7): the column left of the month and multi-week views
     in property <bool> side-open;
     in property <[SideRowData]> side-rows;
+    in property <int> side-add-month-row;
+    in property <int> side-add-someday-row;
     callback side-toggle(ChipData);
     callback side-open-task(ChipData);
     callback side-menu(ChipData, length, length);
@@ -1102,6 +1104,8 @@ export component DeskWindow inherits Window {
                     x: 0;
                     width: body.side-w;
                     rows: root.side-rows;
+                    add-month-row: root.side-add-month-row;
+                    add-someday-row: root.side-add-someday-row;
                     read-only: root.read-only;
                     toggle(c) => { root.side-toggle(c); }
                     open(c) => { root.side-open-task(c); }
@@ -1109,7 +1113,6 @@ export component DeskWindow inherits Window {
                     add(z, t) => { root.side-add(z, t); }
                     wants-keyboard => { root.wants-keyboard(); }
                     leave-focus => { root.focus-root(); }
-                    collapse => { root.side-set(false); }
                 }
                 month := MonthView {
                     x: body.side-shown ? body.side-w + Theme.desk.cell-gap + 2px : 0;
@@ -1144,19 +1147,6 @@ export component DeskWindow inherits Window {
                     changed lane-top => { root.capacity-changed(self.capacity); }
                     changed lane-h => { root.capacity-changed(self.capacity); }
                 }
-                // the handle that opens the column, at the left of the weekday row
-                if body.grid-view && !root.side-open: Button {
-                    x: 0;
-                    y: 0;
-                    width: 16px;
-                    height: 20px;
-                    variant: ButtonVariant.subtle;
-                    size: ButtonSize.icon;
-                    icon: Glyph.chevron-right;
-                    accessible-label: @tr("展开待办栏（不定日待办）");
-                    tip: self.accessible-label;
-                    clicked => { root.side-set(true); }
-                }
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {
                     visible: root.view == "list";
@@ -1174,6 +1164,16 @@ export component DeskWindow inherits Window {
                     items: root.countdowns;
                     jump(d) => { root.jump(d); }
                 }
+            }
+            // The to-do column's handle, in the card's left margin (the layout's padding) beside
+            // the calendar: nothing of the calendar is under it.
+            if root.locked && body.grid-view: SideHandle {
+                x: 0;
+                y: body.y;
+                width: 8px;
+                height: body.height;
+                open: root.side-open;
+                clicked => { root.side-set(!root.side-open); }
             }
             // Adjust mode: the calendar ignores the mouse; a press anywhere below the title
             // bar moves the window (in 0.2 everything but the title bar, bars and grips).

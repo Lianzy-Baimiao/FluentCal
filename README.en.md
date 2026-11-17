@@ -14,6 +14,8 @@ An **Android client** is also available, with editable agendas, a calendar and a
 
 ## Features
 
+The to-do column opens from the handle midway down the calendar's left edge. Click “+ Add”, type a to-do and press Enter to save and keep adding; press Esc to finish.
+
 - **Pinned to the desktop**: sits below all windows, takes no taskbar space and stays visible after Win+D. It can also be switched to "Always on top" or "Normal window". You can lock its position or turn on "Click through". With several screens it can go on any of them, and it can be dragged straight across screens with different scaling.
 - **Calendar**: month view, a scrolling multi-week view and an agenda (Upcoming or All tasks); busy weeks can get taller rows (Settings › Calendar); the agenda shows "In 3 days" or "5 days overdue" beside each task; a to-do column on the left holds things to do once a month on no fixed day, or with no date at all; the Chinese lunar calendar, the 24 solar terms and traditional festivals; Chinese public holidays with their off and work days (including make-up working days, updated online automatically).
 - **Tasks**: double-click a date to add a task, tick to complete, drag to reschedule, right-click to recolor or delete; multi-day tasks show as bars with their progress; a daily task with a start and an end date is done once on each of those days, shown joined, each with its own check box; repeating tasks (daily, every N days, weekly, monthly, yearly, yearly by the lunar calendar, weekdays, official working days, end of month, Ebbinghaus review); reminders; search; "Recent changes" lets you undo an earlier addition, edit or deletion at any time.
