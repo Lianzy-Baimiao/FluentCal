@@ -12,7 +12,7 @@ import { PageMsg } from "settings_data.slint";
 
 // One bullet of the notes list (ul.note.list: 12px, line-height 1.7, 20px indent). Not a
 // HorizontalLayout: that would measure the wrapping text at its own whole width.
-component Bullet inherits Rectangle {
+export component Bullet inherits Rectangle {
     in property <string> text;
     preferred-height: t.preferred-height;
     min-height: t.preferred-height;

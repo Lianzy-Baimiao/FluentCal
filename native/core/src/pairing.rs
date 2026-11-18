@@ -3,8 +3,8 @@
 use aes_gcm::{aead::{Aead, KeyInit, Payload}, Aes256Gcm, Nonce};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
-use std::{net::{Ipv4Addr, SocketAddr}, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::{Duration, Instant}};
-use tiny_http::{Header, Method, Response, Server};
+use crate::httpd::{listen, Limits, Response};
+use std::{net::{IpAddr, Ipv4Addr}, sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::{channel, Sender}}, time::{Duration, Instant}};
 
 pub const MOBILE_DOWNLOAD: &str = "https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest";
 pub const TTL: Duration = Duration::from_secs(300);
@@ -17,6 +17,8 @@ pub struct Session {
     stop: Arc<AtomicBool>,
     used: Arc<AtomicBool>,
     until: Instant,
+    /// Let go of with the session: the server ends then, before its time is over.
+    _end: Sender<()>,
 }
 impl Session {
     pub fn active(&self) -> bool { !self.used.load(Ordering::Acquire) && !self.stop.load(Ordering::Acquire) && Instant::now() < self.until }
@@ -56,31 +58,47 @@ pub fn start(data: &Value, bind: &str, ttl: Duration) -> Result<Session, String>
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| "Encryption failed")?;
     let encrypted = cipher.encrypt(Nonce::from_slice(&iv), Payload { msg: &plain, aad: id.as_bytes() }).map_err(|_| "Encryption failed")?;
     let body = json!({ "v": 1, "iv": URL_SAFE_NO_PAD.encode(iv), "data": URL_SAFE_NO_PAD.encode(encrypted) }).to_string();
-    let server = Server::http(bind).map_err(|_| "Cannot start pairing service")?;
-    let addr = server.server_addr().to_ip().ok_or("Cannot get pairing port")?;
     let stop = Arc::new(AtomicBool::new(false)); let used = Arc::new(AtomicBool::new(false));
-    let session = Session { port: addr.port(), expires, id: id.clone(), key: URL_SAFE_NO_PAD.encode(key), stop: stop.clone(), used: used.clone(), until: Instant::now() + ttl };
-    let until = session.until;
-    std::thread::Builder::new().name("mobile-pair".into()).spawn(move || {
-        while !stop.load(Ordering::Acquire) && Instant::now() < until {
-            let Ok(Some(req)) = server.recv_timeout(Duration::from_millis(150)) else { continue };
-            let local_peer = req.remote_addr().is_some_and(|a| match a.ip() { std::net::IpAddr::V4(ip) => ip.is_private() || ip.is_loopback(), _ => false });
-            let allowed = local_peer && req.method() == &Method::Get && req.url() == format!("/pair/{id}") &&
-                !req.headers().iter().any(|h| h.field.equiv("Origin"));
-            let response = if allowed && !used.load(Ordering::Acquire) && Instant::now() < until && !stop.load(Ordering::Acquire) {
-                Response::from_string(body.clone()).with_status_code(200)
-            } else { Response::from_string("").with_status_code(if used.load(Ordering::Acquire) { 410 } else { 403 }) };
-            let success = response.status_code().0 == 200;
-            let response = response.with_header(Header::from_bytes("Content-Type", "application/json").unwrap())
-                .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap())
-                .with_header(Header::from_bytes("X-Content-Type-Options", "nosniff").unwrap());
-            if req.respond(response).is_ok() && success { used.store(true, Ordering::Release); }
-        }
-        drop(server);
-        // Wake tiny_http's accept thread when bound to 0.0.0.0 on Windows.
-        let _ = std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], addr.port())), Duration::from_millis(100));
+    let until = Instant::now() + ttl;
+    // Requests are answered side by side (httpd.rs), and the data is for one phone: the
+    // first to ask takes it.
+    let taken = Arc::new(AtomicBool::new(false));
+    let (path, stop2, used2) = (format!("/pair/{id}"), stop.clone(), used.clone());
+    // A request has no body (the limit is 0): one that announces any is refused unread.
+    let server = listen(bind, "mobile-pair", Limits::new(0, 8), move |req| {
+        let local_peer = match req.peer.ip() { IpAddr::V4(ip) => ip.is_private() || ip.is_loopback(), _ => false };
+        let allowed = local_peer && req.method == "GET" && req.url == path && req.header("Origin").is_none();
+        let open = allowed && !used2.load(Ordering::Acquire) && Instant::now() < until && !stop2.load(Ordering::Acquire);
+        let mut response = if open && taken.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+            let claim = Claim { taken: taken.clone(), used: used2.clone(), arrived: false };
+            let mut response = Response::new(200);
+            response.body = body.clone().into_bytes();
+            response.sent = Some(Box::new(move || claim.arrive()));
+            response
+        } else { Response::new(if used2.load(Ordering::Acquire) || (allowed && taken.load(Ordering::Acquire)) { 410 } else { 403 }) };
+        response.headers = vec![("Content-Type", "application/json".into()), ("Cache-Control", "no-store".into()), ("X-Content-Type-Options", "nosniff".into())];
+        response
     }).map_err(|_| "Cannot start pairing service")?;
-    Ok(session)
+    let port = server.addr.port();
+    let (end, ended) = channel::<()>();
+    // The server lasts until its time is over or the session is let go of, whichever is first.
+    std::thread::Builder::new().name("mobile-pair".into()).spawn(move || {
+        let _ = ended.recv_timeout(ttl);
+        drop(server);
+    }).map_err(|_| "Cannot start pairing service")?;
+    Ok(Session { port, expires, id, key: URL_SAFE_NO_PAD.encode(key), stop, used, until, _end: end })
+}
+
+/// The data on its way to a phone: used up once it has arrived (`used`, as before: only a
+/// response that was sent counts), free for the next request when it has not.
+struct Claim { taken: Arc<AtomicBool>, used: Arc<AtomicBool>, arrived: bool }
+impl Claim {
+    fn arrive(mut self) { self.arrived = true; }
+}
+impl Drop for Claim {
+    fn drop(&mut self) {
+        if self.arrived { self.used.store(true, Ordering::Release); } else { self.taken.store(false, Ordering::Release); }
+    }
 }
 
 #[cfg(test)]
@@ -136,5 +154,30 @@ mod tests {
     fn expiry_disables_qr() {
         let s = start(&json!({}), "127.0.0.1:0", Duration::ZERO).unwrap();
         assert!(!s.active());
+    }
+    /// tiny_http set aside as much memory as a request announced: 1 TB ended the program.
+    #[test]
+    fn an_announced_body_is_refused_unread() {
+        use std::io::{Read, Write};
+        let s = start(&json!({}), "127.0.0.1:0", Duration::from_secs(3)).unwrap();
+        let mut conn = std::net::TcpStream::connect(("127.0.0.1", s.port)).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        write!(conn, "GET /pair/{} HTTP/1.1\r\nHost: x\r\nContent-Length: 1099511627776\r\n\r\n", s.id).unwrap();
+        let mut answer = Vec::new();
+        let _ = conn.read_to_end(&mut answer);
+        assert!(answer.starts_with(b"HTTP/1.1 413"), "{}", String::from_utf8_lossy(&answer));
+        assert!(s.active() && !s.used(), "the data is still there for the phone");
+    }
+    #[test]
+    fn the_server_ends_with_the_session() {
+        let s = start(&json!({}), "127.0.0.1:0", Duration::from_secs(30)).unwrap();
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], s.port));
+        assert!(std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok());
+        drop(s);
+        let gone = (0..100).any(|_| {
+            std::thread::sleep(Duration::from_millis(20));
+            std::net::TcpListener::bind(addr).is_ok()
+        });
+        assert!(gone, "the port is free again");
     }
 }

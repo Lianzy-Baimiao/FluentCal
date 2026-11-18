@@ -17,8 +17,9 @@ ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no
 base64 = "0.23.1"
 aes-gcm = "0.10.3"
 getrandom = "0.3.4"
-# Web view (src/web.rs): a small HTTP/1.1 server without TLS for the local network.
-tiny_http = "0.12.0"
+# The small HTTP/1.1 server of src/httpd.rs: reading request heads, and the date of an answer.
+httparse = "1.10.1"
+httpdate = "1.0.3"
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_NetworkManagement_IpHelper",

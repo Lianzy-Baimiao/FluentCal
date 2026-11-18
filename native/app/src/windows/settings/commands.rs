@@ -117,6 +117,34 @@ impl App {
                     }
                 });
             }
+            "mcp-copy" => {
+                // What the page shows with the token as dots, with the token.
+                let m = self.mcp_info();
+                let text = match arg {
+                    "command" => crate::mcpcmd::command_config(&m.exe),
+                    "claude-command" => crate::mcpcmd::claude_command(&m.exe),
+                    "url" => crate::mcpcmd::url_config(&m.url, &m.token),
+                    "claude-url" => crate::mcpcmd::claude_url(&m.url, &m.token),
+                    _ => return,
+                };
+                let with_token = matches!(arg, "url" | "claude-url");
+                match crate::platform::clipboard::set_text(&text) {
+                    Ok(()) if with_token => self.settings_say(SUCCESS, tr("已复制。里面带访问令牌，只填到自己的 AI 助手里，不要发给别人。")),
+                    Ok(()) => self.settings_say(SUCCESS, tr("已复制，粘贴到 AI 助手的配置里即可。")),
+                    Err(_) => self.settings_say(ERROR, tr("无法复制到剪贴板，请稍后再试")),
+                }
+            }
+            "mcp-reset-token" => {
+                self.settings_confirm(tr("重新生成令牌？"), tr("旧令牌立即失效：通过网址连接的 AI 助手要换上新的配置才能继续使用。"), tr("重新生成"), "", false, |app, r| {
+                    if r != "primary" {
+                        return;
+                    }
+                    match app.mcp_reset_token() {
+                        Ok(()) => app.settings_say(Severity::Info, tr("已重新生成令牌，请重新复制带令牌的配置。")),
+                        Err(e) => app.settings_say(ERROR, &e),
+                    }
+                });
+            }
             _ => eprintln!("[settings] unknown action {key}"),
         }
     }

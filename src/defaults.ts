@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   holidays: { autoUpdate: true, lastCheck: 0 },
   shortcuts: { toggle: 'Ctrl+Alt+D', newTask: 'Ctrl+Alt+N' },
   web: { enabled: false, port: 18765 },
+  mcp: { enabled: false, port: 18766, write: true },
   // Keep in sync with cloud/service.rs Config::from_settings (absent fields use these too).
   sync: {
     enabled: false,

@@ -150,3 +150,35 @@ fn only_local_network_peers() {
         assert!(!allowed_peer(no.parse().unwrap()), "{no}");
     }
 }
+
+/// A request can announce a body of any length and send none of it. The library used before
+/// (tiny_http) set aside as much memory as was announced, and with 1 TB the program ended
+/// there; any device of the local network could send that.
+#[test]
+fn an_impossible_length_does_no_harm() {
+    use std::io::{Read, Write};
+    let ctx = Arc::new(Ctx { store: store("web-length"), token: Arc::new(Mutex::new(TOKEN.into())), asset: Box::new(asset), accent: Box::new(|| "#000000".into()), pc: "X".into() });
+    let running = start(ctx, "127.0.0.1:0").unwrap();
+    // the status of the answer to one request on a connection of its own
+    let ask = |request: &str| {
+        let mut conn = std::net::TcpStream::connect(running.addr).unwrap();
+        conn.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+        conn.write_all(request.as_bytes()).unwrap();
+        let mut answer = Vec::new();
+        let _ = conn.read_to_end(&mut answer); // the server ends the connection
+        String::from_utf8_lossy(&answer).split(' ').nth(1).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0)
+    };
+    assert_eq!(ask("GET /?w=web HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"), 200);
+    assert_eq!(ask("GET /?w=web HTTP/1.1\r\nHost: x\r\nContent-Length: 1099511627776\r\n\r\n"), 413, "refused, and nothing is set aside for it");
+    assert_eq!(ask("POST /api/doc HTTP/1.1\r\nHost: x\r\nContent-Length: 99999999999999999999999\r\n\r\nabc"), 413);
+    assert_eq!(ask("GET /?w=web HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"), 200, "and the page is still served");
+    // a small body that comes with a GET is read and not looked at
+    assert_eq!(ask(&format!("GET /?w=web HTTP/1.1\r\nHost: x\r\nContent-Length: 5000\r\nConnection: close\r\n\r\n{}", "x".repeat(5000))), 200);
+    // HEAD: the page's headers without the page
+    let mut conn = std::net::TcpStream::connect(running.addr).unwrap();
+    conn.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+    conn.write_all(b"HEAD /?w=web HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n").unwrap();
+    let mut answer = String::new();
+    conn.read_to_string(&mut answer).unwrap();
+    assert!(answer.starts_with("HTTP/1.1 200") && answer.ends_with("\r\n\r\n") && answer.to_ascii_lowercase().contains("content-length: 39\r\n"), "{answer}");
+}

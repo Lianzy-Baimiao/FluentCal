@@ -1,0 +1,155 @@
+// 设置 › AI 助手 (需求文档 4.12): FluentCal as an MCP server for AI assistants. Off unless the
+// user turns it on here.
+
+import { Theme } from "theme.slint";
+import { Glyph } from "icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "controls.slint";
+import { Toggle } from "forms.slint";
+import { NumberBox } from "inputs.slint";
+import { SettingsGroup, SettingsCard, InfoBar, Severity } from "cards.slint";
+import { SetState } from "settings_state.slint";
+import { PageMsg } from "settings_data.slint";
+import { Bullet } from "settings_web.slint";
+
+// What goes into an assistant's settings: what it is for, the text in a fixed-width font, and
+// a button that copies it. The screen shows the access token as dots; the copy has it.
+// (Placed by hand: a layout would measure the wrapping text at its own whole width.)
+component Snippet inherits Rectangle {
+    in property <string> caption;
+    in property <string> text;
+    // which one to copy (the argument of "mcp-copy")
+    in property <string> what;
+    property <length> box-y: max(cap.preferred-height, 24px) + 6px;
+    min-height: box-y + code.preferred-height + 18px;
+    preferred-height: self.min-height;
+    cap := Text {
+        x: 0;
+        y: (max(self.preferred-height, 24px) - self.preferred-height) / 2;
+        width: root.width - copy.width - 12px;
+        height: self.preferred-height;
+        text: root.caption;
+        font-size: 12px;
+        color: Theme.c.text-secondary;
+        wrap: word-wrap;
+        vertical-alignment: top;
+    }
+    copy := Button {
+        x: root.width - self.width;
+        y: 0;
+        width: self.preferred-width;
+        height: 24px;
+        text: @tr("复制");
+        size: ButtonSize.small;
+        icon: Glyph.copy;
+        clicked => { SetState.action-arg("mcp-copy", root.what); }
+    }
+    Rectangle {
+        x: 0;
+        y: root.box-y;
+        width: root.width;
+        height: code.preferred-height + 18px;
+        border-radius: Theme.radius-control;
+        border-width: 1px;
+        border-color: Theme.c.card-stroke;
+        background: Theme.c.card-fill-secondary;
+        code := Text {
+            x: 11px;
+            y: 9px;
+            width: parent.width - 22px;
+            height: self.preferred-height;
+            text: root.text;
+            font-family: "Consolas";
+            font-size: 12px;
+            color: Theme.c.text-primary;
+            // a path has nowhere to break between words
+            wrap: char-wrap;
+            vertical-alignment: top;
+        }
+    }
+}
+
+export component McpPage inherits VerticalLayout {
+    spacing: 4px;
+    if SetState.mcp.error != "": InfoBar { severity: Severity.error; title: @tr("AI 助手服务没有启动"); text: SetState.mcp.error; }
+    if SetState.msg.shown: PageMsg { }
+    SettingsGroup {
+        title: @tr("连接");
+        SettingsCard {
+            icon: Glyph.robot;
+            title: @tr("允许 AI 助手连接");
+            description: @tr("让 Claude、Cursor、Codex 等支持 MCP 的 AI 助手查看这台电脑上的日历和任务。默认关闭，关闭时不占用任何资源");
+            Toggle { checked: SetState.mcp.enabled; toggled(v) => { SetState.set-bool("mcp.enabled", v); } }
+        }
+        SettingsCard {
+            icon: Glyph.edit;
+            title: @tr("允许修改日历");
+            description: @tr("关闭后 AI 助手只能查看，不能添加、修改、完成或删除任务。AI 助手做的修改可以在“最近更改”里撤销");
+            enabled: SetState.mcp.enabled;
+            Toggle { checked: SetState.mcp.write; enabled: SetState.mcp.enabled; toggled(v) => { SetState.set-bool("mcp.write", v); } }
+        }
+    }
+    if SetState.mcp.enabled && SetState.mcp.running: SettingsGroup {
+        first: false;
+        title: @tr("接入方式");
+        Rectangle {
+            border-radius: Theme.radius-overlay;
+            border-width: 1px;
+            border-color: Theme.c.card-stroke;
+            background: Theme.c.card-fill;
+            VerticalLayout {
+                padding: 17px;
+                spacing: 16px;
+                Text {
+                    text: @tr("把下面任意一种配置加到 AI 助手里，重新打开它，然后直接在对话里让它查看或安排日程。");
+                    font-size: 12px;
+                    color: Theme.c.text-secondary;
+                    wrap: word-wrap;
+                    min-height: 20px;
+                    vertical-alignment: center;
+                }
+                // An assistant starts FluentCal's own program as the go-between: no address and
+                // no token to copy. A Store install cannot be started by other programs.
+                if !SetState.mcp.packaged: Snippet {
+                    caption: @tr("Claude Desktop、Cursor、Cline 等大多数 AI 助手：加到它的 MCP 配置文件里");
+                    text: SetState.mcp.command-config;
+                    what: "command";
+                }
+                if !SetState.mcp.packaged: Snippet {
+                    caption: @tr("Claude Code：在终端里运行一次");
+                    text: SetState.mcp.claude-command;
+                    what: "claude-command";
+                }
+                Snippet {
+                    caption: @tr("通过网址连接的 AI 助手：加到它的 MCP 配置文件里（复制的内容里带访问令牌）");
+                    text: SetState.mcp.url-config;
+                    what: "url";
+                }
+                if SetState.mcp.packaged: Snippet {
+                    caption: @tr("Claude Code：在终端里运行一次");
+                    text: SetState.mcp.claude-url;
+                    what: "claude-url";
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    Button { text: @tr("重新生成令牌"); size: ButtonSize.small; variant: ButtonVariant.subtle; icon: Glyph.key; clicked => { SetState.action("mcp-reset-token"); } }
+                }
+            }
+        }
+    }
+    SettingsGroup {
+        first: false;
+        title: @tr("高级");
+        SettingsCard {
+            icon: Glyph.settings;
+            title: @tr("端口");
+            description: @tr("被其他程序占用时换一个（1024–65535）");
+            NumberBox { width: 120px; value: SetState.mcp.port; minimum: 1024; maximum: 65535; changed-value(v) => { SetState.set-num("mcp.port", v); } }
+        }
+    }
+    VerticalLayout {
+        Bullet { text: @tr("只有这台电脑上的程序能连接，并且需要访问令牌；局域网和互联网上的设备连不上。令牌保存在 Windows 凭据管理器里。"); }
+        Bullet { text: @tr("AI 助手能读到你的全部任务（标题、备注、日期、分组），并会把读到的内容发给提供它的公司。只连接你信任的 AI 助手。"); }
+        Bullet { text: @tr("FluentCal 没有运行时 AI 助手连不上，它也不会自己启动 FluentCal。"); }
+        Bullet { text: @tr("访问令牌不小心发给了别人就点“重新生成令牌”，旧令牌立即失效；带令牌的配置要重新复制到 AI 助手里。"); }
+    }
+}

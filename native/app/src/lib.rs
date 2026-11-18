@@ -10,6 +10,7 @@ pub mod fonts;
 pub mod gallery;
 pub mod group_delete;
 pub mod i18n;
+pub mod mcpcmd;
 pub mod platform;
 pub mod reminders;
 pub mod shadow;

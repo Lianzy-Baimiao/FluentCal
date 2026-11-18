@@ -411,3 +411,162 @@ fn leaving_pair_page_cancels_session() {
     assert!(!t.g().get_pair_active());
     assert!(with(|a| a.settings_win.as_ref().unwrap().local.pairing.is_none()).unwrap());
 }
+
+/// One POST to the endpoint for AI assistants on a connection of its own: (status, body).
+fn mcp_post(port: u16, token: &str, body: &str) -> (u16, String) {
+    use std::io::{Read, Write};
+    let mut conn = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    conn.set_read_timeout(Some(std::time::Duration::from_secs(20))).unwrap();
+    write!(conn, "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+    let mut answer = String::new();
+    let _ = conn.read_to_string(&mut answer);
+    let status = answer.split(' ').nth(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    (status, answer.split_once("\r\n\r\n").map_or(String::new(), |(_, b)| b.to_owned()))
+}
+
+/// A tool called the way an assistant does, from another thread, while this one (the UI
+/// thread: the test has no event loop) makes the changes it asks for. Ok(what it told) or
+/// Err(why not).
+fn mcp_call(port: u16, token: &str, tool: &str, args: Value) -> Result<Value, String> {
+    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": tool, "arguments": args } }).to_string();
+    let token = token.to_owned();
+    let call = std::thread::spawn(move || mcp_post(port, &token, &body));
+    while !call.is_finished() {
+        with(|a| a.mcp_drain());
+        wait(5);
+    }
+    let (status, body) = call.join().unwrap();
+    assert_eq!(status, 200, "{body}");
+    let v: Value = serde_json::from_str(&body).unwrap();
+    let text = v["result"]["content"][0]["text"].as_str().unwrap_or_else(|| panic!("no text in {body}")).to_owned();
+    if v["result"]["isError"] == true {
+        Err(text)
+    } else {
+        Ok(serde_json::from_str(&text).unwrap())
+    }
+}
+
+/// 设置 › AI 助手 (需求文档 4.12): off unless turned on; on, an assistant reads and changes the
+/// calendar of the running program through the endpoint, and what it changed is in 最近更改.
+#[test]
+fn ai_assistants_connect_only_when_allowed() {
+    use fluentcal_core::cloud::secrets;
+    let free_port = || std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let t = start("mcp", Some(doc_with(json!({ "t1": task("t1", "已有的任务") }))), "mcp");
+    secrets::delete("mcp-token"); // (left by a run that did not get to its end)
+    let listening = |port: u16| std::net::TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], port)), std::time::Duration::from_millis(300)).is_ok();
+
+    // as installed: off, and nothing of it exists
+    let m = t.g().get_mcp();
+    assert!(!m.enabled && !m.running && m.write && m.error.is_empty(), "off by default, changes allowed once on");
+    assert_eq!(m.port, 18766.0);
+    assert!(!listening(18766) || !with(|a| a.mcp_info().running).unwrap());
+    assert!(secrets::get("mcp-token").is_none(), "no token before it is turned on");
+    assert!(!t.dir.join("mcp.json").exists());
+
+    // turned on: the endpoint, its token, the note for `--mcp`
+    let port = free_port();
+    t.g().invoke_set_num("mcp.port".into(), f32::from(port));
+    assert!(!listening(port), "a port alone starts nothing");
+    t.g().invoke_set_bool("mcp.enabled".into(), true);
+    let m = t.g().get_mcp();
+    assert!(m.enabled && m.running && m.error.is_empty(), "{}", m.error);
+    assert_eq!(t.saved()["settings"]["mcp"], json!({ "enabled": true, "port": port }), "only what was set is written");
+    let token = secrets::get("mcp-token").expect("a token was made");
+    assert!(token.len() == 32 && token.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(fluentcal_core::mcp::bridge::read_state(&t.dir), Some(port));
+    // what the page shows to copy: the address, this program, and dots for the token
+    let info = with(|a| a.mcp_info()).unwrap();
+    assert_eq!((info.url.clone(), info.token.clone()), (format!("http://127.0.0.1:{port}/mcp"), token.clone()));
+    assert!(m.url_config.contains(&format!("\"url\": \"http://127.0.0.1:{port}/mcp\"")) && m.url_config.contains("Bearer ••••••••") && !m.url_config.contains(&token));
+    assert!(!m.claude_url.contains(&token) && m.claude_url.starts_with("claude mcp add --scope user --transport http fluentcal http://127.0.0.1:"));
+    let shown: Value = serde_json::from_str(&m.command_config).expect("the configuration is JSON");
+    assert_eq!(shown["mcpServers"]["fluentcal"]["args"], json!(["--mcp"]));
+    assert_eq!(shown["mcpServers"]["fluentcal"]["command"], info.exe.as_str());
+    assert!(m.claude_command.ends_with("\" --mcp") && m.claude_command.contains(&info.exe));
+    let copied: Value = serde_json::from_str(&fluentcal_app::mcpcmd::url_config(&info.url, &info.token)).unwrap();
+    assert_eq!(copied["mcpServers"]["fluentcal"]["headers"]["Authorization"], format!("Bearer {token}"));
+    assert_eq!(copied["mcpServers"]["fluentcal"]["type"], "http");
+
+    // nobody without the token
+    assert_eq!(mcp_post(port, "wrong", "{}").0, 401);
+    // an assistant looks…
+    let seen = mcp_call(port, &token, "list_tasks", json!({ "from": "2026-10-14", "to": "2026-10-14" })).unwrap();
+    assert_eq!(seen["tasks"][0]["title"], "已有的任务");
+    // …and changes: at once in the program, and listed in 最近更改 to take back
+    let before = with(|a| a.changes.list().len()).unwrap();
+    let added = mcp_call(port, &token, "add_tasks", json!({ "tasks": [{ "title": "助手加的任务", "start": "2026-10-15", "time": "9:00" }] })).unwrap();
+    let id = added["tasks"][0]["id"].as_str().unwrap().to_owned();
+    let found = with({
+        let id = id.clone();
+        move |a| a.doc.tasks.get(&id).map(|t| (t.title.clone(), t.start.clone(), t.time.clone()))
+    })
+    .unwrap();
+    assert_eq!(found, Some(("助手加的任务".to_owned(), "2026-10-15".to_owned(), Some("09:00".to_owned()))));
+    assert_eq!(t.saved()["tasks"][&id]["title"], "助手加的任务");
+    let changes = with(|a| a.changes.list()).unwrap();
+    assert_eq!(changes.len(), before + 1);
+    assert!(changes.iter().any(|c| c.text().contains("助手加的任务")), "{:?}", changes.iter().map(|c| c.text()).collect::<Vec<_>>());
+    mcp_call(port, &token, "set_task_done", json!({ "id": "t1" })).unwrap();
+    assert!(with(|a| a.doc.tasks["t1"].done).unwrap());
+    // nothing to change is not a change
+    let n = with(|a| a.changes.list().len()).unwrap();
+    assert_eq!(mcp_call(port, &token, "update_task", json!({ "id": id, "title": "助手加的任务" })).unwrap()["unchanged"], true);
+    assert_eq!(with(|a| a.changes.list().len()).unwrap(), n);
+    // what is wrong is told, and nothing happens
+    assert!(mcp_call(port, &token, "update_task", json!({ "id": id, "start": "2026-02-30" })).unwrap_err().contains("YYYY-MM-DD"));
+    assert_eq!(with(|a| a.changes.list().len()).unwrap(), n);
+
+    // looking only
+    t.g().invoke_set_bool("mcp.write".into(), false);
+    assert!(t.g().get_mcp().running && !t.g().get_mcp().write);
+    let said = mcp_call(port, &token, "delete_task", json!({ "id": id })).unwrap_err();
+    assert!(said.contains("允许修改日历"), "{said}");
+    assert!(with({
+        let id = id.clone();
+        move |a| a.doc.tasks.contains_key(&id)
+    })
+    .unwrap());
+    assert_eq!(mcp_call(port, &token, "get_task", json!({ "id": id })).unwrap()["title"], "助手加的任务");
+    t.g().invoke_set_bool("mcp.write".into(), true);
+
+    // a new token: asked first, then the old one is worth nothing
+    t.g().invoke_action("mcp-reset-token".into());
+    settle();
+    assert_eq!(t.w.get_confirm_title(), "重新生成令牌？");
+    t.answer("close");
+    assert_eq!(secrets::get("mcp-token").as_deref(), Some(token.as_str()), "not without a yes");
+    t.g().invoke_action("mcp-reset-token".into());
+    settle();
+    t.answer("primary");
+    let new = secrets::get("mcp-token").unwrap();
+    assert!(new != token && new.len() == 32);
+    assert_eq!(t.msg().0, Severity::Info);
+    assert_eq!(mcp_post(port, &token, "{}").0, 401);
+    assert!(mcp_call(port, &new, "list_groups", json!({})).is_ok());
+
+    // another port: the old one is let go of
+    let other = free_port();
+    t.g().invoke_set_num("mcp.port".into(), f32::from(other));
+    assert!(t.g().get_mcp().running && listening(other) && !listening(port));
+    assert_eq!(fluentcal_core::mcp::bridge::read_state(&t.dir), Some(other));
+    // a port somebody else has: said on the page, and nothing runs
+    let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    t.g().invoke_set_num("mcp.port".into(), f32::from(taken.local_addr().unwrap().port()));
+    let m = t.g().get_mcp();
+    assert!(m.enabled && !m.running && m.error.contains("占用"), "{}", m.error);
+    assert!(!listening(other) && fluentcal_core::mcp::bridge::read_state(&t.dir).is_none());
+    t.g().invoke_set_num("mcp.port".into(), f32::from(other));
+    assert!(t.g().get_mcp().running && t.g().get_mcp().error.is_empty());
+
+    // turned off: gone at once; the token stays for the next time
+    t.g().invoke_set_bool("mcp.enabled".into(), false);
+    let m = t.g().get_mcp();
+    assert!(!m.enabled && !m.running && m.error.is_empty());
+    assert!(!listening(other) && !t.dir.join("mcp.json").exists());
+    assert_eq!(secrets::get("mcp-token").as_deref(), Some(new.as_str()));
+    t.g().invoke_set_bool("mcp.enabled".into(), true);
+    assert!(mcp_call(other, &new, "list_groups", json!({})).is_ok(), "the configuration an assistant was given still works");
+    t.g().invoke_set_bool("mcp.enabled".into(), false);
+    secrets::delete("mcp-token");
+}

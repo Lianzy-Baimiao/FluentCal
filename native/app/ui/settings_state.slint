@@ -50,6 +50,12 @@ export struct SSync {
 
 export struct SWeb { enabled: bool, running: bool, port: float, error: string, has-addresses: bool, qr: image }
 
+// What the snippets show has the access token as dots; the copies are made in Rust.
+export struct SMcp {
+    enabled: bool, write: bool, running: bool, port: float, error: string, packaged: bool,
+    command-config: string, url-config: string, claude-command: string, claude-url: string,
+}
+
 export struct SAbout { version: string, build: string, update-checking: bool, update-message: string }
 
 export struct SGroup { id: string, name: string, color: string, desc: string }
@@ -67,6 +73,7 @@ export global SetState {
     in property <SData> data;
     in property <SSync> sync;
     in property <SWeb> web;
+    in property <SMcp> mcp;
     in property <SAbout> about;
     in property <bool> pair-active;
     in property <image> pair-qr;

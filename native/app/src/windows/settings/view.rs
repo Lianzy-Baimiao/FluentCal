@@ -3,7 +3,7 @@
 
 use fluentcal_core::i18n::{tr, trf};
 
-use crate::{SAbout, SAddress, SAppearance, SBackup, SCalendar, SData, SGantt, SGeneral, SGroup, SMsg, SReminders, SSync, SUpcoming, SWeb, SelectOption, SetState, SettingsWindow, Severity, Swatch};
+use crate::{SAbout, SAddress, SAppearance, SBackup, SCalendar, SData, SGantt, SGeneral, SGroup, SMcp, SMsg, SReminders, SSync, SUpcoming, SWeb, SelectOption, SetState, SettingsWindow, Severity, Swatch};
 use fluentcal_core::cloud::service::Status;
 use fluentcal_core::datadir::DataDir;
 use fluentcal_core::settings_page as sp;
@@ -39,6 +39,8 @@ pub struct Local {
     /// Saved secrets ("webdav", "github", "gitee").
     pub secrets: Vec<String>,
     pub web: WebView,
+    /// The AI 助手 page: the endpoint's state (crate::mcpcmd).
+    pub mcp: crate::mcpcmd::McpInfo,
     /// Tests: file/folder picked instead of showing a dialog (export, import, data folder).
     pub test_pick: Option<String>,
     /// Data folder changed: a restart was asked for (tests check it; the app restarts).
@@ -387,6 +389,21 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         })
         .collect();
     update(g.get_addresses(), addrs, |m| g.set_addresses(m));
+    let m = &local.mcp;
+    // On the screen the access token is dots; "复制" copies the real one (commands.rs).
+    let (dots, exe) = ("••••••••", m.exe.as_str());
+    g.set_mcp(SMcp {
+        enabled: st.mcp.enabled,
+        write: st.mcp.write,
+        running: m.running,
+        port: f32::from(st.mcp.port),
+        error: s(m.error.as_deref().unwrap_or("")),
+        packaged: m.packaged,
+        command_config: s(&crate::mcpcmd::command_config(exe)),
+        url_config: s(&crate::mcpcmd::url_config(&m.url, dots)),
+        claude_command: s(&crate::mcpcmd::claude_command(exe)),
+        claude_url: s(&crate::mcpcmd::claude_url(&m.url, dots)),
+    });
     let active = local.pairing.as_ref().is_some_and(|p| p.active());
     g.set_pair_active(active);
     g.set_pair_qr(if active { local.pair_qr.clone().unwrap_or_default() } else { Image::default() });

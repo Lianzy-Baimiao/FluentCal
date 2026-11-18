@@ -94,6 +94,14 @@ impl App {
         l.web = WebView { enabled: info.enabled, running: info.running, port: info.port, error: info.error, addresses: info.addresses, qr };
     }
 
+    /// The state of the endpoint for AI assistants (crate::mcpcmd), for the AI 助手 page.
+    pub fn settings_load_mcp(&mut self) {
+        let info = self.mcp_info();
+        if let Some(l) = self.local() {
+            l.mcp = info;
+        }
+    }
+
     /// A switch, select, slider or box changed `path` (0.2's useSetting).
     pub fn settings_set(&mut self, path: &str, value: Value) {
         if path.starts_with("sync.") { self.settings_pair_cancel(); }
@@ -104,7 +112,7 @@ impl App {
                 let accent = if on { "system".to_owned() } else { self.sys.accent.clone().unwrap_or_else(|| "#0078D4".into()) };
                 json!({ "theme": { "accent": accent } })
             }
-            "calendar.weekStart" | "sync.interval" | "web.port" | "calendar.weeksRows" | "calendar.weeksPast" => {
+            "calendar.weekStart" | "sync.interval" | "web.port" | "mcp.port" | "calendar.weeksRows" | "calendar.weeksPast" => {
                 let n = value.as_f64().unwrap_or(0.0).round();
                 sp::patch(path, json!(n as i64))
             }

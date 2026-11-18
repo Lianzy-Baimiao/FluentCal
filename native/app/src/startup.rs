@@ -34,6 +34,11 @@ fn fatal(text: &str) {
 
 pub fn main() {
     let id = msgwin::instance_id();
+    // `--mcp`: not the calendar but the go-between of an AI assistant and the calendar that
+    // is running (mcpcmd.rs). No window, no second instance, nothing of the user interface.
+    if std::env::args().any(|a| a == "--mcp") {
+        return crate::mcpcmd::bridge_main(local_dir(&id));
+    }
     // The old copy saves its data and syncs (up to ~5 s) before it lets go.
     if std::env::args().any(|a| a == "--restart") {
         msgwin::wait_for_exit(&id, 10_000);
@@ -150,6 +155,7 @@ pub fn build(local: PathBuf) -> Result<App, String> {
         side_ext: 0,
         day: today,
         web: Default::default(),
+        mcp: Default::default(),
         reminder_win: None,
         editor: None,
         settings_win: None,
@@ -211,6 +217,7 @@ fn start_platform(app: &mut App, id: &str) {
     events::register_hotkeys(app);
     autostart::sync(app.doc.settings.general.autostart);
     app.web_apply();
+    app.mcp_apply();
     events::update_holidays(app, false);
     let every = |ms: u64, f: fn(&mut App)| {
         let t = slint::Timer::default();

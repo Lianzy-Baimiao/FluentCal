@@ -33,6 +33,9 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
     if old.web != new.web {
         app.web_apply();
     }
+    if old.mcp != new.mcp {
+        app.mcp_apply();
+    }
     // The saved place (bounds) is written without telling anyone; it isn't appearance.
     let look = |d: &fluentcal_core::settings::Desk| fluentcal_core::settings::Desk { bounds: None, ..d.clone() };
     if old.theme != new.theme || look(o) != look(n) {

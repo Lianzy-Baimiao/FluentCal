@@ -7,13 +7,16 @@ use crate::i18n::{tr, trf};
 
 use crate::store::{signature, Store};
 use serde_json::{json, Value};
-use std::io::Cursor;
-use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
-use tiny_http::{Header, Method, Request, Response, Server};
 
-const WORKERS: usize = 4;
+pub use crate::httpd::Running;
+use crate::httpd::{listen, Limits, ListenError, Request, Response};
+
+/// A few devices, each with the handful of connections a browser opens.
+const CONNECTIONS: usize = 64;
+/// The page only asks (GET): a request has no body worth reading.
+const MAX_BODY: usize = 8 * 1024;
 const CSP: &str = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 pub struct Asset {
@@ -86,7 +89,9 @@ pub fn public_view(doc: &Value, accent: &str, pc: &str) -> Value {
     json!({ "doc": doc, "accent": accent, "pc": pc })
 }
 
-fn same(a: &str, b: &str) -> bool {
+/// Compares in the same time whatever the two have in common, so that the time taken tells nothing about
+/// the token.
+pub(crate) fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
@@ -139,76 +144,25 @@ pub fn handle(ctx: &Ctx, method: &str, url: &str, auth: Option<&str>, if_none_ma
     r
 }
 
-fn serve(ctx: &Ctx, req: Request) {
-    let peer_ok = req.remote_addr().is_some_and(|a: &SocketAddr| allowed_peer(a.ip()));
-    let header = |name: &'static str| req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.as_str().to_owned());
-    let reply = if peer_ok {
-        let method = match req.method() {
-            Method::Get => "GET",
-            Method::Head => "HEAD",
-            _ => "OTHER",
-        };
-        handle(ctx, method, req.url(), header("Authorization").as_deref(), header("If-None-Match").as_deref())
+fn serve(ctx: &Ctx, req: &Request) -> Response {
+    let reply = if allowed_peer(req.peer.ip()) {
+        handle(ctx, &req.method, &req.url, req.header("Authorization"), req.header("If-None-Match"))
     } else {
         Reply::new(403)
     };
-    let len = reply.body.len();
-    let mut res = Response::new(reply.status.into(), Vec::new(), Cursor::new(reply.body), Some(len), None);
     let common = [("X-Content-Type-Options", "nosniff"), ("Referrer-Policy", "no-referrer"), ("X-Frame-Options", "DENY")];
-    for (k, v) in common.iter().map(|(k, v)| (*k, v.to_string())).chain(reply.headers) {
-        if let Ok(h) = Header::from_bytes(k.as_bytes(), v.as_bytes()) {
-            res = res.with_header(h);
-        }
-    }
-    let _ = req.respond(res);
+    let mut res = Response::new(reply.status);
+    res.headers = common.iter().map(|(k, v)| (*k, v.to_string())).chain(reply.headers).collect();
+    res.body = reply.body;
+    res
 }
 
-/// The running server; dropping it stops it and frees the port.
-pub struct Running {
-    server: Option<Arc<Server>>,
-    stop: Arc<AtomicBool>,
-    pub addr: SocketAddr,
-}
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-        let Some(server) = self.server.take() else { return };
-        for _ in 0..WORKERS {
-            server.unblock(); // one per worker
-        }
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-        while Arc::strong_count(&server) > 1 && std::time::Instant::now() < deadline {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        drop(server);
-        // tiny_http wakes its accept thread by connecting to the listening address, which
-        // fails for 0.0.0.0 on Windows; without this the port would stay taken.
-        let _ = std::net::TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], self.addr.port())), std::time::Duration::from_millis(300));
-    }
-}
-
+/// Starts the server (httpd.rs) on `bind`; dropping what is returned stops it and frees the
+/// port.
 pub fn start(ctx: Arc<Ctx>, bind: &str) -> Result<Running, String> {
-    let server = Arc::new(Server::http(bind).map_err(|e| {
-        let text = e.to_string();
-        if text.contains("10048") || text.to_lowercase().contains("in use") {
-            tr("端口已被其他程序占用，请换一个端口").to_owned()
-        } else {
-            trf("无法启动网页服务：{0}", &[format!("{}", text)])
-        }
-    })?);
-    let addr = server.server_addr().to_ip().ok_or(tr("无法启动网页服务"))?;
-    let stop = Arc::new(AtomicBool::new(false));
-    for i in 0..WORKERS {
-        let (server, stop, ctx) = (server.clone(), stop.clone(), ctx.clone());
-        let _ = std::thread::Builder::new().name(format!("web-{i}")).spawn(move || {
-            while let Ok(req) = server.recv() {
-                if stop.load(Ordering::Relaxed) {
-                    break;
-                }
-                serve(&ctx, req);
-            }
-        });
-    }
-    Ok(Running { server: Some(server), stop, addr })
+    listen(bind, "web", Limits::new(MAX_BODY, CONNECTIONS), move |req| serve(&ctx, req)).map_err(|e| match e {
+        ListenError::InUse => tr("端口已被其他程序占用，请换一个端口").to_owned(),
+        ListenError::Other(text) if text.is_empty() => tr("无法启动网页服务").to_owned(),
+        ListenError::Other(text) => trf("无法启动网页服务：{0}", &[text]),
+    })
 }

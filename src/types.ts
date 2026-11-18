@@ -180,6 +180,9 @@ export interface Settings {
   /** Cloud sync (SYN). Per PC; passwords and tokens are in Windows Credential Manager. */
   /** Web view in the local network (WEB). Per PC; the access code is in Credential Manager. */
   web: { enabled: boolean; port: number };
+  /** AI assistants over MCP (MCP), desktop only. Per PC; the token is in Credential Manager.
+   *  `write`: assistants may change the calendar, not only look. */
+  mcp: { enabled: boolean; port: number; write: boolean };
   sync: {
     enabled: boolean;
     /** '' = off; 'folder' = a shared data folder (DAT-04), not a network sync. */

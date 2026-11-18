@@ -139,6 +139,16 @@ section!(Web {
     port: u16 = 18765,
 });
 
+section!(
+    /// AI assistants (MCP, 需求文档 4.12 / 7.8): the server in mcp/http.rs.
+    Mcp {
+    /// Off: no port, no thread, no token.
+    enabled: bool = false,
+    port: u16 = 18766,
+    /// Assistants may change tasks and groups, not only look.
+    write: bool = true,
+});
+
 section!(SyncWebDav {
     url: String = String::new(),
     user: String = String::new(),
@@ -177,6 +187,7 @@ section!(
     holidays: Holidays = Holidays::default(),
     shortcuts: Shortcuts = Shortcuts::default(),
     web: Web = Web::default(),
+    mcp: Mcp = Mcp::default(),
     sync: Sync = Sync::default(),
 });
 

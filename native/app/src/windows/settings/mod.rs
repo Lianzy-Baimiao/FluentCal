@@ -88,6 +88,11 @@ impl App {
         if let Some(s) = &mut self.settings_win {
             if s.local.pairing.as_ref().is_some_and(|p| !p.active()) { s.local.pair_timer.stop(); }
         }
+        // The endpoint for AI assistants follows its settings at once (shell::apply_settings),
+        // whoever changed them: its page shows it as it is now.
+        if self.settings_win.as_ref().is_some_and(|s| s.local.page == "mcp") {
+            self.settings_load_mcp();
+        }
         let info = self.settings_info();
         if let Some(s) = &self.settings_win {
             view::push(&s.window, &self.doc, &info, &s.local);
@@ -128,7 +133,7 @@ impl App {
     }
 
     pub fn settings_navigate(&mut self, page: &str) {
-        const PAGES: [&str; 9] = ["general", "appearance", "calendar", "gantt", "reminders", "data", "sync", "web", "about"];
+        const PAGES: [&str; 10] = ["general", "appearance", "calendar", "gantt", "reminders", "data", "sync", "web", "mcp", "about"];
         let Some(s) = &mut self.settings_win else { return };
         if !PAGES.contains(&page) {
             return;
@@ -146,6 +151,7 @@ impl App {
             "data" => self.settings_load_backups(),
             "sync" => self.settings_load_secrets(),
             "web" => self.settings_load_web(),
+            "mcp" => self.settings_load_mcp(),
             _ => {}
         }
         self.settings_refresh();
