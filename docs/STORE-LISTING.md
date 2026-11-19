@@ -31,9 +31,9 @@ FluentCal 位于所有窗口之下、不占任务栏，按 Win+D 显示桌面时
 
 数据：保存在本机，每天自动备份，可导出 JSON、CSV（Excel）和 ICS（Outlook、Google 日历）。提醒使用 Windows 通知或屏幕右下角的提醒卡片。
 
-可选功能：通过你自己的 WebDAV 网盘或 GitHub/Gitee 私有仓库在多台电脑间同步；在本机浏览器或同一局域网的手机上只读查看日历。
+可选功能：通过你自己的 WebDAV 网盘或 GitHub/Gitee 私有仓库在多台电脑间同步；在本机浏览器或同一局域网的手机上只读查看日历；让 Claude、Cursor、Codex 等支持 MCP 的 AI 助手查看和管理这台电脑上的日程（只有本机的程序能连接，可以只允许查看；AI 助手读到的内容由它的提供方处理）。
 
-不需要账号，没有广告，不收集使用数据。同步和网页查看默认关闭，只在你设置后才会使用网络。
+不需要账号，没有广告，不收集使用数据。同步、网页查看和 AI 助手接入默认关闭，只在你设置后才会启用。
 
 ### 中文功能（产品功能列表）
 
@@ -59,19 +59,19 @@ A calendar and Gantt chart that sit on your Windows desktop.
 
 FluentCal stays below all windows, takes no taskbar space and remains visible after Win+D (Show desktop). You can also make it always on top or an ordinary window, lock its position, or let mouse clicks pass through it.
 
-Calendar: month and scrolling multi-week views with the Chinese lunar calendar, the 24 solar terms, traditional festivals and China's public holidays and make-up work days (updated online). Double-click a day to add a task, tick to complete, drag to reschedule, right-click to recolour or delete. Multi-day tasks show as bars. Repeating tasks (daily, weekly, monthly, yearly, workdays, lunar dates and more), countdowns and search are included.
+Calendar: month and scrolling multi-week views with the Chinese lunar calendar, the 24 solar terms, traditional festivals and China's public holidays and make-up work days (updated online). Double-click a day to add a task, tick to complete, drag to reschedule, and right-click to recolor or delete. Multi-day tasks appear as bars. Repeating tasks, countdowns and search are included.
 
-Gantt chart: the same data as the calendar, with day, week and month scales. Drag bars to move tasks, drag their ends to change dates, drag the handle to set progress, and drag from one bar to another to add a dependency. Group summaries, milestones and PNG/SVG export.
+Gantt chart: the same data as the calendar, with day, week and month scales. Drag bars to move tasks, drag their ends to change dates, adjust progress, and drag from one bar to another to add a dependency. Includes group summaries, milestones and PNG/SVG export.
 
-Appearance: light, dark or follow Windows; the Windows accent colour or your own; background colour, transparency, acrylic, corner radius, font size and spacing, with five presets.
+Appearance: light, dark or follow Windows; the Windows accent color or your own; background color, transparency, acrylic, corner radius, font size and spacing, with five presets.
 
 Language: follows your Windows display language by default. Switch instantly between English, Simplified Chinese and Traditional Chinese, and keep your choice across restarts. The browser view follows the browser language and remembers its own selection.
 
-Data is stored on your PC with a daily backup, and can be exported as JSON, CSV (Excel) and ICS (Outlook, Google Calendar). Reminders use Windows notifications or a card at the bottom right of the screen.
+Data is stored on your PC with daily backups and can be exported as JSON, CSV (Excel) and ICS (Outlook, Google Calendar). Reminders use Windows notifications or a card at the bottom right of the screen.
 
-Optional: sync between PCs through your own WebDAV storage or a private GitHub/Gitee repository, and view the calendar read-only in a browser on this PC or on a phone on the same network.
+Optional: sync between PCs through your own WebDAV storage or a private GitHub/Gitee repository; view the calendar read-only in a browser on this PC or on a phone on the same network; and let AI assistants that support MCP, such as Claude, Cursor and Codex, see and manage the schedule on this PC (only programs on this PC can connect, you can let them look only, and what an assistant reads is handled by its provider).
 
-No account, no advertising, no usage data collected. Sync and the web view are off by default and use the network only after you set them up.
+No account, no advertising, and no usage data collected. Sync, the web view and AI assistant access are off by default and only work when you configure them.
 
 ### English features
 
@@ -108,9 +108,9 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 
 資料：儲存在本機，每日自動備份，可匯出 JSON、CSV（Excel）與 ICS（Outlook、Google 日曆）。提醒使用 Windows 通知或螢幕右下角的提醒卡片。
 
-選用功能：透過自己的 WebDAV 儲存空間或 GitHub/Gitee 私人儲存庫，在多部電腦間同步；也能在本機瀏覽器或同一區域網路的手機上，以唯讀方式檢視行事曆。
+選用功能：透過自己的 WebDAV 儲存空間或 GitHub/Gitee 私人儲存庫，在多部電腦間同步；也能在本機瀏覽器或同一區域網路的手機上，以唯讀方式檢視行事曆；還能讓 Claude、Cursor、Codex 等支援 MCP 的 AI 助手檢視和管理這部電腦上的行程（只有本機的程式能連線，可以只允許檢視；AI 助手讀到的內容由它的提供者處理）。
 
-不需要帳號、沒有廣告、不收集使用資料。同步與網頁檢視預設關閉，僅在你設定後才會啟用。
+不需要帳號、沒有廣告、不收集使用資料。同步、網頁檢視與 AI 助手接入預設關閉，僅在你設定後才會啟用。
 
 ### 繁體中文功能
 
@@ -349,7 +349,7 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 14:15 点击“提交进行认证”，概述页显示 **正在认证更新 / 预处理**；14:35 再看已是 **产品更新：正在发布（Submission 11）**。是否上架以商店目录查询为准。2026-11-17 18:00 前后商店目录（CN）已返回 `ice.FluentCal_0.3.13.0_x64__rz8m2sa64m4em`，0.3.13.0 已上架。
 - 浏览器改为固定配置：Partner Center 专用的 Edge 配置文件放在 `%LOCALAPPDATA%\fluentcal-pc-edge`，用完只关浏览器、不删配置，登录状态保留；不加载扩展、不同步，默认在隐藏桌面上运行，屏幕上不出现窗口。脚本在 `C:\Users\30694\tools\fluentcal-store\`（`launch-edge-hidden.ps1`、`launch-edge.ps1`、`stop-edge.ps1`、`pc.py`）。14:33 用隐藏桌面重新启动验证过：直接进入产品概述页，无需登录。无头模式会被 Partner Center 以 Access Denied 拒绝，不能用。
 
-### 0.3.14.0 待办栏展开方式、多日任务显示第几天（2026-11-17 22:10 送审）
+### 0.3.14.0 待办栏展开方式、多日任务显示第几天（2026-11-17 22:10 送审，已上架）
 
 - 送审前商店目录（CN）返回 0.3.13.0，Partner Center 概述页显示 Submission 11 已上架。新建 **Submission 12 / 1152921505702429699**。
 - 对应 GitHub [v0.3.14](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.14)（提交 `23808db`）。商店包：`release/FluentCal_0.3.14.0_x64.msix`，10,785,353 字节，SHA-256 `3f58a6daf8a6c7d6f1e53692a4768a2a7d0f988e3dd09e2bea87c3d1b62b4bf1`。包内 EXE 与独立 EXE 一致（SHA-256 `8da7a807c3214b2a43ceec3a0118df5fc7daf4bd01b94ad1facbc345159ced90`），清单较 0.3.13.0 仅版本改变。
@@ -360,3 +360,16 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
   - English: The to-do column can now open in three ways (Settings › Calendar): beside the calendar, by widening the window to the left so the calendar keeps its size, or floating over the calendar. Bars of multi-day tasks show "Day 2 of 5 (40%)" after the name, and progress reads "60% done", including 0% and 100%. Both can be turned off in Settings › Calendar.
   - 繁體中文：不定日待辦欄可以選擇展開方式（設定 › 日曆）：佔用日曆左側、向左擴展視窗（日曆大小不變）、或浮在日曆上。跨多天的任務橫條在名稱後顯示“第5-2天（40%）”，表示一共 5 天、今天是第 2 天；完成進度顯示為“進度 60%”，0% 和 100% 也顯示。這兩項都可以在設定 › 日曆裡關閉。
 - 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-17 22:10 点击“提交进行认证”，概述页显示 **正在认证更新 / 产品更新：正在认证（Submission 12）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.14/14-*.png`。
+- 2026-11-19 12:00 商店目录（CN）返回 `ice.FluentCal_0.3.14.0_x64__rz8m2sa64m4em`，0.3.14.0 已上架。
+
+### 0.3.16.0 AI 助手接入（MCP），含 0.3.15 的内容（2026-11-19 14:22 送审）
+
+- 用户 2026-11-19：“发，Releases和微软商店都发”。0.3.15 没有提交过商店，这次的更新对商店用户来说是 0.3.14 → 0.3.16。送审前商店目录（CN）返回 0.3.14.0，概述页显示 Submission 12 已上架。新建 **Submission 13 / 1152921505702446050**。
+- 对应 GitHub [v0.3.16](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.16)（提交 `1fc5617`）。商店包：`release/FluentCal_0.3.16.0_x64.msix`，10,980,550 字节，SHA-256 `cdc90825364b8b6ab33671546b48a9ce2b3f013bf853bc6401c61665ab8e1460`。包内 EXE 与独立 EXE 一致（SHA-256 `9ffd185db461574f55a37314fe5648060b83db7d1baef683b1c4ec035f377c16`），清单较 0.3.14.0 仅版本改变。
+- 登录：固定配置的 Edge 在隐藏桌面上启动，直接进入产品概述页，没有要求输入任何内容。
+- 上传 0.3.16.0 后页面提示 0.3.14.0 保存后移除；保存后概述页的包只剩 **FluentCal_0.3.16.0_x64.msix / Validated / 已更新**。只出现既有的 `runFullTrust` 提醒，设备系列只勾选 Windows 10/11 Desktop。
+- **商店描述改了两处**（三种语言，上面“商店资料”里已是新文本；改前、改后的文本在 `release/store-0.3.16/description-old-*.txt` / `description-*.txt`）：“可选功能”一段加上 AI 助手接入（只有本机的程序能连接，可以只允许查看，AI 助手读到的内容由它的提供方处理）；最后一段的“同步和网页查看默认关闭”改为“同步、网页查看和 AI 助手接入默认关闭”。简短描述、功能列表、关键词、截图没有动。
+  - 英文描述：商店里在用的文本（1901 字符）和本文件原来记的（1974 字符）不一样，是之前有人在 Partner Center 里润色过（recolor、color 等美式拼写，几处措辞）。第一次填的时候用了本文件的版本，保存后发现，随即改回以商店在用的文本为底、只加上面两处（2152 字符），重新保存并核对。本文件的英文描述现在与商店一致。
+- “此版本的新增功能”文本在 `release/store-0.3.16/whats-new-*.txt`（简体 236、英文 686、繁体 243 字符），讲的是 AI 助手接入和内置服务更稳定。三种语言的描述和新增功能保存后重新载入，逐字一致。
+- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-19 14:22 点击“提交进行认证”，概述页显示 **正在认证更新 / 产品更新：正在认证（Submission 13）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.16/16-*.png`。
+- 审核说明（Additional testing info）没有改：AI 助手接入默认关闭，审核不需要用到。
