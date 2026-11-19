@@ -1088,5 +1088,10 @@
   "Microsoft Store 更新": "Microsoft Store 更新",
   "通过微软商店检查和安装桌面端更新": "透過 Microsoft Store 檢查與安裝桌面版更新",
   "检查更新": "檢查更新",
-  "打开 Microsoft Store": "開啟 Microsoft Store"
+  "打开 Microsoft Store": "開啟 Microsoft Store",
+  "请把 FluentCal 桌面日历加到你的 MCP 服务器里，对所有项目生效：名称 fluentcal，类型 stdio，命令 \"{0}\"，参数 \"{1}\"。": "請把 FluentCal 桌面日曆加到你的 MCP 伺服器裡，對所有專案生效：名稱 fluentcal，類型 stdio，命令 \"{0}\"，參數 \"{1}\"。",
+  "请把 FluentCal 桌面日历加到你的 MCP 服务器里，对所有项目生效：名称 fluentcal，类型 http（Streamable HTTP），网址 {0}，请求头 Authorization: Bearer {1}。": "請把 FluentCal 桌面日曆加到你的 MCP 伺服器裡，對所有專案生效：名稱 fluentcal，類型 http（Streamable HTTP），網址 {0}，請求頭 Authorization: Bearer {1}。",
+  "Codex、Gemini CLI、Qoder 等能自己改配置的 AI 助手：把这句话发给它": "Codex、Gemini CLI、Qoder 等能自己改設定的 AI 助手：把這句話傳給它",
+  "Codex、Gemini CLI、Qoder 等能自己改配置的 AI 助手：把这句话发给它（复制的内容里带访问令牌）": "Codex、Gemini CLI、Qoder 等能自己改設定的 AI 助手：把這句話傳給它（複製的內容裡帶訪問令牌）",
+  "已复制，发给 AI 助手即可。": "已複製，傳給 AI 助手即可。"
 }

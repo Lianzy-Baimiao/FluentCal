@@ -1,4 +1,4 @@
-//! `fluentcal.exe --mcp`: for the clients that start a command and talk to it over its
+//! `fluentcal.exe mcp`: for the clients that start a command and talk to it over its
 //! standard input and output (one JSON message per line) instead of calling a web address.
 //!
 //! This is not a second calendar: every message is passed on to the endpoint of the FluentCal

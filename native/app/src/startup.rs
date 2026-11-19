@@ -34,13 +34,15 @@ fn fatal(text: &str) {
 
 pub fn main() {
     let id = msgwin::instance_id();
-    // `--mcp`: not the calendar but the go-between of an AI assistant and the calendar that
-    // is running (mcpcmd.rs). No window, no second instance, nothing of the user interface.
-    if std::env::args().any(|a| a == "--mcp") {
+    let args: Vec<String> = std::env::args_os().skip(1).map(|a| a.to_string_lossy().into_owned()).collect();
+    // `fluentcal.exe mcp`: not the calendar but the go-between of an AI assistant and the
+    // calendar that is running (mcpcmd.rs). No window, no second instance, nothing of the
+    // user interface.
+    if crate::mcpcmd::is_bridge_start(&args) {
         return crate::mcpcmd::bridge_main(local_dir(&id));
     }
     // The old copy saves its data and syncs (up to ~5 s) before it lets go.
-    if std::env::args().any(|a| a == "--restart") {
+    if args.iter().any(|a| a == "--restart") {
         msgwin::wait_for_exit(&id, 10_000);
     }
     if !msgwin::claim(&id) {

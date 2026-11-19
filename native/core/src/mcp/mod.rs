@@ -6,7 +6,7 @@
 //!   (2026-07-28) and the older ones that open with `initialize`.
 //! - tools.rs: what an assistant can do.
 //! - http.rs: the endpoint on 127.0.0.1 (Streamable HTTP), behind an access token.
-//! - bridge.rs: `fluentcal.exe --mcp`, for clients that start a command and talk to it over
+//! - bridge.rs: `fluentcal.exe mcp`, for clients that start a command and talk to it over
 //!   stdin/stdout: it passes each message on to the endpoint of the running FluentCal.
 //!
 //! The specification is kept in C:\Users\30694\tools\mcp-spec (both revisions).

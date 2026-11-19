@@ -1029,7 +1029,7 @@ fn a_slow_call_does_not_hold_up_the_others() {
 }
 
 // ---------------------------------------------------------------------------------------
-// The bridge (`fluentcal.exe --mcp`)
+// The bridge (`fluentcal.exe mcp`)
 // ---------------------------------------------------------------------------------------
 
 /// Feeds lines to the bridge; the lines it answers with.

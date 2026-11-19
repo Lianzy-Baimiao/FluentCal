@@ -125,11 +125,15 @@ impl App {
                     "claude-command" => crate::mcpcmd::claude_command(&m.exe),
                     "url" => crate::mcpcmd::url_config(&m.url, &m.token),
                     "claude-url" => crate::mcpcmd::claude_url(&m.url, &m.token),
+                    // the sentence for an assistant that adds the server itself
+                    "agent" if m.packaged => crate::mcpcmd::agent_sentence_url(&m.url, &m.token),
+                    "agent" => crate::mcpcmd::agent_sentence(&m.exe),
                     _ => return,
                 };
-                let with_token = matches!(arg, "url" | "claude-url");
+                let with_token = matches!(arg, "url" | "claude-url") || (arg == "agent" && m.packaged);
                 match crate::platform::clipboard::set_text(&text) {
                     Ok(()) if with_token => self.settings_say(SUCCESS, tr("已复制。里面带访问令牌，只填到自己的 AI 助手里，不要发给别人。")),
+                    Ok(()) if arg == "agent" => self.settings_say(SUCCESS, tr("已复制，发给 AI 助手即可。")),
                     Ok(()) => self.settings_say(SUCCESS, tr("已复制，粘贴到 AI 助手的配置里即可。")),
                     Err(_) => self.settings_say(ERROR, tr("无法复制到剪贴板，请稍后再试")),
                 }

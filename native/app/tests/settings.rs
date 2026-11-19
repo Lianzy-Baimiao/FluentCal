@@ -464,7 +464,7 @@ fn ai_assistants_connect_only_when_allowed() {
     assert!(secrets::get("mcp-token").is_none(), "no token before it is turned on");
     assert!(!t.dir.join("mcp.json").exists());
 
-    // turned on: the endpoint, its token, the note for `--mcp`
+    // turned on: the endpoint, its token, the note for the bridge (`fluentcal.exe mcp`)
     let port = free_port();
     t.g().invoke_set_num("mcp.port".into(), f32::from(port));
     assert!(!listening(port), "a port alone starts nothing");
@@ -481,9 +481,19 @@ fn ai_assistants_connect_only_when_allowed() {
     assert!(m.url_config.contains(&format!("\"url\": \"http://127.0.0.1:{port}/mcp\"")) && m.url_config.contains("Bearer ••••••••") && !m.url_config.contains(&token));
     assert!(!m.claude_url.contains(&token) && m.claude_url.starts_with("claude mcp add --scope user --transport http fluentcal http://127.0.0.1:"));
     let shown: Value = serde_json::from_str(&m.command_config).expect("the configuration is JSON");
-    assert_eq!(shown["mcpServers"]["fluentcal"]["args"], json!(["--mcp"]));
+    assert_eq!(shown["mcpServers"]["fluentcal"]["args"], json!(["mcp"]));
     assert_eq!(shown["mcpServers"]["fluentcal"]["command"], info.exe.as_str());
-    assert!(m.claude_command.ends_with("\" --mcp") && m.claude_command.contains(&info.exe));
+    // (no `--` and no `--mcp`: PowerShell does not pass a lone `--` on to npm's claude.ps1)
+    assert_eq!(m.claude_command, format!("claude mcp add --scope user fluentcal \"{}\" mcp", info.exe));
+    // the sentence for the assistants that add the server themselves: this program and the
+    // same word; what "复制" puts on the clipboard is what the page shows
+    assert!(!info.packaged);
+    assert!(m.agent_sentence.contains(&format!("\"{}\"", info.exe)) && m.agent_sentence.contains("\"mcp\"") && m.agent_sentence.contains("fluentcal"), "{}", m.agent_sentence);
+    assert_eq!(m.agent_sentence, fluentcal_app::mcpcmd::agent_sentence(&info.exe));
+    assert!(!m.agent_sentence.contains(&token));
+    // (a Store install gets the address and, in the copy only, the token)
+    let by_address = fluentcal_app::mcpcmd::agent_sentence_url(&info.url, &info.token);
+    assert!(by_address.contains(&info.url) && by_address.contains(&format!("Authorization: Bearer {token}")), "{by_address}");
     let copied: Value = serde_json::from_str(&fluentcal_app::mcpcmd::url_config(&info.url, &info.token)).unwrap();
     assert_eq!(copied["mcpServers"]["fluentcal"]["headers"]["Authorization"], format!("Bearer {token}"));
     assert_eq!(copied["mcpServers"]["fluentcal"]["type"], "http");

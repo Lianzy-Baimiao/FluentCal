@@ -334,7 +334,16 @@ fn settings_scene(sc: &Value, doc: &Doc, scale: f32) -> (Info, Local) {
         qr,
     };
     let secrets = si["secrets"].as_array().map(|a| a.iter().map(st).collect()).unwrap_or_default();
-    let local = Local { page: st(&si["page"]), web, secrets, ..Default::default() };
+    // 设置 › AI 助手 with its endpoint running (`settingsInfo.mcp`), for a look at the page.
+    let m = &si["mcp"];
+    let mcp = fluentcal_app::mcpcmd::McpInfo {
+        running: m["running"].as_bool().unwrap_or(false),
+        url: st(&m["url"]),
+        exe: st(&m["exe"]),
+        packaged: m["packaged"].as_bool().unwrap_or(false),
+        ..Default::default()
+    };
+    let local = Local { page: st(&si["page"]), web, secrets, mcp, ..Default::default() };
     (info, local)
 }
 

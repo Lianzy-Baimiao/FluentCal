@@ -19,6 +19,9 @@ component Snippet inherits Rectangle {
     in property <string> text;
     // which one to copy (the argument of "mcp-copy")
     in property <string> what;
+    // Words stay whole (the sentence); a word wider than the box, such as a long path, is
+    // still broken. Off for what is typed into a terminal or a file, shown as a terminal would.
+    in property <bool> words;
     property <length> box-y: max(cap.preferred-height, 24px) + 6px;
     min-height: box-y + code.preferred-height + 18px;
     preferred-height: self.min-height;
@@ -61,8 +64,8 @@ component Snippet inherits Rectangle {
             font-family: "Consolas";
             font-size: 12px;
             color: Theme.c.text-primary;
-            // a path has nowhere to break between words
-            wrap: char-wrap;
+            // (a path has nowhere to break between words)
+            wrap: root.words ? word-wrap : char-wrap;
             vertical-alignment: top;
         }
     }
@@ -99,13 +102,22 @@ export component McpPage inherits VerticalLayout {
             VerticalLayout {
                 padding: 17px;
                 spacing: 16px;
-                Text {
-                    text: @tr("把下面任意一种配置加到 AI 助手里，重新打开它，然后直接在对话里让它查看或安排日程。");
-                    font-size: 12px;
-                    color: Theme.c.text-secondary;
-                    wrap: word-wrap;
-                    min-height: 20px;
-                    vertical-alignment: center;
+                // (Placed by hand, like the snippets: in the layout the text got the height of
+                // one line, and the second line of the English one was cut off.)
+                Rectangle {
+                    min-height: max(intro.preferred-height, 20px);
+                    preferred-height: self.min-height;
+                    intro := Text {
+                        x: 0;
+                        y: (parent.height - self.height) / 2;
+                        width: parent.width;
+                        height: self.preferred-height;
+                        text: @tr("把下面任意一种配置加到 AI 助手里，重新打开它，然后直接在对话里让它查看或安排日程。");
+                        font-size: 12px;
+                        color: Theme.c.text-secondary;
+                        wrap: word-wrap;
+                        vertical-alignment: top;
+                    }
                 }
                 // An assistant starts FluentCal's own program as the go-between: no address and
                 // no token to copy. A Store install cannot be started by other programs.
@@ -119,6 +131,14 @@ export component McpPage inherits VerticalLayout {
                     text: SetState.mcp.claude-command;
                     what: "claude-command";
                 }
+                // For the assistants without a line of their own here: they add the server
+                // themselves when told what it is.
+                if !SetState.mcp.packaged: Snippet {
+                    caption: @tr("Codex、Gemini CLI、Qoder 等能自己改配置的 AI 助手：把这句话发给它");
+                    text: SetState.mcp.agent-sentence;
+                    what: "agent";
+                    words: true;
+                }
                 Snippet {
                     caption: @tr("通过网址连接的 AI 助手：加到它的 MCP 配置文件里（复制的内容里带访问令牌）");
                     text: SetState.mcp.url-config;
@@ -128,6 +148,12 @@ export component McpPage inherits VerticalLayout {
                     caption: @tr("Claude Code：在终端里运行一次");
                     text: SetState.mcp.claude-url;
                     what: "claude-url";
+                }
+                if SetState.mcp.packaged: Snippet {
+                    caption: @tr("Codex、Gemini CLI、Qoder 等能自己改配置的 AI 助手：把这句话发给它（复制的内容里带访问令牌）");
+                    text: SetState.mcp.agent-sentence;
+                    what: "agent";
+                    words: true;
                 }
                 HorizontalLayout {
                     alignment: start;

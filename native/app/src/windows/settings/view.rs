@@ -403,6 +403,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         url_config: s(&crate::mcpcmd::url_config(&m.url, dots)),
         claude_command: s(&crate::mcpcmd::claude_command(exe)),
         claude_url: s(&crate::mcpcmd::claude_url(&m.url, dots)),
+        agent_sentence: s(&if m.packaged { crate::mcpcmd::agent_sentence_url(&m.url, dots) } else { crate::mcpcmd::agent_sentence(exe) }),
     });
     let active = local.pairing.as_ref().is_some_and(|p| p.active());
     g.set_pair_active(active);

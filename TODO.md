@@ -2,6 +2,31 @@
 
 > 需求编号见 [需求文档.md](需求文档.md)。`[x]` 完成，`[~]` 进行中，`[ ]` 未开始。
 
+## 桌面 0.3.16：设置页给 Claude Code 的命令在 PowerShell 里报错；给其他 AI 助手的一句话（2026-11-19）
+> 用户：“你做的AI助手，第二段的执行会报错”：在 PowerShell 里粘贴 `claude mcp add --scope user fluentcal -- "…\fluentcal.exe" --mcp`，得到 `error: unknown option '--mcp'`。
+- [x] 原因（已在本机 PowerShell 5.1 复现）：用 npm 安装的 Claude Code，PowerShell 里的 `claude` 是 `claude.ps1`；PowerShell 调用脚本时把单独的 `--` 当作自己的参数结束标记去掉，`--mcp` 就成了 `claude mcp add` 的选项。同一条命令走 `claude.cmd`（cmd）和 Git Bash 正常。0.3.15 没发现，是因为这条命令当时没有在任何真实终端里运行过。
+- [x] 修复：程序认 `fluentcal.exe mcp`（不带横线，只认第一个参数；`mcpcmd::is_bridge_start`），`--mcp` 继续有效。设置页两段命令方式的配置都改用 `mcp`（常量 `mcpcmd::BRIDGE_ARG`，页面显示的和程序认的是同一个）；Claude Code 那一行变成 `claude mcp add --scope user fluentcal "<程序>" mcp`，服务名之后没有以横线开头的词，不需要 `--`。原因和取舍记在需求文档 7.8。
+- [x] 测试：原生工作区 224 项通过（新增 3 项，在 `mcpcmd.rs`：这一行在服务名之后没有以横线开头的词；设置页给出的参数能被程序认成桥；`mcp` / `--mcp` 的识别规则）。第一项在改之前的代码上运行过，按预期失败。
+- [x] 正式版实测（`tools\issues\mcp_claude_check.py <fluentcal.exe> [--ask]`；程序放在带空格和中文的文件夹里，数据隔离，窗口开在隐藏桌面上，Claude 配置用 `CLAUDE_CONFIG_DIR` 隔离，不动已安装的版本和用户自己的 Claude 配置）：
+  - 新命令在 PowerShell 5.1（`claude.ps1`）、cmd（`claude.cmd`）、Git Bash 里都登记为程序路径加 `["mcp"]`，Claude Code 2.1.327 的 `claude mcp list` 都是 Connected。
+  - 旧命令在 PowerShell 里仍然报同样的错；它在 cmd 里登记的 `--mcp`，新程序照样能用。
+  - 网址方式的那一行（商店版显示的）在三种终端里登记成功并且 Connected，令牌错误时明确报 401。
+  - 一次真实请求（`--ask`）：Claude Code 看到 11 个工具，模型调用 `list_tasks` 读到了隔离日历里的任务。
+- [x] 已安装的 0.3.15 也用真实的 Claude Code 连过（隔离的 Claude 配置，只握手）：Connected。还在用 0.3.15 的人在 PowerShell 里可以把 `--` 加上引号：`claude mcp add --scope user fluentcal "--" "<程序>" --mcp`（PowerShell 5.1、cmd、Git Bash 实测可用）。
+- [x] 用户追问（2026-11-19）：“兼容 npm、exe 等不同方式吗？如果是其他Agent，怎么调用？能不能加个给其他Agent调用的一句话”。
+  - 兼容性实测（同一个脚本，新增的项）：`claude` 是程序本身（claude.ai 的安装脚本、winget 装出来的就是 `claude.exe`；这里用 npm 包里的那个 `claude.exe`，把它的文件夹放到 PATH 最前）时，新命令在 PowerShell 5.1、cmd、Git Bash 里同样登记成功并且 Connected。加上之前的 `claude.ps1` / `claude.cmd`，两种安装方式、三种终端都过了。没有另外下载官方安装脚本装一份来试。
+  - Codex 0.170.0（npm 安装，`CODEX_HOME` 隔离）：`codex mcp add fluentcal "<程序>" mcp` 和带 `--` 的写法，在三种终端里都登记为程序路径加 `["mcp"]`（PowerShell 吃掉 `--` 也不影响，因为后面没有以横线开头的词）。只验证了登记，没有让 Codex 真的发起对话：那要用到用户的 Codex 登录信息，没有动。
+  - 新增“一句话”（MCP-06，方案见 7.8）：设置 › AI 助手 › 接入方式里多一段“Codex、Gemini CLI、Qoder 等能自己改配置的 AI 助手：把这句话发给它”，可复制，三种语言。安装版给的是程序路径和参数，商店版给的是网址和令牌（屏幕上是圆点，复制出来的是真令牌）。代码在 `mcpcmd::agent_sentence` / `agent_sentence_url`，页面是 `settings_mcp.slint`，复制走 `mcp-copy` 的 `agent`。
+  - 测试：原生工作区 225 项通过（新增 1 项：三种语言的这句话都带服务名、类型、加引号的完整路径和程序认的那个参数，网址版带地址和令牌；`tests/settings.rs` 补了页面显示与复制内容一致的断言）。`node scripts/check-translations.mjs` 通过（1095 条）。
+  - 这句话的真实效果（`mcp_claude_check.py --ask`）：把中文和英文两句分别发给真实的 Claude Code 2.1.327（隔离配置，只允许它运行 `claude mcp …`），两次它都自己运行了 `claude mcp add --scope user fluentcal -- "<程序>" mcp`，登记在用户级，`claude mcp list` 为 Connected。Codex、Gemini CLI、Qoder、Cursor 没有用真实对话试过。
+- [x] 第一次看了“AI 助手”页的样子（离屏渲染，`examples/snapshot.rs` 的设置场景加了 `settingsInfo.mcp`；简体、英文、商店版三张）。看出并修了两处：
+  - 英文界面下“接入方式”开头的说明换成两行时，第二行被下面的内容盖住一半（0.3.15 就有；这段文字在布局里只拿到一行的高度）。改成和各段配置一样手工摆放。
+  - 那句话原来按字符换行，英文单词会从中间断开（`fluentca` / `l`）。改成按词换行（`Snippet` 的 `words`）；比一行还长的路径仍然会断开，用一条很长的路径渲染确认过。命令和配置保持原来的按字符换行，和终端里看到的一样。
+- [ ] 上面看的是离屏渲染，不是真实窗口；复制按钮没有在真实窗口里点过（复制的内容由 `tests/settings.rs` 断言）。
+- [ ] 没有在 PowerShell 7 里试过（本机没装）；新命令里已经没有需要终端特别处理的内容。
+- [x] 发版（用户 2026-11-19：“发，Releases和微软商店都发”）：版本号改为 0.3.16（`native/Cargo.toml`、`Cargo.lock`、`app.rc`、`app.manifest`、`package.json`），README 三种语言补上“把页面上那句话发给它”。正式版重新构建后再跑一遍：原生 225 项、翻译检查、`mcp_claude_check.py`（不带 `--ask`）、三种语言隔离启动，全部通过；EXE 版本信息 0.3.16，商店包内 EXE 与独立 EXE 一致，清单较 0.3.14.0 仅版本不同。
+- [ ] 本机安装的仍是 0.3.15（覆盖安装会关掉正在运行的日历，没有替用户装）。
+
 ## 桌面 0.3.15：AI 助手接入（MCP 服务端）（2026-11-19）
 > 用户：“接入MCP功能，默认不启用”，随后“完成测试之后，推送发版本Releases”。需求见 4.12（MCP-01~08），方案见 7.8。
 - [x] 核心 `native/core/src/mcp/`：协议处理（2026-07-28 无状态 + 旧版 `initialize` 握手）、11 个工具、Streamable HTTP 服务、标准输入输出的桥。
@@ -15,7 +40,7 @@
 - [x] README（三种语言）、隐私政策（生效日期 2026-11-19）补充 AI 助手一节。
 - [x] 提交 `c48106a` 已推送，GitHub [v0.3.15](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.15) 为最新版，附安装包（7,612,974 字节，SHA-256 `bba86c8e78f49c9d59b969f11df3d45611c5da5546da6205182c5fb8e8a802cd`）、独立 EXE 及校验文件，线上摘要与本地一致。
 - [ ] 设置页“AI 助手”只有无界面测试，没有在真实窗口里看过。
-- [ ] 没有用真实的 AI 客户端（Claude Code、Claude Desktop、Cursor）连接过，只用脚本按协议发请求。
+- [~] 真实的 AI 客户端：Claude Code 2.1.327 已经连接并调用过工具（2026-11-19，见上面 0.3.16 一节）；Claude Desktop、Cursor 还没有试过。
 - [ ] Microsoft Store 版的命令方式需要应用执行别名（清单改动，要装包实测），本次只给网址方式。
 - [ ] 微软商店 0.3.15.0 未提交（用户这次只说了 GitHub Releases）；提交时一起更新商店说明。
 
