@@ -374,3 +374,17 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-19 14:22 点击“提交进行认证”，概述页显示 **正在认证更新 / 产品更新：正在认证（Submission 13）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.16/16-*.png`。
 - 审核说明（Additional testing info）没有改：AI 助手接入默认关闭，审核不需要用到。
 - 2026-11-20 11:04 商店目录（CN）返回 `ice.FluentCal_0.3.16.0_x64__rz8m2sa64m4em`，0.3.16.0 已上架。
+
+### 0.3.17.0 按分组筛选、完成日期、待办拖动排序、快速选年份（2026-11-20 19:11 送审）
+
+- 用户 2026-11-20：“做完之后直接推送提交发版本，包括微软商店”。送审前（18:52）商店目录（CN）返回 0.3.16.0，概述页显示 Submission 13 已上架。新建 **Submission 14 / 1152921505702459639**。
+- 对应 GitHub [v0.3.17](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.17)（提交 `0b79980`）。商店包：`release/FluentCal_0.3.17.0_x64.msix`，11,178,596 字节，SHA-256 `bfe1d17bbcac02ea42818565a2d3ac4248df96a095431684eb5c730b595283dd`。包内 EXE 与独立 EXE 一致（SHA-256 `021cdcb00aeb210e222359e61ecd8c733db044791d6ebf4b2db4011bf392e3c5`），清单较 0.3.16.0 仅版本改变，图标文件相同。
+- 登录：固定配置的 Edge 在隐藏桌面上启动，直接进入产品概述页，没有要求输入任何内容。
+- 上传 0.3.17.0 后页面提示 0.3.16.0 保存后移除；保存后概述页的包只剩 **FluentCal_0.3.17.0_x64.msix / Validated / 已更新**。只出现既有的 `runFullTrust` 提醒，设备系列只勾选 Windows 10/11 Desktop。
+- 描述、简短描述、功能列表、关键词、截图都没有改。填写之前先核对：三种语言草稿里的描述与上面“商店资料”记的逐字一致（简体 770、英文 2152、繁体 770 字符），“此版本的新增功能”还是 0.3.16 的文本。
+- “此版本的新增功能”文本在 `release/store-0.3.17/whats-new-*.txt`（简体 255、英文 770、繁体 255 字符），讲的是按分组筛选、右键改分组和四个预设分组、多日任务的完成日期、待办拖动排序、年份列表和“今天”按钮。三种语言保存后重新载入，逐字一致；描述重新载入后也没有变。
+  - 简体：新增按分组筛选：标题栏的筛选按钮可以只显示勾选分组的任务（可多选，含“未分组”），筛选时按钮变红，选“全部”恢复；右键任务 ›“分组”可直接改分组，自带“生日”“工作”“还款”“纪念日”四个常用分组。跨多天的任务勾选完成后，横条上显示完成日期，如“26.11.27完成”；勾错了可以右键 ›“修改完成日期…”，也可以在 设置 › 日历 里关闭。不定日待办栏里的待办可以上下拖动排序，或按 Alt+↑ / Alt+↓。选年份更快：点年月标题再点年份，从列表里直接选；日期选择器同样可以选年份，并新增“今天”按钮。
+  - English: New: filter the calendar by group. The filter button on the title bar shows only the tasks of the groups you tick (any number of them, including Ungrouped); it turns red while it filters, and All shows everything again. Right-click a task › Group to change its group; Birthdays, Work, Repayments and Anniversaries are built in. Multi-day tasks now show the day they were completed on their bar, for example "Done 11/27/26"; right-click › "Change completion date…" to correct it, or turn it off in Settings › Calendar. To-dos in the to-do column can be dragged up and down to reorder them, or moved with Alt+↑ / Alt+↓. Picking a year is faster: click the month title, then the year, and choose from a list; date pickers have the same list of years and a new Today button.
+  - 繁體：新增按分組篩選：標題列的篩選按鈕可以只顯示勾選分組的任務（可多選，含“未分組”），篩選時按鈕變紅，選“全部”恢復；右鍵任務 ›“分組”可直接改分組，內建“生日”“工作”“還款”“紀念日”四個常用分組。跨多天的任務勾選完成後，橫條上顯示完成日期，如“26.11.27完成”；勾錯了可以右鍵 ›“修改完成日期…”，也可以在 設定 › 日曆 裡關閉。不定日待辦欄裡的待辦可以上下拖動排序，或按 Alt+↑ / Alt+↓。選年份更快：點年月標題再點年份，從列表裡直接選；日期選擇器同樣可以選年份，並新增“今天”按鈕。
+- 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-20 19:11 点击“提交进行认证”，概述页显示 **产品更新：正在认证（Submission 14）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.17/17-*.png`。
+- 审核说明（Additional testing info）没有改：新功能都在主界面上，不需要额外说明。

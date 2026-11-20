@@ -16,6 +16,12 @@
 - [x] 正式版实测（隔离数据，不动已安装的版本）：三种语言启动并正常退出；`tools\issues\round4\done_day_check.py` 通过 AI 助手接口勾选、取消、再勾选，`data.json` 里的 `doneOn` 符合预期，升级前完成的任务没有日期；`mcp_smoke.py` 全部通过；空闲时 19 个线程、约 12 MB 私有工作集，与 0.3.16 相同（`idle_measure.py`，两个版本各 3 次）。
 - [ ] 没有在真实窗口里用鼠标点过：拖动排序、筛选浮窗、年份列表、“修改完成日期”的日历，经过的是无界面测试（发送真实的指针和键盘事件）和离屏渲染。嵌入桌面时 Alt+↑ / Alt+↓ 要先按 Ctrl+Alt+D 唤出日历（和其他快捷键一样）。
 - [ ] 安卓端和网页查看不显示完成日期，没有分组筛选；在安卓端或旧版本里取消再勾选，不会更新 `doneOn`（字段原样保留）。待办的手动顺序在安卓端同样生效（那边也按 `order` 排）。
+- [x] 发版（用户 2026-11-20：“做完之后直接推送提交发版本，包括微软商店”）：版本号改为 0.3.17（`native/Cargo.toml`、`Cargo.lock`、`app.rc`、`app.manifest`、`package.json`）。正式版在上面两处修复之后重新构建（第一次构建的包作废），再跑一遍：原生 242 项、翻译检查、三种语言隔离启动、`mcp_smoke.py`、`done_day_check.py`、`idle_measure.py`，全部通过；EXE 版本信息 0.3.17，商店包内 EXE 与独立 EXE 一致，清单较 0.3.16.0 仅版本不同，图标文件相同。
+- [x] 提交 `0b79980` 已推送，GitHub [v0.3.17](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.17) 为最新版，附安装包（7,726,124 字节，SHA-256 `583cab23711bd35a645883e9888f2cbcae9be9a5c54890fe5b3709b1a068f323`）、独立 EXE 及校验文件，线上摘要与本地一致。
+- [x] 微软商店 0.3.17.0：Submission 14 / 1152921505702459639，2026-11-20 19:11 送审，状态“正在认证”；只换了包和“此版本的新增功能”，商店描述没有改，详见 `docs/STORE-LISTING.md`。
+- [x] 2026-11-20 19:17 在 #16、#15、#14、#7 下回复了做法和用法（回复草稿在 `tools\issues\round4\replies\`）；#16、#15、#14 提出的每一点都做了，已关闭；#7 是待办栏的长期讨论，保持打开。
+- [ ] 商店目录返回 0.3.17.0 之后，把 `docs/STORE-LISTING.md` 的标题改成“已上架”并记下查询结果。
+- [ ] 本机安装的仍是 0.3.16（覆盖安装会关掉正在运行的日历，没有替用户装）。
 
 ## 桌面 0.3.16：设置页给 Claude Code 的命令在 PowerShell 里报错；给其他 AI 助手的一句话（2026-11-19）
 > 用户：“你做的AI助手，第二段的执行会报错”：在 PowerShell 里粘贴 `claude mcp add --scope user fluentcal -- "…\fluentcal.exe" --mcp`，得到 `error: unknown option '--mcp'`。
