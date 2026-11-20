@@ -86,6 +86,8 @@ section!(Calendar {
     bar_days: bool = true,
     /// … and how far the task is: "进度 60%", the done part darker (GitHub #10, #13).
     bar_progress: bool = true,
+    /// … and, once ticked done, the day that was: "26.11.27完成" (GitHub #15).
+    bar_done: bool = true,
     weeks_rows: u32 = 5,
     weeks_past: u32 = 1,
     show_lunar: bool = true,

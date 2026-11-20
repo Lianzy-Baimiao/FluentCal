@@ -29,6 +29,8 @@ pub struct DeskLive {
     pub ui: DeskUi,
     pub room: Option<super::vm::Room>,
     pub drag: Option<Drag>,
+    /// A to-do of the column being dragged to another place (GitHub #7).
+    pub side_drag: Option<super::reorder::SideDrag>,
     pub toast_timer: slint::Timer,
     pub flash_timer: slint::Timer,
     /// Scale factor the theme images (shadows) were rendered for.
@@ -39,7 +41,7 @@ pub struct DeskLive {
 
 impl DeskLive {
     pub fn new(window: DeskWindow, ui: DeskUi) -> DeskLive {
-        DeskLive { window, ui, room: None, drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
+        DeskLive { window, ui, room: None, drag: None, side_drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
     }
 }
 
@@ -47,6 +49,7 @@ impl App {
     /// Everything the desk window shows.
     pub fn desk_refresh(&mut self) {
         let today = self.today();
+        super::vm::tidy_filter(&self.doc, &mut self.desk.ui);
         let d = &self.desk;
         super::push_all(&d.window, &self.doc, &d.ui, &today, d.room, &self.tokens);
         self.desk_refresh_status();
@@ -57,6 +60,7 @@ impl App {
     /// The parts that follow tasks (week rows, countdowns).
     pub fn desk_refresh_data(&mut self) {
         let today = self.today();
+        super::vm::tidy_filter(&self.doc, &mut self.desk.ui);
         let d = &self.desk;
         super::push_weeks(&d.window, &self.doc, &d.ui, &today, d.room, &self.tokens);
         self.gantt_refresh();
@@ -66,6 +70,7 @@ impl App {
     /// The open day list and search results, and the info bars.
     pub fn desk_refresh_overlays(&mut self) {
         self.desk_refresh_day_list();
+        self.desk_filter_refresh();
         self.desk_search_refresh();
         self.desk_changes_refresh();
         self.desk_refresh_bars();

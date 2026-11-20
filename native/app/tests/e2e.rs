@@ -349,6 +349,10 @@ fn every_control_has_a_name() {
     assert!(unnamed(&t).is_empty(), "day list: {:?}", unnamed(&t));
     t.key(&slint::SharedString::from(Key::Escape));
     with(|a| a.desk_close_popups()).unwrap();
+    // the group filter's list
+    t.click("按分组筛选");
+    assert!(t.w.get_any_popup() && unnamed(&t).is_empty(), "group filter: {:?}", unnamed(&t));
+    t.key(&slint::SharedString::from(Key::Escape));
     with(|a| a.desk_set_view("gantt")).unwrap();
     settle();
     assert!(unnamed(&t).is_empty(), "Gantt view: {:?}", unnamed(&t));
@@ -1436,4 +1440,655 @@ fn todo_column_beside_or_over_the_calendar() {
     assert!(t.w.get_grid_x() >= panel.absolute_position().x + panel.size().width);
     t.click("收起待办栏");
     assert_eq!(t.w.get_grid_x(), closed);
+}
+
+/// GitHub #16: the year in the picker under the title is a button that opens the list of years,
+/// for one far away; over the months the wheel turns the years.
+#[test]
+fn year_month_picker_lists_the_years() {
+    use i_slint_backend_testing::AccessibleRole as R;
+    let t = start("ymyears", Some(doc_with(&[], json!({}))));
+    let (y, _, _) = fluentcal_core::date::parts(&t.today());
+    let of_role = |label: &str, role: R| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(role)).unwrap_or_else(|| panic!("no {label:?}"));
+    let centre = |e: &ElementHandle| LogicalPosition::new(e.absolute_position().x + e.size().width / 2.0, e.absolute_position().y + e.size().height / 2.0);
+    let wheel = |e: &ElementHandle, dy: f32| {
+        let position = centre(e);
+        t.ev(WindowEvent::PointerMoved { position });
+        t.ev(WindowEvent::PointerScrolled { position, delta_x: 0.0, delta_y: dy });
+        settle();
+    };
+    t.click(&t.find_prefix(&format!("{y}年")).accessible_label().unwrap());
+    // the wheel over the months: a year a notch
+    wheel(&of_role(&format!("{y}年"), R::List), -60.0);
+    assert_eq!(t.w.get_ym_year(), y + 1);
+    wheel(&of_role(&format!("{}年", y + 1), R::List), 60.0);
+    assert_eq!(t.w.get_ym_year(), y);
+    // the year's button: the years, this one in view; an arrow is a page of them (three rows:
+    // with four, a row between two pages was never in view)
+    t.click_at(centre(&of_role(&format!("{y}年"), R::Button)));
+    // a year's cell when all of it is in the list's view (the search skips what is scrolled away)
+    let year_cell = |year: i32| {
+        let list = of_role("选择年份", R::List);
+        let (top, bottom) = (list.absolute_position().y, list.absolute_position().y + list.size().height);
+        ElementHandle::find_by_accessible_label(&t.w, &format!("{year}年")).filter(|e| e.accessible_role() == Some(R::ListItem)).find(|e| e.absolute_position().y >= top - 0.5 && e.absolute_position().y + e.size().height <= bottom + 0.5)
+    };
+    assert!(year_cell(y).is_some(), "the list opens around the year shown");
+    assert!(year_cell(y - 4).is_some() && year_cell(y + 4).is_some(), "with the rows before and after it");
+    assert!(year_cell(y - 12).is_none());
+    t.click("更早的年份");
+    assert_eq!(t.w.get_ym_year(), y - 12);
+    assert!(year_cell(y - 12).is_some(), "the list follows the arrows");
+    assert!(year_cell(y - 8).is_some(), "the row that was just out of view is in it now");
+    // a year, then a month of it
+    let target = y - 16;
+    t.click(&format!("{target}年"));
+    assert!(!t.has("选择年份") && t.w.get_ym_year() == target, "a year comes back to its months");
+    t.click("3月");
+    assert_eq!(with(|a| a.desk.ui.cursor.clone()).unwrap(), format!("{target}-03-01"));
+    assert!(!t.w.get_any_popup(), "picking closes it");
+}
+
+/// 0.3.17 (GitHub #15): a bar over several days says the day it was ticked done after its days,
+/// "26.11.27完成" (the days go on being counted, done or not). The day is kept with the task
+/// and goes with the tick; 右键 › 修改完成日期 puts it right (not on a day that has not come), and
+/// ticking again writes today over that. A switch in 设置 › 日历. What was done before the day
+/// was kept says 进度 100% as before, until the user says when.
+#[test]
+fn a_done_bar_says_the_day_it_was_done() {
+    use fluentcal_core::date::{add_days, add_months, parts, start_of_month};
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let tasks = [
+        json!({ "id": "cat", "title": "看望小猫", "start": add_days(&today, -1), "end": add_days(&today, 3), "progress": 60 }),
+        json!({ "id": "over", "title": "培训", "start": add_days(&today, -4), "end": add_days(&today, -2), "done": true, "progress": 100 }),
+        json!({ "id": "camp", "title": "集训", "start": add_days(&today, -1), "end": today, "repeat": { "freq": "monthly", "interval": 1 } }),
+    ];
+    let chip_of = |t: &T, title: &str| {
+        let weeks = t.w.get_weeks();
+        let chips: Vec<_> = weeks.iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).collect();
+        chips.into_iter().find(|c| c.title == title).unwrap_or_else(|| panic!("no chip {title:?}"))
+    };
+    let label = |t: &T, title: &str| chip_of(t, title).pct.to_string();
+    let short = |d: &str| {
+        let (y, m, dd) = parts(d);
+        format!("{:02}.{m}.{dd}完成", y % 100)
+    };
+    let day = |d: &str| {
+        let (y, m, dd) = parts(d);
+        format!("{y}年{m}月{dd}")
+    };
+    // the chip's check box, its menu
+    let el = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::Groupbox)).unwrap_or_else(|| panic!("no chip {label:?}"));
+    let tick = |t: &T, label: &str| {
+        let e = el(t, label);
+        t.click_at(t.at(&e, 9.0, e.size().height / 2.0));
+    };
+    let menu = |t: &T, label: &str| {
+        let e = el(t, label);
+        t.right_click_at(t.at(&e, 40.0, e.size().height / 2.0));
+    };
+    let cal = json!({ "view": "weeks", "weeksRows": 4, "weeksPast": 1 });
+    let t = start("bar-done", Some(doc_with(&tasks, json!({ "calendar": cal, "tasks": { "autoPostpone": false } }))));
+    assert_eq!(label(&t, "培训"), "第3-3天（100%） 进度 100%", "done before the day was kept: as before");
+    assert!(!chip_of(&t, "培训").tip.contains("完成于"));
+
+    // ticked: today, after the days
+    tick(&t, "看望小猫");
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(today));
+    assert_eq!(label(&t, "看望小猫"), format!("第5-2天（40%） {}", short(&today)));
+    assert!(chip_of(&t, "看望小猫").tip.contains("完成于 "), "the tooltip says the day in full");
+
+    // 右键 › 修改完成日期: a calendar on that day; tomorrow can't be picked
+    menu(&t, "看望小猫，已完成");
+    t.click("修改完成日期…");
+    assert!(t.w.get_any_popup() && t.has("修改完成日期") && t.has("回到今天"), "the calendar is open");
+    assert_eq!(t.find(&day(&today)).accessible_checked(), Some(true), "on the day it was done");
+    let tomorrow = add_days(&today, 1);
+    assert_eq!(t.find(&day(&tomorrow)).accessible_enabled(), Some(false), "a day that has not come");
+    t.click(&day(&tomorrow));
+    assert!(t.w.get_any_popup());
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(today));
+    // the 15th of last month
+    t.click("上个月");
+    let (py, pm, _) = parts(&add_months(&start_of_month(&today), -1));
+    let picked = format!("{py:04}-{pm:02}-15");
+    t.click(&day(&picked));
+    assert!(!t.w.get_any_popup(), "a day closes it");
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(picked));
+    assert_eq!(label(&t, "看望小猫"), format!("第5-2天（40%） {}", short(&picked)));
+    assert_eq!(with(|a| a.changes.list().first().map(|c| c.text())).unwrap().as_deref(), Some("改完成日期“看望小猫”"));
+    // it is one step to take back
+    t.ctrl("z");
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(today));
+    t.ctrl("y");
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(picked));
+
+    // the switch: off, the progress says it is done; the tooltip still knows the day
+    with(|a| a.patch_settings(json!({ "calendar": { "barDone": false } }))).unwrap();
+    settle();
+    assert_eq!(label(&t, "看望小猫"), "第5-2天（40%） 进度 100%");
+    assert!(chip_of(&t, "看望小猫").tip.contains("完成于 "));
+    with(|a| a.patch_settings(json!({ "calendar": { "barDone": true, "barDays": false, "barProgress": false } }))).unwrap();
+    settle();
+    assert_eq!(label(&t, "看望小猫"), short(&picked), "on its own");
+    with(|a| a.patch_settings(json!({ "calendar": { "barDays": true, "barProgress": true } }))).unwrap();
+    settle();
+
+    // unticked: no day, nothing to correct; ticked again: today, whatever was set by hand
+    tick(&t, "看望小猫，已完成");
+    assert!(t.task("看望小猫").get("doneOn").is_none());
+    assert_eq!(label(&t, "看望小猫"), "第5-2天（40%） 进度 0%");
+    menu(&t, "看望小猫");
+    assert!(t.has("标记为完成") && !t.has("修改完成日期…"));
+    t.key(&slint::SharedString::from(Key::Escape));
+    tick(&t, "看望小猫");
+    assert_eq!(t.task("看望小猫")["doneOn"], json!(today));
+
+    // done before the day was kept: the calendar opens with no day chosen; one is picked
+    menu(&t, "培训，已完成");
+    t.click("修改完成日期…");
+    assert_eq!(t.find(&day(&today)).accessible_checked(), Some(false));
+    t.click(&day(&today));
+    assert_eq!(t.task("培训")["doneOn"], json!(today));
+    assert_eq!(label(&t, "培训"), format!("第3-3天（100%） {}", short(&today)));
+
+    // a repeating task: each time has its own day
+    tick(&t, "集训");
+    let occ = add_days(&today, -1);
+    assert_eq!(t.task("集训")["doneOnDates"], json!({ occ.as_str(): today }));
+    assert_eq!(label(&t, "集训"), format!("第2-2天（100%） {}", short(&today)));
+    menu(&t, "集训，已完成");
+    t.click("修改完成日期…");
+    t.click("上个月");
+    t.click(&day(&picked));
+    assert_eq!(t.task("集训")["doneOnDates"], json!({ occ.as_str(): picked }));
+    assert_eq!(label(&t, "集训"), format!("第2-2天（100%） {}", short(&picked)));
+}
+
+/// 0.3.17 (GitHub #14): 按分组筛选. The title bar's filter button lists 全部, 未分组 and the groups;
+/// ticking some shows only their tasks in the month and multi-week views, the list view, the
+/// "+N" list and the to-do column, and the button is red (ticked) and named after them until 全部
+/// is chosen again. Every choice ticked is 全部. A task made while one group shows is of that
+/// group; with several, the toast says it isn't shown. A group that is deleted leaves the
+/// filter. 右键 › 分组 puts a task in a group; a preset one (生日、工作、还款、纪念日) is made the first
+/// time it is chosen.
+#[test]
+fn group_filter_shows_the_ticked_groups() {
+    use fluentcal_core::date::{add_days, parts, start_of_month, start_of_week};
+    use i_slint_backend_testing::AccessibleRole as R;
+    use std::collections::BTreeSet;
+    let today = fluentcal_core::date::today();
+    // the days of this week (all of them are in the month view), a task or two on each
+    let day = |i: i32| add_days(&start_of_week(&today, 1), i);
+    let tasks = [
+        json!({ "id": "b1", "title": "妈妈生日", "start": day(0), "groupId": "g1" }),
+        json!({ "id": "u1", "title": "买菜", "start": day(0) }),
+        json!({ "id": "w1", "title": "周报", "start": day(1), "groupId": "g2" }),
+        json!({ "id": "x1", "title": "旧分组的事", "start": day(2), "groupId": "gone" }),
+        json!({ "id": "m1", "title": "交物业费", "start": start_of_month(&today), "flex": "month", "groupId": "g2" }),
+        json!({ "id": "s1", "title": "整理相册", "start": today, "flex": "someday" }),
+    ];
+    let mut doc = doc_with(&tasks, json!({ "calendar": { "sidebar": true } }));
+    doc["groups"] = json!({
+        "g1": { "id": "g1", "name": "生日", "color": "pink", "order": 1 },
+        "g2": { "id": "g2", "name": "工作", "color": "blue", "order": 2 },
+    });
+    let t = start("groupfilter", Some(doc));
+    let set = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<BTreeSet<String>>();
+    let chips = |t: &T| t.w.get_weeks().iter().flat_map(|w| w.chips.iter().collect::<Vec<_>>()).map(|c| c.title.to_string()).collect::<BTreeSet<String>>();
+    let side = |t: &T| t.w.get_side_rows().iter().filter(|r| r.kind == "item").map(|r| r.chip.title.to_string()).collect::<BTreeSet<String>>();
+    let listed = |t: &T| t.w.get_list_rows().iter().filter(|r| r.kind == "item").map(|r| r.chip.title.to_string()).collect::<BTreeSet<String>>();
+    let button = |t: &T| t.w.root_element().query_descendants().match_predicate(|e| e.accessible_role() == Some(R::Button) && e.accessible_label().is_some_and(|l| l.starts_with("按分组筛选"))).find_first();
+    let press = |t: &T| {
+        let b = button(t).expect("the filter button");
+        t.click_at(t.at(&b, 16.0, 16.0));
+    };
+    let boxed = |t: &T, name: &str| ElementHandle::find_by_accessible_label(&t.w, name).find(|e| e.accessible_role() == Some(R::Checkbox)).unwrap_or_else(|| panic!("no box {name:?}"));
+    let tick = |t: &T, name: &str| {
+        let b = boxed(t, name);
+        t.click_at(t.at(&b, 9.0, b.size().height / 2.0));
+    };
+    let rows = |t: &T| t.w.get_filter_rows().iter().map(|r| format!("{}:{}:{}", r.name, r.count, r.checked)).collect::<Vec<_>>();
+    let menu = |t: &T, title: &str| {
+        let e = ElementHandle::find_by_accessible_label(&t.w, title).find(|e| e.accessible_role() == Some(R::Groupbox)).unwrap_or_else(|| panic!("no chip {title:?}"));
+        t.right_click_at(t.at(&e, 40.0, e.size().height / 2.0));
+    };
+    let group_named = |name: &str| {
+        let name = name.to_owned();
+        with(move |a| a.doc.groups.values().find(|g| g.name == name).cloned()).unwrap()
+    };
+    let everything = set(&["妈妈生日", "周报", "买菜", "旧分组的事"]);
+    assert_eq!((chips(&t), side(&t)), (everything.clone(), set(&["交物业费", "整理相册"])));
+
+    // 右键 › 分组: the task's own group is the one ticked; another, then none
+    menu(&t, "周报");
+    t.click("分组");
+    let leaf = |t: &T, name: &str| ElementHandle::find_by_accessible_label(&t.w, name).find(|e| e.accessible_role() == Some(R::ListItem)).unwrap_or_else(|| panic!("no entry {name:?}"));
+    assert_eq!((leaf(&t, "工作").accessible_checked(), leaf(&t, "生日").accessible_checked(), leaf(&t, "未分组").accessible_checked()), (Some(true), Some(false), Some(false)));
+    assert!(t.has("还款") && t.has("纪念日"), "the presets no group has the name of");
+    t.click("生日");
+    assert_eq!(t.task("周报")["groupId"], json!("g1"));
+    menu(&t, "周报");
+    t.click("分组");
+    t.click("未分组");
+    assert!(t.task("周报").get("groupId").is_none_or(Value::is_null));
+    t.ctrl("z");
+    t.ctrl("z");
+    assert_eq!(t.task("周报")["groupId"], json!("g2"));
+    // a preset: the group is made with it, and both go back in one step
+    menu(&t, "买菜");
+    t.click("分组");
+    t.click("纪念日");
+    let made = group_named("纪念日").expect("the preset group");
+    assert_eq!((made.color.as_str(), t.task("买菜")["groupId"].as_str()), ("purple", Some(made.id.as_str())));
+    menu(&t, "买菜");
+    t.click("分组");
+    assert_eq!(leaf(&t, "纪念日").accessible_checked(), Some(true), "a group like any other now");
+    with(|a| a.desk_close_popups()).unwrap();
+    settle();
+    assert!(!t.w.get_any_popup());
+    t.ctrl("z");
+    assert!(group_named("纪念日").is_none() && t.task("买菜").get("groupId").is_none_or(Value::is_null));
+
+    // the button: plain while everything shows
+    let b = button(&t).expect("the filter button");
+    assert_eq!((b.accessible_label().unwrap().to_string(), b.accessible_checked(), t.w.get_filter_on()), ("按分组筛选".to_owned(), Some(false), false));
+    press(&t);
+    assert!(t.w.get_any_popup(), "its list is open");
+    assert_eq!(rows(&t), ["未分组:3:false", "生日:1:false", "工作:2:false"]);
+    assert_eq!((boxed(&t, "全部").accessible_checked(), t.w.get_filter_all_count().to_string()), (Some(true), "6".to_owned()));
+
+    // one group: its tasks only, in the calendar and the to-do column; the button says so
+    tick(&t, "生日");
+    assert!(t.w.get_any_popup(), "it stays open for more");
+    assert_eq!((chips(&t), side(&t)), (set(&["妈妈生日"]), set(&[])));
+    assert_eq!(rows(&t), ["未分组:3:false", "生日:1:true", "工作:2:false"]);
+    assert_eq!(boxed(&t, "全部").accessible_checked(), Some(false));
+    assert!(t.w.get_filter_on());
+    assert_eq!(t.w.get_filter_tip(), "按分组筛选：生日");
+    // with 未分组: a task whose group is gone is one of those
+    tick(&t, "未分组");
+    assert_eq!((chips(&t), side(&t)), (set(&["妈妈生日", "买菜", "旧分组的事"]), set(&["整理相册"])));
+    assert_eq!(t.w.get_filter_tip(), "按分组筛选：未分组、生日");
+    // every one ticked is 全部
+    tick(&t, "工作");
+    assert_eq!((t.w.get_filter_on(), chips(&t)), (false, everything.clone()));
+    assert_eq!((rows(&t), boxed(&t, "全部").accessible_checked()), (vec!["未分组:3:false".to_owned(), "生日:1:false".to_owned(), "工作:2:false".to_owned()], Some(true)));
+    // 全部 while it is on changes nothing; it takes a filter away
+    tick(&t, "全部");
+    assert!(!t.w.get_filter_on());
+    tick(&t, "工作");
+    assert_eq!((chips(&t), side(&t)), (set(&["周报"]), set(&["交物业费"])));
+    tick(&t, "全部");
+    assert_eq!((t.w.get_filter_on(), chips(&t), side(&t)), (false, everything.clone(), set(&["交物业费", "整理相册"])));
+    tick(&t, "生日");
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert!(!t.w.get_any_popup());
+    let b = button(&t).expect("the filter button");
+    assert_eq!((b.accessible_label().unwrap().to_string(), b.accessible_checked()), ("按分组筛选：生日".to_owned(), Some(true)), "red, and named after what shows");
+
+    // a task made while one group shows is one of that group
+    let cell_of = |t: &T, date: &str| {
+        let (_, m, d) = parts(date);
+        t.find_prefix(&format!("{m}月{d}日 "))
+    };
+    let cell = cell_of(&t, &day(4));
+    t.double_click_at(t.at(&cell, 40.0, 50.0));
+    t.type_text("订蛋糕");
+    t.key("\n");
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert_eq!((t.task("订蛋糕")["groupId"].clone(), t.task("订蛋糕")["start"].clone()), (json!("g1"), json!(day(4))));
+    assert_eq!(chips(&t), set(&["妈妈生日", "订蛋糕"]));
+    with(|a| a.open_editor_new(None)).unwrap();
+    settle();
+    let ed = with(|a| a.editor_window()).flatten().expect("the editor");
+    assert_eq!(ed.get_data().group, "g1", "新建任务 starts in it too");
+    with(|a| a.editor_close()).unwrap();
+    settle();
+    // with two groups it is in neither: the toast says why it isn't there
+    press(&t);
+    tick(&t, "工作");
+    t.key(&slint::SharedString::from(Key::Escape));
+    let cell = cell_of(&t, &day(5));
+    t.double_click_at(t.at(&cell, 40.0, 50.0));
+    t.type_text("散步");
+    t.key("\n");
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert!(t.task("散步").get("groupId").is_none_or(Value::is_null));
+    assert_eq!(t.w.get_toast_text(), "已添加“散步”（未分组，当前筛选下不显示）");
+    assert_eq!(chips(&t), set(&["妈妈生日", "周报", "订蛋糕"]));
+    assert_eq!(t.w.get_filter_tip(), "按分组筛选：生日、工作");
+
+    // the "+N" list of a day, and the list view
+    with({
+        let first = day(0);
+        move |a| a.desk_day_list(&first, (10.0, 10.0, 10.0, 10.0))
+    })
+    .unwrap();
+    settle();
+    assert_eq!(t.w.get_day_list_chips().iter().map(|c| c.title.to_string()).collect::<BTreeSet<_>>(), set(&["妈妈生日"]), "买菜 is on that day too");
+    with(|a| a.desk_close_popups()).unwrap();
+    settle();
+    assert!(!t.w.get_any_popup(), "a press outside the calendar closes them");
+    with(|a| {
+        a.desk_set_view("list");
+        a.desk_set_list_range("all");
+    })
+    .unwrap();
+    settle();
+    assert_eq!(listed(&t), set(&["妈妈生日", "周报", "订蛋糕"]));
+    assert!(button(&t).is_some_and(|b| b.accessible_checked() == Some(true)));
+
+    // not in the Gantt chart, which has its own 只显示分组
+    with(|a| a.desk_set_view("gantt")).unwrap();
+    settle();
+    assert!(button(&t).is_none());
+    t.click("更多");
+    assert!(!t.has("按分组筛选…"));
+    t.key(&slint::SharedString::from(Key::Escape));
+    with(|a| a.desk_set_view("month")).unwrap();
+    settle();
+    // 更多 › 按分组筛选…: the same list, under the ⋯ button
+    t.click("更多");
+    t.click("按分组筛选…");
+    assert!(t.w.get_any_popup());
+    assert_eq!(rows(&t), ["未分组:4:false", "生日:2:true", "工作:2:true"]);
+
+    // a group that is deleted leaves the filter; the last one gone, everything shows again
+    let delete = |id: &str| {
+        let id = id.to_owned();
+        with(move |a| {
+            let e = fluentcal_core::tasks::delete_groups(&a.doc, &[id], false, fluentcal_core::date::now_ms());
+            a.apply(e, true);
+        })
+        .unwrap();
+        settle();
+    };
+    delete("g1");
+    assert_eq!((t.w.get_filter_tip().to_string(), rows(&t)), ("按分组筛选：工作".to_owned(), vec!["未分组:6:false".to_owned(), "工作:2:true".to_owned()]));
+    assert_eq!(chips(&t), set(&["周报"]));
+    delete("g2");
+    assert!(!t.w.get_filter_on());
+    assert_eq!(rows(&t), ["未分组:8:false"]);
+    assert_eq!(t.w.get_filter_hint(), "还没有分组。右键任务 › 分组，可以把它放进“生日”“工作”等分组。");
+    assert_eq!(chips(&t), set(&["妈妈生日", "周报", "买菜", "旧分组的事", "订蛋糕", "散步"]));
+    // 管理分组…: where groups are made, renamed and deleted
+    t.click("管理分组…");
+    assert!(!t.w.get_any_popup());
+    assert_eq!(with(|a| a.settings_win.as_ref().map(|s| s.local.page.clone())).unwrap().as_deref(), Some("gantt"));
+}
+
+/// The button is there while there is room after the view switch, and always while it filters
+/// (hidden tasks must not be overlooked): the view switch goes sooner then, and in the
+/// narrowest window it stands where the search button was.
+#[test]
+fn group_filter_button_stays_while_it_filters() {
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let mut doc = doc_with(&[json!({ "id": "a", "title": "周报", "start": today, "groupId": "g" })], json!({}));
+    doc["groups"] = json!({ "g": { "id": "g", "name": "工作", "color": "blue", "order": 1 } });
+    let t = start("groupfilter-narrow", Some(doc));
+    let button = |t: &T, prefix: &'static str| t.w.root_element().query_descendants().match_predicate(move |e| e.accessible_role() == Some(R::Button) && e.accessible_label().is_some_and(|l| l.starts_with(prefix))).find_first();
+    let tabs = |t: &T| ElementHandle::find_by_accessible_label(&t.w, "多周").any(|e| e.accessible_role() == Some(R::Tab));
+    let resize = |t: &T, w: f32| {
+        t.w.window().set_size(slint::LogicalSize::new(w, 640.0));
+        settle();
+    };
+    let widths: Vec<f32> = (0..=26).map(|i| 880.0 - 20.0 * i as f32).collect();
+    // not filtering: there in a wide window, and it goes before the view switch does
+    let mut seen = Vec::new();
+    for &w in &widths {
+        resize(&t, w);
+        seen.push((button(&t, "按分组筛选").is_some(), tabs(&t), button(&t, "搜索").is_some()));
+    }
+    assert_eq!(seen[0], (true, true, true), "at 880");
+    assert!(seen.contains(&(false, true, true)), "the filter button goes first: {seen:?}");
+    assert_eq!(*seen.last().unwrap(), (false, false, true), "at 360: {seen:?}");
+    assert!(seen.windows(2).all(|p| (p[0].0 || !p[1].0) && (p[0].1 || !p[1].1)), "what went doesn't come back as it narrows: {seen:?}");
+    // filtering: always there, and the bar's buttons still fit
+    with(|a| a.desk_filter_toggle("g", true)).unwrap();
+    settle();
+    let mut switch_at = Vec::new();
+    for &w in &widths {
+        resize(&t, w);
+        let b = button(&t, "按分组筛选").unwrap_or_else(|| panic!("no filter button at {w}"));
+        assert_eq!(b.accessible_checked(), Some(true));
+        let more = button(&t, "更多").expect("更多");
+        assert!(more.absolute_position().x + more.size().width <= w, "the bar's buttons fit at {w}");
+        switch_at.push(tabs(&t));
+    }
+    // (the view switch gives way to it one step sooner)
+    let count = |v: &[bool]| v.iter().filter(|x| **x).count();
+    assert!(count(&switch_at) < count(&seen.iter().map(|s| s.1).collect::<Vec<_>>()), "{switch_at:?}");
+    // the narrowest, with the long title of the multi-week view: it has the search button's
+    // place (搜索 is in 更多, and Ctrl+F)
+    with(|a| a.desk_set_view("weeks")).unwrap();
+    settle();
+    assert!(button(&t, "按分组筛选").is_some() && button(&t, "搜索").is_none() && !tabs(&t));
+    with(|a| a.desk_filter_clear()).unwrap();
+    settle();
+    assert!(button(&t, "搜索").is_some() && button(&t, "按分组筛选").is_none());
+}
+
+/// 0.3.17 (GitHub #7): the to-do column's order by hand. A to-do is dragged to another place
+/// in its part (a line shows where it goes; one task is written, and it is one step to take
+/// back), or moved with Alt+↑ / Alt+↓; the keys stay with the to-do that was moved. It stays in
+/// its part, and nothing happens beside the column or after Esc. A list longer than the
+/// column scrolls under the to-do at the edges.
+#[test]
+fn todo_column_order_by_hand() {
+    use fluentcal_core::date::{add_months, start_of_month};
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let first = start_of_month(&today);
+    let last = add_months(&first, -1);
+    let tasks = [
+        json!({ "id": "m1", "title": "交物业费", "start": last, "flex": "month" }),
+        json!({ "id": "m2", "title": "洗车", "start": first, "flex": "month" }),
+        json!({ "id": "m3", "title": "理发", "start": first, "flex": "month" }),
+        json!({ "id": "s1", "title": "整理相册", "start": today, "flex": "someday" }),
+        json!({ "id": "s2", "title": "学吉他", "start": today, "flex": "someday" }),
+        json!({ "id": "s3", "title": "换灯泡", "start": today, "flex": "someday" }),
+        json!({ "id": "s4", "title": "修自行车", "start": today, "flex": "someday" }),
+    ];
+    let t = start("side-order", Some(doc_with(&tasks, json!({ "calendar": { "sidebar": true } }))));
+    let part = |t: &T, zone: &str| t.w.get_side_rows().iter().filter(|r| r.kind == "item" && r.zone == zone).map(|r| r.chip.title.to_string()).collect::<Vec<_>>().join(" ");
+    let item = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::ListItem)).unwrap_or_else(|| panic!("no {label:?}"));
+    // a point on a to-do (right of its check circle), and one just under its top edge
+    let on = |t: &T, label: &str| {
+        let e = item(t, label);
+        t.at(&e, 60.0, e.size().height / 2.0)
+    };
+    let above = |t: &T, label: &str| t.at(&item(t, label), 60.0, 1.0);
+    let below = |t: &T, label: &str| {
+        let e = item(t, label);
+        t.at(&e, 60.0, e.size().height - 1.0)
+    };
+    let written = |t: &T| t.tasks().iter().filter(|x| x["updatedAt"] != json!(0)).map(|x| x["title"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    let button = PointerEventButton::Left;
+    assert_eq!((part(&t, "month"), part(&t, "overdue"), part(&t, "someday")), ("交物业费 洗车 理发".to_owned(), "交物业费".to_owned(), "整理相册 学吉他 换灯泡 修自行车".to_owned()));
+
+    // dragged to the front: the line is above the first one while it is held there
+    let (from, to) = (on(&t, "修自行车"), above(&t, "整理相册"));
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x + 2.0, from.y - 2.0) });
+    assert!(!t.w.get_drag_active(), "not yet: a click that slipped");
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x, from.y - 30.0) });
+    t.ev(WindowEvent::PointerMoved { position: to });
+    settle();
+    let first_row = t.w.get_side_rows().iter().position(|r| r.kind == "item" && r.zone == "someday").unwrap() as i32;
+    assert_eq!((t.w.get_drag_active(), t.w.get_drag_label().to_string(), t.w.get_side_drag_key().to_string(), t.w.get_side_drop_row()), (true, "修自行车".to_owned(), "s4@s:".to_owned(), first_row));
+    t.ev(WindowEvent::PointerReleased { position: to, button });
+    settle();
+    assert_eq!(part(&t, "someday"), "修自行车 整理相册 学吉他 换灯泡");
+    assert_eq!((t.w.get_drag_active(), t.w.get_side_drag_key().to_string(), t.w.get_side_drop_row()), (false, String::new(), -1));
+    assert_eq!(written(&t), ["修自行车"], "one task is written");
+    assert_eq!(with(|a| a.changes.list().first().map(|c| c.text())).unwrap().as_deref(), Some("调整顺序“修自行车”"));
+    // one step to take back, and again
+    t.ctrl("z");
+    assert_eq!(part(&t, "someday"), "整理相册 学吉他 换灯泡 修自行车");
+    t.ctrl("y");
+    assert_eq!(part(&t, "someday"), "修自行车 整理相册 学吉他 换灯泡");
+    // between two others; let go on the lower half of a row: behind that one
+    t.drag(on(&t, "修自行车"), above(&t, "换灯泡"));
+    assert_eq!(part(&t, "someday"), "整理相册 学吉他 修自行车 换灯泡");
+    t.drag(on(&t, "整理相册"), below(&t, "换灯泡"));
+    assert_eq!(part(&t, "someday"), "学吉他 修自行车 换灯泡 整理相册");
+    // where it is already (its own row, the edge it shares with the next one): nothing
+    let before = with(|a| a.changes.list().len()).unwrap();
+    t.drag(on(&t, "修自行车"), above(&t, "换灯泡"));
+    t.drag(on(&t, "修自行车"), below(&t, "学吉他"));
+    assert_eq!((part(&t, "someday"), with(|a| a.changes.list().len()).unwrap()), ("学吉他 修自行车 换灯泡 整理相册".to_owned(), before));
+
+    // it stays in its part: let go far below, it is the last of its own
+    t.drag(on(&t, "交物业费"), on(&t, "换灯泡"));
+    assert_eq!((part(&t, "month"), part(&t, "overdue"), part(&t, "someday")), ("洗车 理发 交物业费".to_owned(), "交物业费".to_owned(), "学吉他 修自行车 换灯泡 整理相册".to_owned()));
+    // beside the column (over the calendar): no line, and nothing happens
+    let from = on(&t, "理发");
+    let away = LogicalPosition::new(t.w.get_grid_x() + 200.0, from.y);
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x, from.y - 20.0) });
+    t.ev(WindowEvent::PointerMoved { position: away });
+    settle();
+    assert_eq!((t.w.get_drag_active(), t.w.get_side_drop_row()), (true, -1));
+    t.ev(WindowEvent::PointerReleased { position: away, button });
+    settle();
+    assert_eq!((t.w.get_drag_active(), part(&t, "month")), (false, "洗车 理发 交物业费".to_owned()));
+    // Esc while it is held: let go, it stays
+    let (from, to) = (on(&t, "理发"), above(&t, "洗车"));
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: to });
+    settle();
+    assert!(t.w.get_drag_active() && t.w.get_side_drop_row() >= 0);
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert_eq!((t.w.get_drag_active(), t.w.get_side_drop_row()), (false, -1));
+    t.ev(WindowEvent::PointerReleased { position: to, button });
+    settle();
+    assert_eq!(part(&t, "month"), "洗车 理发 交物业费");
+
+    // Alt+↓ / Alt+↑ on the one that has the keys; they stay with it as it moves
+    let alt = |t: &T, k: Key| {
+        let a: slint::SharedString = Key::Alt.into();
+        t.ev(WindowEvent::KeyPressed { text: a.clone() });
+        t.key(&slint::SharedString::from(k));
+        t.ev(WindowEvent::KeyReleased { text: a });
+        settle();
+    };
+    t.click_at(on(&t, "学吉他"));
+    alt(&t, Key::DownArrow);
+    assert_eq!(part(&t, "someday"), "修自行车 学吉他 换灯泡 整理相册");
+    alt(&t, Key::DownArrow);
+    alt(&t, Key::DownArrow);
+    assert_eq!(part(&t, "someday"), "修自行车 换灯泡 整理相册 学吉他");
+    // the last one: no further
+    let before = with(|a| a.changes.list().len()).unwrap();
+    alt(&t, Key::DownArrow);
+    assert_eq!((part(&t, "someday"), with(|a| a.changes.list().len()).unwrap()), ("修自行车 换灯泡 整理相册 学吉他".to_owned(), before));
+    alt(&t, Key::UpArrow);
+    assert_eq!(part(&t, "someday"), "修自行车 换灯泡 学吉他 整理相册");
+    // undone, the keys are still with it (in the row it went back to)
+    t.ctrl("z");
+    assert_eq!(part(&t, "someday"), "修自行车 换灯泡 整理相册 学吉他");
+    alt(&t, Key::UpArrow);
+    alt(&t, Key::UpArrow);
+    alt(&t, Key::UpArrow);
+    assert_eq!(part(&t, "someday"), "学吉他 修自行车 换灯泡 整理相册");
+    alt(&t, Key::UpArrow);
+    assert_eq!(part(&t, "someday"), "学吉他 修自行车 换灯泡 整理相册", "the first one: no further");
+    // Space ticks the one that was moved, not the one that has its old row now
+    alt(&t, Key::DownArrow);
+    assert_eq!(part(&t, "someday"), "修自行车 学吉他 换灯泡 整理相册");
+    t.key(" ");
+    assert_eq!((t.task("学吉他")["done"].clone(), t.task("修自行车")["done"].clone(), part(&t, "someday")), (json!(true), json!(false), "修自行车 换灯泡 整理相册".to_owned()));
+    t.ctrl("z");
+    assert_eq!(part(&t, "someday"), "修自行车 学吉他 换灯泡 整理相册");
+
+    // one left open last month is in two parts: moved in either, it moves in both
+    with({
+        let last = last.clone();
+        move |a| {
+            let p = fluentcal_core::flex::new_task(fluentcal_core::flex::MONTH, "交水费", &last);
+            let (e, _) = fluentcal_core::tasks::add_task(&a.doc, p, None, fluentcal_core::date::now_ms());
+            a.apply(e, true);
+        }
+    })
+    .unwrap();
+    settle();
+    assert_eq!((part(&t, "month"), part(&t, "overdue")), ("洗车 理发 交物业费 交水费".to_owned(), "交物业费 交水费".to_owned()));
+    // (the lower of the two rows it has)
+    let overdue = |t: &T, label: &str| {
+        let mut both: Vec<ElementHandle> = ElementHandle::find_by_accessible_label(&t.w, label).filter(|e| e.accessible_role() == Some(R::ListItem)).collect();
+        both.sort_by(|a, b| a.absolute_position().y.total_cmp(&b.absolute_position().y));
+        assert_eq!(both.len(), 2, "{label} is in two parts");
+        both.pop().unwrap()
+    };
+    let (moved, onto) = (overdue(&t, "交水费"), overdue(&t, "交物业费"));
+    t.drag(t.at(&moved, 60.0, moved.size().height / 2.0), t.at(&onto, 60.0, 1.0));
+    assert_eq!((part(&t, "month"), part(&t, "overdue")), ("洗车 理发 交水费 交物业费".to_owned(), "交水费 交物业费".to_owned()));
+}
+
+/// GitHub #7: in a column too short for its list, the list scrolls under a to-do held at the
+/// bottom or the top edge, so it can be taken to a place that wasn't in sight.
+#[test]
+fn todo_column_scrolls_under_a_dragged_one() {
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let tasks: Vec<Value> = (1..=16).map(|i| json!({ "id": format!("s{i:02}"), "title": format!("待办{i:02}"), "start": today, "flex": "someday" })).collect();
+    let t = start("side-scroll", Some(doc_with(&tasks, json!({ "calendar": { "sidebar": true } }))));
+    t.w.window().set_size(slint::LogicalSize::new(880.0, 360.0));
+    settle();
+    let order = |t: &T| t.w.get_side_rows().iter().filter(|r| r.kind == "item").map(|r| r.chip.title.to_string()).collect::<Vec<_>>();
+    let item = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::ListItem)).unwrap_or_else(|| panic!("no {label:?}"));
+    // (what the column cuts off isn't found: it is not in sight)
+    let seen = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).any(|e| e.accessible_role() == Some(R::ListItem));
+    let panel = t.find("不定日待办");
+    let (top, bottom) = (panel.absolute_position().y, panel.absolute_position().y + panel.size().height);
+    assert!(seen(&t, "待办01") && !seen(&t, "待办16"), "the list is longer than the column");
+    let button = PointerEventButton::Left;
+    let first = item(&t, "待办01");
+    let from = t.at(&first, 60.0, first.size().height / 2.0);
+    // held at the bottom edge: the list goes up under it, to its end
+    let hold = LogicalPosition::new(from.x, bottom - 8.0);
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x, from.y + 20.0) });
+    t.ev(WindowEvent::PointerMoved { position: hold });
+    for _ in 0..80 {
+        wait(20);
+    }
+    assert!(!seen(&t, "待办02"), "scrolled: the first ones are out of sight");
+    let last = item(&t, "待办16");
+    assert!(last.absolute_position().y + last.size().height <= bottom, "to the end: {} vs {bottom}", last.absolute_position().y);
+    // the line went with it: let go here, it is behind the ones that were out of sight
+    let line = t.w.get_side_drop_row();
+    assert!(line > 12, "the line is far down the list: {line}");
+    t.ev(WindowEvent::PointerReleased { position: hold, button });
+    settle();
+    let now = order(&t);
+    let at = now.iter().position(|x| x == "待办01").unwrap();
+    assert!(at >= 10, "taken down the list: {now:?}");
+    assert_eq!(now.len(), 16);
+    // and back up: held at the top edge
+    let e = item(&t, "待办01");
+    let from = t.at(&e, 60.0, e.size().height / 2.0);
+    let hold = LogicalPosition::new(from.x, top + 8.0);
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x, from.y - 20.0) });
+    t.ev(WindowEvent::PointerMoved { position: hold });
+    for _ in 0..80 {
+        wait(20);
+    }
+    t.ev(WindowEvent::PointerReleased { position: hold, button });
+    settle();
+    assert_eq!(order(&t)[0], "待办01", "at the front again: {:?}", order(&t));
+    // let go, the list stays still
+    let y = item(&t, "待办02").absolute_position().y;
+    for _ in 0..10 {
+        wait(20);
+    }
+    assert_eq!(item(&t, "待办02").absolute_position().y, y);
 }

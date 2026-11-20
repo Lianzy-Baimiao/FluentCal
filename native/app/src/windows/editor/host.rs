@@ -130,6 +130,8 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
         flex: v.flex.into(),
         progress: d.progress as f32,
         done: d.done,
+        done_on: v.done_on.into(),
+        today: today.into(),
         countdown: d.countdown == Some(true),
         show_postpone: v.show_postpone,
         postpone: v.postpone,
@@ -152,7 +154,14 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
 
 /// Applies `m` to the draft; the returned effect has the edit to write and what to show.
 pub fn handle(w: &EditorWindow, ed: &mut Editor, doc: &Doc, m: Msg, today: &str, now_ms: i64) -> Effect {
+    // (the window may have stayed open over midnight: a tick is dated the day it is made)
+    ed.set_today(today);
     match m {
+        // a preset group (生日、工作…) that isn't there yet: made now, like 新建分组's 创建
+        Msg::Edit(k, v) if k == "group" && v.starts_with(fluentcal_core::tasks::PRESET_PREFIX) => {
+            let key = &v[fluentcal_core::tasks::PRESET_PREFIX.len()..];
+            Effect { edit: ed.pick_preset(doc, key).unwrap_or_default(), ..Default::default() }
+        }
         Msg::Edit(k, v) => {
             // 0.2's maxlength: 200 for the title, 5000 for the notes
             let max = match k.as_str() {

@@ -142,6 +142,8 @@ export interface Settings {
     barDays: boolean;
     /** … and the task's progress (GitHub #10, #13). */
     barProgress: boolean;
+    /** … and, once done, the day it was ticked (GitHub #15). */
+    barDone: boolean;
     weeksRows: number;
     weeksPast: number;
     showLunar: boolean;

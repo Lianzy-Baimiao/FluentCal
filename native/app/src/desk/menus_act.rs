@@ -40,6 +40,7 @@ impl App {
                 Some(tasks::save_task(&self.doc, Task { countdown: on.then_some(true), ..t.clone() }, now))
             }
             c if c.starts_with("color:") => Some(tasks::set_color(&self.doc, &t, &c[6..], now)),
+            g if g.starts_with("group:") => Some(tasks::set_group(&self.doc, &t, Some(&g[6..]).filter(|g| !g.is_empty()), now)),
             _ => None,
         };
         if let Some(e) = edit {
@@ -47,6 +48,7 @@ impl App {
         }
         match id {
             "edit" => self.open_editor_task(tid, Some(date.to_owned())),
+            "doneDay" => self.desk_done_day_open(tid, date),
             "gantt" => self.gantt_focus(tid),
             "delete:this" => self.desk_remove_task(&t, Some((date, DeleteMode::This))),
             "delete:future" => self.desk_remove_task(&t, Some((date, DeleteMode::Future))),
@@ -71,6 +73,8 @@ impl App {
         match id {
             "new" => self.open_editor_new(None),
             "search" => self.desk_search(),
+            // where the menu was: under the ⋯ button
+            "filter" => self.desk_filter_open(self.desk.popups.menu_at.unwrap_or(super::popups::At::Point(0.0, 0.0))),
             "changes" => self.desk_changes(),
             "sidebar" => {
                 let v = !self.doc.settings.calendar.sidebar;

@@ -303,3 +303,164 @@ fn progress_slider_follows_a_drag() {
     t.ctrl(&w, "s");
     assert_eq!(t.task("a").unwrap()["progress"], 50);
 }
+
+/// GitHub #16: a year far away without paging there month by month. The calendar's title goes up
+/// a level (the days, the months, the years); a year and then a month come back down. The years
+/// are a list that the wheel scrolls; over the days the wheel turns the months, over the months
+/// the years. 今天 comes back to this month from wherever the view is, without choosing a day.
+#[test]
+fn date_picker_reaches_a_far_year() {
+    use i_slint_backend_testing::AccessibleRole as R;
+    let t = start("years", &[json!({ "id": "a", "title": "外婆生日", "start": "2026-11-19" })]);
+    let today = t.today();
+    let (ty, tm, td) = fluentcal_core::date::parts(&today);
+    let w = t.open(|a| a.open_editor_task("a", None));
+    let has = |label: &str| ElementHandle::find_by_accessible_label(&w, label).next().is_some();
+    let of_role = |label: &str, role: R| ElementHandle::find_by_accessible_label(&w, label).find(|e| e.accessible_role() == Some(role)).unwrap_or_else(|| panic!("no {label:?}"));
+    let wheel = |e: &ElementHandle, dy: f32| {
+        let (p, s) = (e.absolute_position(), e.size());
+        let position = LogicalPosition::new(p.x + s.width / 2.0, p.y + s.height / 2.0);
+        w.window().dispatch_event(WindowEvent::PointerMoved { position });
+        w.window().dispatch_event(WindowEvent::PointerScrolled { position, delta_x: 0.0, delta_y: dy });
+        settle();
+    };
+    let open = ElementHandle::find_by_accessible_label(&w, "打开日历").next().expect("the start date's calendar button");
+    t.click(&w, &open);
+    // up to the months, up to the years
+    t.click(&w, &of_role("2026年11月", R::Button));
+    assert!(has("5月") && !has("2026年11月"), "the months of 2026");
+    t.click(&w, &of_role("2026年", R::Button));
+    let list = of_role("选择年份", R::List);
+    // a year's cell when all of it is in the list's view (the search skips what is scrolled away)
+    let year_cell = |label: &str| {
+        let list = of_role("选择年份", R::List);
+        let (top, bottom) = (list.absolute_position().y, list.absolute_position().y + list.size().height);
+        ElementHandle::find_by_accessible_label(&w, label).filter(|e| e.accessible_role() == Some(R::ListItem)).find(|e| e.absolute_position().y >= top - 0.5 && e.absolute_position().y + e.size().height <= bottom + 0.5)
+    };
+    assert!(year_cell("2026年").is_some(), "the list opens around the year shown");
+    assert!(year_cell("1960年").is_none(), "1960 is far above");
+    // the wheel scrolls the years: a notch is 60px, more than a row
+    let mut turns = 0;
+    while year_cell("1960年").is_none() {
+        turns += 1;
+        assert!(turns <= 20, "the wheel reaches 1960 from 2026 in a few turns");
+        wheel(&list, 60.0);
+    }
+    assert!(turns >= 8, "66 years are not on one page ({turns} notches)");
+    t.click(&w, &t.find(&w, "1960年"));
+    assert!(of_role("1960年", R::Button).accessible_label().is_some() && has("10月"), "the months of 1960");
+    t.click(&w, &t.find(&w, "10月"));
+    let days = of_role("1960年10月", R::Table);
+    // over the days the wheel turns the months, a notch a month; over the months the years
+    wheel(&days, -60.0);
+    assert!(has("1960年11月"), "wheel down: the next month");
+    wheel(&days, 60.0);
+    wheel(&days, 60.0);
+    assert!(has("1960年9月"), "wheel up twice: back two months");
+    // small steps (a touchpad) add up to one
+    for _ in 0..4 {
+        wheel(&days, -12.0);
+    }
+    assert!(has("1960年10月") && !has("1960年11月"), "four small steps make one month");
+    t.click(&w, &of_role("1960年10月", R::Button));
+    wheel(&t.find(&w, "6月"), 60.0);
+    assert!(has("1959年"), "over the months: the year before");
+    wheel(&t.find(&w, "6月"), -60.0);
+    assert!(has("1960年"));
+    t.click(&w, &t.find(&w, "10月"));
+    // 今天: back to this month, nothing chosen; then 1960 again by the keys' way of a year
+    t.click(&w, &t.find(&w, "回到今天"));
+    assert!(has(&format!("{ty}年{tm}月")) && has(&format!("{ty}年{tm}月{td}")), "今天 shows this month");
+    assert_eq!(w.get_data().start, "2026-11-19", "今天 doesn't choose a day");
+    t.key(&w, &slint::SharedString::from(Key::PageDown));
+    let next = fluentcal_core::date::add_months(&fluentcal_core::date::start_of_month(&today), 1);
+    let (ny, nm, _) = fluentcal_core::date::parts(&next);
+    assert!(has(&format!("{ny}年{nm}月")), "PageDown: the next month");
+    // choose the day in 1960
+    t.click(&w, &of_role(&format!("{ny}年{nm}月"), R::Button));
+    t.click(&w, &of_role(&format!("{ny}年"), R::Button));
+    // the arrows: four rows of years a click
+    t.click(&w, &t.find(&w, "更早的年份"));
+    assert!(year_cell(&format!("{}年", ny - 16)).is_some(), "an arrow: 16 years");
+    let list = of_role("选择年份", R::List);
+    for _ in 0..40 {
+        if year_cell("1960年").is_some() {
+            break;
+        }
+        wheel(&list, 60.0);
+    }
+    t.click(&w, &t.find(&w, "1960年"));
+    t.click(&w, &t.find(&w, "10月"));
+    t.click(&w, &t.find(&w, "1960年10月1"));
+    assert_eq!(w.get_data().start, "1960-10-01", "the day is chosen and the calendar closes");
+    assert!(!has("回到今天"), "the calendar closed");
+    t.ctrl(&w, "s");
+    assert_eq!(t.task("a").unwrap()["start"], "1960-10-01");
+}
+
+/// GitHub #15: ticking 已完成 shows 完成日期 with today in it; another day can be put there (not
+/// one that has not come), and unticking takes the row away again.
+#[test]
+fn done_day_in_the_editor() {
+    use fluentcal_core::date::{add_days, add_months, parts, start_of_month};
+    let t = start("done-on", &[json!({ "id": "a", "title": "看望小猫", "start": "2026-11-10", "end": "2026-11-12" })]);
+    let today = t.today();
+    let w = t.open(|a| a.open_editor_task("a", None));
+    let has = |label: &str| ElementHandle::find_by_accessible_label(&w, label).next().is_some();
+    let calendars = || ElementHandle::find_by_accessible_label(&w, "打开日历").count();
+    let day = |d: &str| {
+        let (y, m, dd) = parts(d);
+        format!("{y}年{m}月{dd}")
+    };
+    assert_eq!(calendars(), 2, "from and to");
+    t.click(&w, &t.find(&w, "已完成"));
+    assert_eq!((w.get_data().done, w.get_data().done_on.to_string(), calendars()), (true, today.clone(), 3), "完成日期 comes with today in it");
+    // its calendar: tomorrow can't be chosen, a day last month can
+    t.click(&w, &ElementHandle::find_by_accessible_label(&w, "打开日历").last().unwrap());
+    let tomorrow = t.find(&w, &day(&add_days(&today, 1)));
+    assert_eq!(tomorrow.accessible_enabled(), Some(false));
+    t.click(&w, &tomorrow);
+    assert!(has("回到今天"), "still open");
+    assert_eq!(w.get_data().done_on, today.as_str());
+    t.click(&w, &t.find(&w, "上个月"));
+    let (py, pm, _) = parts(&add_months(&start_of_month(&today), -1));
+    let picked = format!("{py:04}-{pm:02}-15");
+    t.click(&w, &t.find(&w, &day(&picked)));
+    assert!(!has("回到今天"), "a day closes the calendar");
+    assert_eq!(w.get_data().done_on, picked.as_str());
+    // unticked: the row is gone; ticked again: today
+    t.click(&w, &t.find(&w, "已完成"));
+    assert_eq!((w.get_data().done_on.to_string(), calendars()), (String::new(), 2));
+    t.click(&w, &t.find(&w, "已完成"));
+    assert_eq!(w.get_data().done_on, today.as_str());
+    t.click(&w, &ElementHandle::find_by_accessible_label(&w, "打开日历").last().unwrap());
+    t.click(&w, &t.find(&w, "上个月"));
+    t.click(&w, &t.find(&w, &day(&picked)));
+    t.ctrl(&w, "s");
+    let saved = t.task("a").unwrap();
+    assert_eq!((saved["done"].clone(), saved["doneOn"].clone()), (json!(true), json!(picked)));
+}
+
+/// GitHub #14: 分组 offers the preset groups (生日、工作、还款、纪念日) that aren't there yet; one is
+/// made when it is chosen, and the task is in it.
+#[test]
+fn preset_group_from_the_editor() {
+    let t = start("preset-group", &[json!({ "id": "a", "title": "妈妈生日", "start": "2026-11-10" })]);
+    let w = t.open(|a| a.open_editor_task("a", None));
+    let groups = || with(|a| a.doc.groups.values().map(|g| (g.name.clone(), g.color.clone(), g.id.clone())).collect::<Vec<_>>()).unwrap();
+    assert!(groups().is_empty());
+    use slint::Model;
+    let choices: Vec<String> = w.get_groups().iter().map(|o| o.label.to_string()).collect();
+    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…"]);
+    // chosen from the list (the box shows the group now chosen: 未分组)
+    t.click(&w, &t.find(&w, "未分组"));
+    let option = ElementHandle::find_by_accessible_label(&w, "生日").find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::ListItem)).expect("the choice");
+    t.click(&w, &option);
+    let made = groups();
+    assert_eq!(made.iter().map(|(n, c, _)| (n.as_str(), c.as_str())).collect::<Vec<_>>(), [("生日", "pink")]);
+    assert_eq!(w.get_data().group, made[0].2.as_str(), "the task is in it");
+    let choices: Vec<String> = w.get_groups().iter().map(|o| o.label.to_string()).collect();
+    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…"], "生日 is a group now, once");
+    t.ctrl(&w, "s");
+    assert_eq!(t.task("a").unwrap()["groupId"], json!(made[0].2));
+}

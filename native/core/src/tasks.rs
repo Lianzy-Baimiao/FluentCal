@@ -154,14 +154,114 @@ pub fn make_task(doc: &Doc, mut p: Task, order: Option<f64>, now_ms: i64) -> Tas
     p.order = order.unwrap_or_else(|| next_order(doc));
     p.created_at = now_ms;
     p.updated_at = now_ms;
+    // made done (the editor's 已完成 box, an assistant): done today
+    stamp_done(None, &mut p, &day_of(now_ms));
     p
 }
 
+/// The local day of a time.
+fn day_of(now_ms: i64) -> String {
+    crate::date::local_of_ms(now_ms, crate::date::utc_offset_minutes()).0
+}
+
+/// Keeps the day a task was ticked done (GitHub #15) in step with its done state, whoever
+/// writes it (the calendar, the Gantt chart, the editor, a reminder, an assistant):
+/// - ticked: `today`, unless this very edit names the day (the editor's 完成日期);
+/// - unticked: no day, so ticking it again is a new day (a day set by hand goes too);
+/// - done before and after: the day as the edit has it (unchanged, or corrected by hand). A
+///   task done before 0.3.17 has none, and none is made up for it.
+///
+/// Repeating tasks keep a day per occurrence, the same way. To-dos without a day have their
+/// own record (`flex_done`). `old`: the task as stored (None: a new one).
+fn stamp_done(old: Option<&Task>, t: &mut Task, today: &str) {
+    let days = t.done_on_dates.take();
+    if crate::flex::is_flex(t) {
+        t.done_on = None;
+        return;
+    }
+    if t.repeat.is_some() {
+        let mut days = days.unwrap_or_default();
+        days.retain(|k, _| t.done_dates.iter().flatten().any(|d| d == k));
+        // (a new task that comes with times done is a copy: they were done when the task's
+        // were, and a day that isn't known is not made up for the copy either)
+        if let Some(old) = old {
+            let was: BTreeSet<&str> = old.done_dates.iter().flatten().map(String::as_str).collect();
+            for d in t.done_dates.iter().flatten().filter(|d| !was.contains(d.as_str())) {
+                days.entry(d.clone()).or_insert_with(|| today.to_owned());
+            }
+        }
+        t.done_on_dates = (!days.is_empty()).then_some(days);
+    }
+    // (a repeating task keeps `done` and its day for the day it stops repeating)
+    if !t.done {
+        t.done_on = None;
+        return;
+    }
+    let was_done = old.is_some_and(|o| o.done);
+    let named = t.done_on.is_some() && old.is_none_or(|o| o.done_on != t.done_on);
+    if !was_done && !named {
+        t.done_on = Some(today.to_owned());
+    }
+}
+
+/// The day an occurrence was ticked done, when it is done and the day is known. `date` as in
+/// `set_occurrence_done`: the occurrence, or a to-do's slot or the day it was done.
+pub fn done_day<'a>(t: &'a Task, date: &str) -> Option<&'a str> {
+    if crate::flex::is_flex(t) {
+        if crate::flex::is_slot(date) {
+            return crate::flex::slot_done(t, date);
+        }
+        return t.flex_done.iter().flatten().map(|(_, d)| d.as_str()).find(|d| *d == date);
+    }
+    if t.repeat.is_some() {
+        let done = t.done_dates.iter().flatten().any(|d| d == date);
+        return t.done_on_dates.as_ref().filter(|_| done)?.get(date).map(String::as_str);
+    }
+    t.done_on.as_deref().filter(|_| t.done)
+}
+
+/// Corrects the day an occurrence was done (右键 › 修改完成日期, GitHub #15: a tick or an untick
+/// by mistake). Nothing for one that isn't done, or for a day after today. `date` as in
+/// `done_day`.
+pub fn set_done_day(doc: &Doc, t: &Task, date: &str, day: &str, now_ms: i64) -> Edit {
+    // (nothing was done on a day that has not come)
+    if !crate::date::is_iso_date(day) || day > day_of(now_ms).as_str() {
+        return Edit::default();
+    }
+    let mut t = t.clone();
+    if crate::flex::is_flex(&t) {
+        if crate::flex::is_slot(date) {
+            if crate::flex::slot_done(&t, date).is_none() {
+                return Edit::default();
+            }
+            crate::flex::set_slot(&mut t, date, Some(day));
+        } else {
+            crate::flex::move_day(&mut t, date, day);
+        }
+    } else if t.repeat.is_some() {
+        if !t.done_dates.iter().flatten().any(|d| d == date) {
+            return Edit::default();
+        }
+        t.done_on_dates.get_or_insert_with(Default::default).insert(date.to_owned(), day.to_owned());
+    } else {
+        if !t.done {
+            return Edit::default();
+        }
+        t.done_on = Some(day.to_owned());
+    }
+    if doc.tasks.get(&t.id) == Some(&t) {
+        return Edit::default();
+    }
+    save_task(doc, t, now_ms)
+}
+
 pub fn save_task(doc: &Doc, mut t: Task, now_ms: i64) -> Edit {
+    let old = doc.tasks.get(&t.id);
     // A renamed sample task is the user's own now: "清除示例数据" must not take it.
-    if t.is_sample() && doc.tasks.get(&t.id).is_some_and(|old| old.title != t.title) {
+    if t.is_sample() && old.is_some_and(|old| old.title != t.title) {
         t.sample = None;
     }
+    stamp_done(old, &mut t, &day_of(now_ms));
     t.updated_at = now_ms;
     Edit::task(&t)
 }
@@ -257,7 +357,9 @@ pub fn move_occurrence(doc: &Doc, occ: &Occurrence, start: &str, now_ms: i64) ->
     copy.end = add_days(start, diff_days(&occ.start, &occ.end));
     copy.done = occ.done;
     copy.progress = if occ.done { 100.0 } else { 0.0 };
-    let copy = make_task(doc, copy, Some(t.order), now_ms);
+    let mut copy = make_task(doc, copy, Some(t.order), now_ms);
+    // done on the day the occurrence was (not known: not made up)
+    copy.done_on = done_day(t, &occ.date).map(str::to_owned);
     let mut series = t.clone();
     let mut ex: BTreeSet<String> = series.ex_dates.take().unwrap_or_default().into_iter().collect();
     ex.insert(occ.date.clone());
@@ -298,7 +400,10 @@ pub fn duplicate_task(doc: &Doc, t: &Task, now_ms: i64) -> (Edit, Task) {
     let mut p = t.clone();
     p.title = trf("{0}（副本）", &[format!("{}", t.title)]);
     p.sample = None;
-    add_task(doc, p, None, now_ms)
+    let mut copy = make_task(doc, p, None, now_ms);
+    // a copy of a done task was done when the task was (not known: not made up)
+    copy.done_on = t.done_on.clone().filter(|_| copy.done);
+    (Edit::task(&copy), copy)
 }
 
 /// Moves overdue single-day tasks (late by at most 30 days) to today. Not undoable (0.2 kept
@@ -336,6 +441,111 @@ pub fn save_group(doc: &Doc, mut g: Group) -> Edit {
     }
     let mut e = Edit::default();
     e.put("groups", &g.id.clone(), g.to_value());
+    e
+}
+
+/// Groups there from the start (GitHub #14: 生日、工作、还款、纪念日), as choices wherever a task's
+/// group is chosen. One is made the first time it is chosen, so nobody's Gantt chart fills
+/// with empty groups. The name is a translation key: the group gets it in the language it is
+/// made in. With its colour.
+pub const PRESET_GROUPS: [(&str, &str); 4] = [("生日", "pink"), ("工作", "blue"), ("还款", "orange"), ("纪念日", "purple")];
+
+/// A preset among group ids (a Select's value, a menu entry): its key behind this.
+pub const PRESET_PREFIX: &str = "__preset__:";
+
+/// The group that is preset `key` already: one with the preset's name in any of the app's
+/// languages. A group is named in the language it was made in and keeps that name, so one
+/// made while the calendar was in English (or on another PC, synced here) is 生日 here too,
+/// not offered a second time. The first in the groups' order when several have such a name.
+fn preset_owner<'a>(doc: &'a Doc, key: &str) -> Option<&'a Group> {
+    use crate::i18n::{translate, Language};
+    let names = [Language::SimplifiedChinese, Language::TraditionalChinese, Language::English].map(|l| translate(l, key));
+    doc.groups.values().filter(|g| names.iter().any(|n| n.eq_ignore_ascii_case(g.name.trim()))).min_by(|a, b| a.order.total_cmp(&b.order).then_with(|| a.id.cmp(&b.id)))
+}
+
+/// The presets no group has the name of yet: (key, name).
+pub fn open_presets(doc: &Doc) -> Vec<(&'static str, &'static str)> {
+    PRESET_GROUPS.iter().filter(|(k, _)| preset_owner(doc, k).is_none()).map(|(k, _)| (*k, crate::i18n::tr(k))).collect()
+}
+
+/// The group of preset `key` and what makes it: nothing when a group has that name already.
+pub fn preset_group(doc: &Doc, key: &str) -> Option<(String, Edit)> {
+    let (k, color) = PRESET_GROUPS.iter().find(|(k, _)| *k == key)?;
+    if let Some(g) = preset_owner(doc, k) {
+        return Some((g.id.clone(), Edit::default()));
+    }
+    let g = make_group(doc, crate::i18n::tr(k), color);
+    Some((g.id.clone(), save_group(doc, g)))
+}
+
+/// 分组 in a task's menu: `group` None is 未分组, a preset (`PRESET_PREFIX` and its key) is made
+/// with it.
+pub fn set_group(doc: &Doc, t: &Task, group: Option<&str>, now_ms: i64) -> Edit {
+    let (group, mut e) = match group.and_then(|g| g.strip_prefix(PRESET_PREFIX)) {
+        Some(key) => match preset_group(doc, key) {
+            Some((id, e)) => (Some(id), e),
+            None => return Edit::default(),
+        },
+        None => (group.map(str::to_owned), Edit::default()),
+    };
+    if t.group_id != group {
+        e.extend(save_task(doc, Task { group_id: group, ..t.clone() }, now_ms));
+    }
+    e
+}
+
+/// The to-do column's order, set by hand (GitHub #7): the to-do `id` goes in front of
+/// `before`, or behind `after` when there is nothing to go in front of (the end of its part).
+/// The column lists by `order`: the one moved gets a number between its new neighbours', so
+/// one task is written. Two with the same number (a copy has its original's) leave none
+/// between them: the ones behind it that have that number are spread out with it. When the
+/// numbers between two are used up (some fifty moves into the same gap), all are numbered
+/// anew.
+///
+/// The neighbours are looked up among all to-dos of its kind, also the ones the column
+/// doesn't show now (done, or of a group the filter leaves out): those keep their places.
+pub fn reorder_flex(doc: &Doc, id: &str, after: Option<&str>, before: Option<&str>, now_ms: i64) -> Edit {
+    let mut e = Edit::default();
+    let Some(t) = doc.tasks.get(id) else { return e };
+    let Some(kind) = crate::flex::kind(t) else { return e };
+    let by_order = |a: &Task, b: &Task| a.order.total_cmp(&b.order).then_with(|| a.id.cmp(&b.id));
+    let mut all: Vec<&Task> = doc.tasks.values().filter(|o| o.id != id && crate::flex::kind(o) == Some(kind)).collect();
+    all.sort_by(|a, b| by_order(a, b));
+    let index = |x: &str| all.iter().position(|o| o.id == x);
+    let at = match (before.and_then(index), after.and_then(index)) {
+        (Some(i), _) => i,
+        (None, Some(i)) => i + 1,
+        (None, None) => return e,
+    };
+    // there already
+    if all.iter().filter(|o| by_order(o, t).is_lt()).count() == at {
+        return e;
+    }
+    let low = at.checked_sub(1).map(|i| all[i].order);
+    // the ones behind it that have the number of the one before it need new ones as well
+    let tied = all[at..].iter().take_while(|o| low.is_some_and(|l| o.order <= l)).count();
+    let high = all.get(at + tied).map(|o| o.order);
+    let (first, step) = match (low, high) {
+        (Some(l), Some(h)) => (l + (h - l) / (tied as f64 + 2.0), (h - l) / (tied as f64 + 2.0)),
+        (Some(l), None) => (l + 1.0, 1.0),
+        (None, Some(h)) => (h - 1.0, 1.0),
+        (None, None) => return e,
+    };
+    let numbers: Vec<f64> = (0..=tied).map(|i| first + step * i as f64).collect();
+    let rising = low.is_none_or(|l| l < numbers[0]) && numbers.windows(2).all(|w| w[0] < w[1]) && high.is_none_or(|h| numbers[tied] < h);
+    let placed: Vec<(&Task, f64)> = if rising {
+        std::iter::once(t).chain(all[at..at + tied].iter().copied()).zip(numbers).collect()
+    } else {
+        // no number left between two of them: 1, 2, 3… for all (the moved one first: it names
+        // the change in 最近更改)
+        let number = |i: usize| (i + 1) as f64;
+        std::iter::once((t, number(at))).chain(all.iter().enumerate().map(|(i, o)| (*o, number(if i < at { i } else { i + 1 })))).collect()
+    };
+    for (task, order) in placed {
+        if task.order != order {
+            e.extend(save_task(doc, Task { order, ..task.clone() }, now_ms));
+        }
+    }
     e
 }
 

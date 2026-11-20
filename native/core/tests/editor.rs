@@ -302,5 +302,82 @@ fn new_group_is_saved_and_picked() {
     let gid = e.draft.as_ref().unwrap().group_id.clone().unwrap();
     assert_eq!((doc.groups[&gid].name.as_str(), doc.groups[&gid].color.as_str(), doc.groups[&gid].order), ("生活", "blue", 4.0));
     let labels: Vec<String> = e.view(&doc, TODAY).groups.into_iter().map(|o| o.label).collect();
-    assert_eq!(labels, ["未分组", "工作", "生活", "新建分组…"]);
+    // (and the presets no group has the name of, since 0.3.17: `preset_groups_in_the_editor`)
+    assert_eq!(labels, ["未分组", "工作", "生活", "生日", "还款", "纪念日", "新建分组…"]);
+}
+
+// GitHub #15
+#[test]
+fn ticking_done_writes_the_day_and_it_can_be_corrected() {
+    let mut doc = doc_with(vec![Task { end: "2026-10-12".into(), ..mk("a", "2026-10-10") }], vec![]);
+    let mut e = open(&doc, Payload::edit("a", None));
+    assert_eq!(e.view(&doc, TODAY).done_on, "");
+    e.edit("done", "1");
+    assert_eq!(e.view(&doc, TODAY).done_on, TODAY);
+    // the day before; a day that has not come, or no day at all, is not taken
+    e.edit("done-on", "2026-10-13");
+    e.edit("done-on", "2026-10-15");
+    e.edit("done-on", "昨天");
+    assert_eq!(e.view(&doc, TODAY).done_on, "2026-10-13");
+    let fx = e.save(&doc, 2000);
+    apply(&mut doc, &fx.edit);
+    assert_eq!((doc.tasks["a"].done, doc.tasks["a"].done_on.as_deref()), (true, Some("2026-10-13")));
+    // opened again: the day is shown; unticking forgets it, ticking again is today
+    let mut e = open(&doc, Payload::edit("a", None));
+    assert_eq!(e.view(&doc, TODAY).done_on, "2026-10-13");
+    e.edit("done", "0");
+    assert_eq!(e.view(&doc, TODAY).done_on, "");
+    e.edit("done-on", "2026-10-12");
+    assert_eq!(e.draft.as_ref().unwrap().done_on, None, "nothing to date while it isn't done");
+    e.edit("progress-done", "100");
+    assert_eq!(e.view(&doc, TODAY).done_on, TODAY);
+    e.edit("done-on", "2026-10-11");
+    e.edit("progress-done", "100");
+    assert_eq!(e.view(&doc, TODAY).done_on, "2026-10-11", "the slider let go at 100 % again does not move the day");
+    // the window stayed open over midnight: a tick is the day it is made
+    e.edit("done", "0");
+    e.set_today("2026-10-15");
+    e.edit("done", "1");
+    assert_eq!(e.view(&doc, "2026-10-15").done_on, "2026-10-15");
+    let fx = e.save(&doc, 3000);
+    apply(&mut doc, &fx.edit);
+    assert_eq!(doc.tasks["a"].done_on.as_deref(), Some("2026-10-15"));
+    // only the title changed here while the day was corrected elsewhere: that day stays
+    let mut e = open(&doc, Payload::edit("a", None));
+    e.edit("title", "改名");
+    let elsewhere = Task { done_on: Some("2026-10-14".into()), ..doc.tasks["a"].clone() };
+    doc.tasks.insert("a".into(), elsewhere);
+    let fx = e.save(&doc, 4000);
+    apply(&mut doc, &fx.edit);
+    assert_eq!((doc.tasks["a"].title.as_str(), doc.tasks["a"].done_on.as_deref()), ("改名", Some("2026-10-14")));
+    // a repeating task has no day of its own in the window
+    let weekly = Task { repeat: Some(RepeatRule { freq: Some(Freq::Weekly), ..Default::default() }), done: true, done_on: Some("2026-10-01".into()), ..mk("w", "2026-10-05") };
+    let doc = doc_with(vec![weekly], vec![]);
+    assert_eq!(open(&doc, Payload::edit("w", None)).view(&doc, TODAY).done_on, "");
+}
+
+// GitHub #14
+#[test]
+fn preset_groups_in_the_editor() {
+    let mut doc = doc_with(vec![mk("a", "2026-10-10")], vec![Group { id: "g1".into(), name: "还款".into(), color: "red".into(), order: 1.0, ..Default::default() }]);
+    let mut e = open(&doc, Payload::edit("a", None));
+    let choices = |e: &Editor, doc: &Doc| e.view(doc, TODAY).groups.iter().map(|o| (o.value.clone(), o.label.clone())).collect::<Vec<_>>();
+    let s = |v: &str, l: &str| (v.to_owned(), l.to_owned());
+    // 未分组, the groups, the presets that aren't there yet, 新建分组…
+    assert_eq!(choices(&e, &doc), [s("", "未分组"), s("g1", "还款"), s("__preset__:生日", "生日"), s("__preset__:工作", "工作"), s("__preset__:纪念日", "纪念日"), s("__new__", "新建分组…")]);
+    // one chosen: made at once, the draft is in it
+    let edit = e.pick_preset(&doc, "纪念日").expect("made");
+    apply(&mut doc, &edit);
+    let made = doc.groups.values().find(|g| g.name == "纪念日").expect("the group").clone();
+    assert_eq!((made.color.as_str(), e.draft.as_ref().unwrap().group_id.as_deref()), ("purple", Some(made.id.as_str())));
+    assert_eq!(e.view(&doc, TODAY).groups.iter().filter(|o| o.label == "纪念日").map(|o| o.value.clone()).collect::<Vec<_>>(), [made.id.clone()], "once, as a group");
+    let fx = e.save(&doc, 2000);
+    apply(&mut doc, &fx.edit);
+    assert_eq!(doc.tasks["a"].group_id.as_deref(), Some(made.id.as_str()));
+    // the one a group has the name of already: that group, nothing to make
+    let mut e = open(&doc, Payload::edit("a", None));
+    assert!(e.pick_preset(&doc, "还款").expect("known").is_empty());
+    assert_eq!(e.draft.as_ref().unwrap().group_id.as_deref(), Some("g1"));
+    assert!(e.pick_preset(&doc, "旅行").is_none());
+    assert_eq!(e.draft.as_ref().unwrap().group_id.as_deref(), Some("g1"));
 }

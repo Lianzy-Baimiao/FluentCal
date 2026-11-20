@@ -53,6 +53,8 @@ pub struct Editor {
     pub asking: Option<Ask>,
     /// Opened on another task while this one had changes: loaded after "放弃".
     pending: Option<Payload>,
+    /// Today (`load`, `set_today`): what ticking 已完成 writes as the day it was done.
+    today: String,
 }
 
 fn json(t: &Option<Task>) -> String {
@@ -61,9 +63,17 @@ fn json(t: &Option<Task>) -> String {
 
 impl Editor {
     /// Loads `p` (0.2's load): a copy of the task, or a new one with defaults.
+    /// The day it is now (the window may stay open over midnight): what a tick is dated.
+    pub fn set_today(&mut self, today: &str) {
+        if self.today != today {
+            self.today = today.to_owned();
+        }
+    }
+
     pub fn load(&mut self, doc: &Doc, p: &Payload, today: &str, now_ms: i64) {
         self.missing = false;
         self.title_error = false;
+        self.today = today.to_owned();
         match p {
             Payload::Edit { task_id, date } => {
                 let t = doc.tasks.get(task_id).cloned();

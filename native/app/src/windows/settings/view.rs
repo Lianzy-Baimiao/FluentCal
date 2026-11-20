@@ -289,6 +289,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         fit_rows: c.fit_rows,
         bar_days: c.bar_days,
         bar_progress: c.bar_progress,
+        bar_done: c.bar_done,
         sidebar_mode: s(&c.sidebar_mode),
         weeks_rows: c.weeks_rows as f32,
         weeks_past: c.weeks_past as f32,

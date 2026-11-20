@@ -3,7 +3,7 @@
 
 use super::menus::Entry;
 use crate::theme::color;
-use crate::{ChipData, MenuEntry, MenuLeaf, SearchHitData, Swatch};
+use crate::{ChipData, FilterRowData, MenuEntry, MenuLeaf, SearchHitData, Swatch};
 use fluentcal_core::date::{format_friendly, format_range};
 use fluentcal_core::lunar::display_info as day_info;
 use fluentcal_core::recur::occurrences;
@@ -120,9 +120,10 @@ pub fn menu(entries: &[Entry], t: &Tokens) -> (ModelRc<MenuEntry>, bool, bool) {
 
 /// "+N": the day's title, lunar label and tasks (0.2's DayListFlyout: completed ones only
 /// when shown, done last, then by time and order).
-pub fn day_list(doc: &Doc, date: &str, today: &str, t: &Tokens) -> (String, String, ModelRc<ChipData>) {
+pub fn day_list(doc: &Doc, ui: &super::vm::DeskUi, date: &str, today: &str, t: &Tokens) -> (String, String, ModelRc<ChipData>) {
     let show_done = doc.settings.tasks.show_completed;
-    let mut occs: Vec<_> = doc.tasks.values().flat_map(|task| occurrences(task, date, date, 50)).filter(|o| show_done || !o.done).collect();
+    let tasks = doc.tasks.values().filter(|task| super::vm::shown(doc, ui, task));
+    let mut occs: Vec<_> = tasks.flat_map(|task| occurrences(task, date, date, 50)).filter(|o| show_done || !o.done).collect();
     occs.sort_by(|a, b| {
         a.done
             .cmp(&b.done)
@@ -137,6 +138,31 @@ pub fn day_list(doc: &Doc, date: &str, today: &str, t: &Tokens) -> (String, Stri
         })
         .collect();
     (format_friendly(date, today), day_info(date).lunar_label, model(chips))
+}
+
+/// 按分组筛选 (GitHub #14): 未分组 and the groups (in their order) with how many tasks each has,
+/// ticked when the calendar shows it alone or with others; the count behind 全部; and a line
+/// for when there are no groups yet.
+pub fn filter_rows(doc: &Doc, ui: &super::vm::DeskUi, t: &Tokens) -> (Vec<FilterRowData>, String, String) {
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    for task in doc.tasks.values() {
+        *counts.entry(task.group_id.as_deref().filter(|g| doc.groups.contains_key(*g)).unwrap_or("")).or_default() += 1;
+    }
+    let count = |id: &str| counts.get(id).copied().unwrap_or(0).to_string();
+    let ticked = |id: &str| ui.group_filter.iter().any(|g| g == id);
+    let mut groups: Vec<_> = doc.groups.values().collect();
+    groups.sort_by(|a, b| a.order.total_cmp(&b.order));
+    let mut rows = vec![FilterRowData { id: "".into(), name: fluentcal_core::i18n::tr("未分组").into(), color: color(Rgba::new(0.0, 0.0, 0.0, 0.0)), dot: false, checked: ticked(""), count: count("").into() }];
+    rows.extend(groups.iter().map(|g| FilterRowData {
+        id: g.id.as_str().into(),
+        name: g.name.as_str().into(),
+        color: color(task_color(Some(&g.color), t).bar),
+        dot: true,
+        checked: ticked(&g.id),
+        count: count(&g.id).into(),
+    }));
+    let hint = if groups.is_empty() { fluentcal_core::i18n::tr("还没有分组。右键任务 › 分组，可以把它放进“生日”“工作”等分组。") } else { "" };
+    (rows, doc.tasks.len().to_string(), hint.into())
 }
 
 /// The welcome bar (0.2: not onboarded and sample tasks left).

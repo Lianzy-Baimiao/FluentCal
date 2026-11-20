@@ -15,11 +15,17 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
     let done = if fluentcal_core::flex::is_slot(date) { fluentcal_core::flex::slot_done(t, date).is_some() } else { occurrence_on(t, date).map_or(t.done, |o| o.done) };
     let mut v = vec![
         shortcut(item("done", if done { tr("标记为未完成") } else { tr("标记为完成") }, "completed"), "Space"),
+    ];
+    // the day it was ticked, to put right after a tick by mistake (GitHub #15)
+    if done {
+        v.push(item("doneDay", tr("修改完成日期…"), "calendar"));
+    }
+    v.extend([
         swatches("color:", t.color.as_deref(), true),
         sep(),
         shortcut(item("edit", tr("编辑…"), "edit"), "Enter"),
         item("duplicate", tr("复制一份"), "copy"),
-    ];
+    ]);
     if t.repeat.is_none() && !flex {
         v.push(item("postpone", tr("推迟一天"), "forward"));
         if t.start == t.end {
@@ -27,6 +33,15 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
         }
     }
     v.push(Entry { icon: "flag".into(), ..check("countdown", tr("倒数日"), t.countdown == Some(true)) });
+    // 分组 (GitHub #14): 未分组, the groups, and the presets that aren't there yet (one is made
+    // when it is first chosen)
+    let mut groups: Vec<_> = app.doc.groups.values().collect();
+    groups.sort_by(|a, b| a.order.total_cmp(&b.order));
+    let own = t.group_id.as_deref().filter(|g| app.doc.groups.contains_key(*g));
+    let mut choices = vec![radio("group:", tr("未分组"), own.is_none())];
+    choices.extend(groups.iter().map(|g| radio(&format!("group:{}", g.id), &g.name, own == Some(g.id.as_str()))));
+    choices.extend(fluentcal_core::tasks::open_presets(&app.doc).into_iter().map(|(key, name)| radio(&format!("group:{}{key}", fluentcal_core::tasks::PRESET_PREFIX), name, false)));
+    v.push(sub(tr("分组"), "group", choices));
     let o = RowOptions { hide_done: s.gantt.hide_done, hide_single_day: s.gantt.hide_single_day, group_filter: s.gantt.group_filter.clone() };
     if s.calendar.view != "gantt" && in_gantt(t, &o) {
         v.push(item("gantt", tr("在甘特图中查看"), "gantt"));
@@ -62,6 +77,10 @@ pub fn more(app: &App) -> Vec<Entry> {
     let mut v = vec![shortcut(item("new", tr("新建任务…"), "add"), "Ctrl+N"), shortcut(item("search", tr("搜索"), "search"), "Ctrl+F")];
     if app.sync.enabled {
         v.push(item("syncNow", tr("立即同步"), "sync"));
+    }
+    // (the Gantt chart has its own 只显示分组)
+    if s.calendar.view != "gantt" {
+        v.push(item("filter", tr("按分组筛选…"), "filter"));
     }
     v.push(item("changes", tr("最近更改"), "delete"));
     v.push(check("sidebar", tr("不定日待办栏"), s.calendar.sidebar));

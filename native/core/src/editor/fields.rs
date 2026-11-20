@@ -76,17 +76,27 @@ impl Editor {
             "time" => t.time = (!v.is_empty()).then(|| v.into()),
             "notes" => t.notes = (!v.is_empty()).then(|| v.into()),
             "color" => t.color = (!v.is_empty()).then(|| v.into()),
+            // (a preset that isn't a group yet is `pick_preset`'s: its choice is no group id)
+            "group" if v.starts_with(crate::tasks::PRESET_PREFIX) => {}
             "group" => t.group_id = (!v.is_empty()).then(|| v.into()),
             "progress" => t.progress = num(v).clamp(0.0, 100.0),
             // the slider's end of drag (0.2's @change): 100 % means done
             "progress-done" => {
                 t.progress = num(v).clamp(0.0, 100.0);
-                t.done = t.progress >= 100.0;
+                let done = t.progress >= 100.0;
+                if done != t.done {
+                    t.done_on = done.then(|| self.today.clone());
+                }
+                t.done = done;
             }
+            // ticked: done today, until 完成日期 says another day (GitHub #15); unticked: no day
             "done" => {
                 t.done = on(v);
                 t.progress = if t.done { 100.0 } else if t.progress == 100.0 { 0.0 } else { t.progress };
+                t.done_on = t.done.then(|| self.today.clone());
             }
+            // 完成日期: any day up to today
+            "done-on" if t.done && crate::date::is_iso_date(v) && v <= self.today.as_str() => t.done_on = Some(v.into()),
             "milestone" => t.milestone = on(v).then_some(true),
             "countdown" => t.countdown = on(v).then_some(true),
             "postpone" => t.auto_postpone = Some(on(v)),

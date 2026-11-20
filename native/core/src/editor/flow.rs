@@ -183,6 +183,17 @@ impl Editor {
         }
     }
 
+    /// A preset chosen in 分组 (GitHub #14: 生日、工作、还款、纪念日): made now when no group has
+    /// that name yet (saved at once, like the new-group box's), and picked for the draft.
+    pub fn pick_preset(&mut self, doc: &Doc, key: &str) -> Option<Edit> {
+        self.draft.as_ref()?;
+        let (id, edit) = crate::tasks::preset_group(doc, key)?;
+        if let Some(t) = self.draft.as_mut() {
+            t.group_id = Some(id);
+        }
+        Some(edit)
+    }
+
     /// The new-group box's 创建: the group is saved at once and picked for the draft.
     pub fn create_group(&mut self, doc: &Doc, name: &str) -> Option<Edit> {
         let name = name.trim();

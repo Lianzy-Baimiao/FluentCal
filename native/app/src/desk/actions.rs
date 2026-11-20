@@ -167,8 +167,13 @@ impl App {
         }
         self.history.boundary();
         self.desk.window.set_quick_add_text("".into());
-        let (edit, _) = tasks::add_task(&self.doc, Task { title: title.clone(), start: date.clone(), ..Default::default() }, None, now_ms());
+        // (while the calendar shows one group only, the task is one of that group)
+        let group_id = self.desk_new_task_group();
+        let (edit, _) = tasks::add_task(&self.doc, Task { title: title.clone(), start: date.clone(), group_id: group_id.clone(), ..Default::default() }, None, now_ms());
         self.apply(edit, true);
+        if self.desk_filter_told(&title, group_id.as_deref()) {
+            return;
+        }
         // Stays open for the next entry; tell when the new task went behind "+N".
         if let Some(n) = self.desk_overflow_on(&date).filter(|n| *n > 0) {
             self.notify(&trf("已添加“{0}”（点 +{1} 查看）", &[format!("{}", title), format!("{}", n)]), false);
@@ -184,9 +189,11 @@ impl App {
         }
         self.history.boundary();
         let kind = if zone == "month" { fluentcal_core::flex::MONTH } else { fluentcal_core::flex::SOMEDAY };
-        let p = fluentcal_core::flex::new_task(kind, title, &self.today());
+        let group_id = self.desk_new_task_group();
+        let p = Task { group_id: group_id.clone(), ..fluentcal_core::flex::new_task(kind, title, &self.today()) };
         let (edit, _) = tasks::add_task(&self.doc, p, None, now_ms());
         self.apply(edit, true);
+        self.desk_filter_told(title, group_id.as_deref());
     }
 
     pub fn desk_side_set(&mut self, on: bool) {

@@ -4,6 +4,8 @@ use crate::app::{run, with};
 use crate::DeskWindow;
 
 pub fn wire(w: &DeskWindow) {
+    // the calendar of 修改完成日期 (its date helpers, lunar days and 休/班)
+    crate::fluent::install(w, "", Some(std::rc::Rc::new(crate::windows::editor::day_labels)));
     super::gantt::keys::wire(w);
     crate::group_delete::wire(w, crate::group_delete::Host::Desk);
     w.on_capacity_changed(|_| run(|a| a.desk_sync_capacity()));
@@ -36,6 +38,12 @@ pub fn wire(w: &DeskWindow) {
     w.on_side_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
     w.on_side_add(|z, t| run(move |a| a.desk_side_add(&z, &t)));
     w.on_side_set(|on| run(move |a| a.desk_side_set(on)));
+    w.on_side_press(|c, i, x, y| run(move |a| a.desk_side_press(&c, i, x, y)));
+    w.on_side_move(|x, y, i| run(move |a| a.desk_side_move(x, y, i)));
+    w.on_side_release(|i| run(move |a| a.desk_side_release(i)));
+    w.on_side_cancel(|| run(|a| drop(a.desk_side_drag_end())));
+    w.on_side_nudge(|i, d| run(move |a| a.desk_side_nudge(i, d)));
+    w.on_side_refocus(|k| run(move |a| a.desk_side_refocus(&k)));
     w.on_changes_toggle_open(|| run(|a| a.desk_changes()));
     w.on_changes_close(|| run(|a| a.desk_changes_close()));
     w.on_changes_revert(|id| run(move |a| a.desk_changes_toggle(id)));
@@ -58,6 +66,12 @@ pub fn wire(w: &DeskWindow) {
     w.on_day_list_add(|t| run(move |a| a.desk_day_list_add(&t)));
     w.on_day_list_closed(|| run(|a| a.desk_day_list_closed()));
     w.on_ym_pick(|y, m| run(move |a| a.desk_ym_pick(y, m)));
+    w.on_done_day_picked(|d| run(move |a| a.desk_done_day_picked(&d)));
+    w.on_filter_open(|x, y, bw, bh| run(move |a| a.desk_filter_open(super::popups::At::Below(x, y, bw, bh))));
+    w.on_filter_toggle(|id, on| run(move |a| a.desk_filter_toggle(&id, on)));
+    w.on_filter_clear(|| run(|a| a.desk_filter_clear()));
+    w.on_filter_manage(|| run(|a| a.desk_filter_manage()));
+    w.on_filter_closed(|| run(|a| a.desk_filter_closed()));
     w.on_search_changed(|| run(|a| a.desk_search_refresh()));
     w.on_search_go(|h| run(move |a| a.desk_search_go(&h.date)));
     w.on_search_open_task(|h| run(move |a| a.open_editor_task(&h.task_id, Some(h.date.to_string()))));

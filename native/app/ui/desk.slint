@@ -10,12 +10,13 @@ import { Overlay, OverlayRoot, Tip, TipLayer, Flyout, DialogHost, DialogBody, Pl
 import { Menu, MenuEntry } from "menu.slint";
 import { InfoBar, Severity } from "cards.slint";
 import { DialogFooter } from "dialog.slint";
-import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData, ChangesPanel, ChangeRowData } from "desk_overlays.slint";
+import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData, ChangesPanel, ChangeRowData, GroupFilterPanel, FilterRowData } from "desk_overlays.slint";
 import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
 import { SidePanel, SideHandle, SideRowData } from "desk_side.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
+import { CalendarView } from "inputs.slint";
 import { Swatch } from "theme.slint";
-export { MenuEntry, SearchHitData, ChangeRowData }
+export { MenuEntry, SearchHitData, ChangeRowData, FilterRowData }
 export { ChipData, ListRowData, SideRowData }
 
 // The day grid has the keyboard (0.2: a focused .cell): the selected day's cell keeps the
@@ -532,6 +533,11 @@ component TitleBar inherits Rectangle {
     in property <bool> sync-failed;
     in property <string> sync-tip;
     in property <string> today-tip;
+    // 按分组筛选 (GitHub #14): on while some groups' tasks are hidden; the tip then says which
+    // are shown.
+    in property <bool> filter-on;
+    in property <string> filter-tip;
+    callback filter(length, length, length, length);
     // The sync icon's turn, one path per frame (src/spin.rs); empty: no spinning.
     in property <[string]> spin-frames;
     callback pick-month(length, length, length, length);
@@ -551,9 +557,17 @@ component TitleBar inherits Rectangle {
     // (four choices since the list view, 170px) with search, lock and more needs 300px; 今天 and
     // 设置 (and 同步) are the first to go when it gets narrow, as in 0.2.
     property <length> room: root.width - 6px - left.preferred-width;
-    property <bool> mid: room > 300px;
+    // The group filter's button stands after the view switch when there is room for it (it is
+    // in the ⋯ menu too; not in the Gantt chart, which has its own 只显示分组). While it filters
+    // it is always there, so that hidden tasks aren't overlooked: the view switch goes sooner
+    // then, and at the narrowest it takes the search button's place (搜索 is in ⋯, and Ctrl+F).
+    property <bool> can-filter: root.view != "gantt";
+    property <length> filter-room: can-filter && root.filter-on ? 34px : 0;
+    property <bool> mid: room > 300px + filter-room;
+    property <bool> show-filter: can-filter && (root.filter-on || room > 300px + 34px);
+    property <bool> show-search: filter-room == 0 || room > 102px + 34px;
     // 最近更改 comes with them (it is in the ⋯ menu too)
-    property <bool> wide: room > 300px + 52px + 34px + 34px + (root.sync-enabled ? 34px : 0);
+    property <bool> wide: room > 300px + (can-filter ? 34px : 0) + 52px + 34px + 34px + (root.sync-enabled ? 34px : 0);
     property <float> fs: Theme.desk.fs;
     height: 36px;
     TouchArea {
@@ -665,7 +679,19 @@ component TitleBar inherits Rectangle {
                 selected(v) => { root.set-view(v); }
             }
             if mid: Rectangle { width: 2px; }
-            Button {
+            if show-filter: filter-btn := Button {
+                variant: ButtonVariant.subtle;
+                size: ButtonSize.icon;
+                icon: Glyph.filter;
+                // red, on a tinted ground, while some tasks are hidden
+                color-override: root.filter-on ? Theme.c.critical : transparent;
+                pressed-state: root.filter-on;
+                accessible-label: root.filter-tip != "" ? root.filter-tip : @tr("按分组筛选");
+                tip: self.accessible-label;
+                tip-bottom: true;
+                clicked => { root.filter(filter-btn.absolute-position.x, filter-btn.absolute-position.y, filter-btn.width, filter-btn.height); }
+            }
+            if show-search: Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.search;
@@ -923,6 +949,17 @@ export component DeskWindow inherits Window {
     callback side-menu(ChipData, length, length);
     callback side-add(string, string);
     callback side-set(bool);
+    // its order by hand: a to-do dragged to another place in its part (the ghost is drag-*)
+    in property <string> side-drag-key;
+    in property <int> side-drop-row: -1;
+    in property <int> side-focus-row: -1;
+    in property <int> side-focus-tick;
+    callback side-press(ChipData, int, length, length);
+    callback side-move(length, length, int);
+    callback side-release(int);
+    callback side-cancel();
+    callback side-nudge(int, int);
+    callback side-refocus(string);
     // 最近更改
     in property <bool> changes-open;
     in property <[ChangeRowData]> changes;
@@ -972,9 +1009,33 @@ export component DeskWindow inherits Window {
     in-out property <int> ym-year;
     in property <string> ym-cursor;
     in property <string> ym-now;
+    in property <int> ym-now-year;
     callback ym-pick(int, int);
     public function open-ym(x: length, y: length, w: length, h: length) { ym-fly.open-at(x, y, w, h); }
     public function close-ym() { ym-fly.close(); }
+    // 修改完成日期 (GitHub #15): a calendar on the day a done task was ticked; `done-day-max`
+    // is today (nothing was done later than that).
+    in property <string> done-day;
+    in property <string> done-day-max;
+    in property <string> done-day-title;
+    in property <int> done-day-first: 1;
+    callback done-day-picked(string);
+    public function open-done-day(x: length, y: length, w: length, h: length) { done-fly.open-at(x, y, w, h); }
+    public function close-done-day() { done-fly.close(); }
+    // 按分组筛选 (GitHub #14): the calendar shows the ticked groups' tasks only (`filter-on`);
+    // Rust fills the list while it is open.
+    in property <bool> filter-on;
+    in property <string> filter-tip;
+    in property <[FilterRowData]> filter-rows;
+    in property <string> filter-all-count;
+    in property <string> filter-hint;
+    callback filter-open(length, length, length, length);
+    callback filter-toggle(string, bool);
+    callback filter-clear();
+    callback filter-manage();
+    callback filter-closed();
+    public function open-filter(x: length, y: length, w: length, h: length) { filter-fly.open-at(x, y, w, h); }
+    public function close-filter() { filter-fly.close(); }
     // Task search.
     in property <bool> search-open;
     in-out property <string> search-query;
@@ -1008,7 +1069,7 @@ export component DeskWindow inherits Window {
     callback onboarded();
     callback notice-closed();
     // A menu or flyout is open (Rust then watches for presses outside the window).
-    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open;
+    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open;
     callback popups-changed(bool);
     changed any-popup => { root.popups-changed(self.any-popup); }
     title: "FluentCal";
@@ -1062,6 +1123,9 @@ export component DeskWindow inherits Window {
                     sync-tip: root.sync-tip;
                     spin-frames: root.spin-frames;
                     today-tip: root.today-tip;
+                    filter-on: root.filter-on;
+                    filter-tip: root.filter-tip;
+                    filter(x, y, w, h) => { root.filter-open(x, y, w, h); }
                     page(d) => { root.page(d); }
                     go-today => { root.go-today(); }
                     set-view(v) => { root.set-view(v); }
@@ -1153,6 +1217,16 @@ export component DeskWindow inherits Window {
                     open(c) => { root.side-open-task(c); }
                     menu(c, x, y) => { root.side-menu(c, x, y); }
                     add(z, t) => { root.side-add(z, t); }
+                    drag-key: root.side-drag-key;
+                    drop-row: root.side-drop-row;
+                    focus-row: root.side-focus-row;
+                    focus-tick: root.side-focus-tick;
+                    item-press(c, i, x, y) => { root.side-press(c, i, x, y); }
+                    item-move(x, y, i) => { root.side-move(x, y, i); }
+                    item-release(i) => { root.side-release(i); }
+                    item-cancel => { root.side-cancel(); }
+                    item-nudge(i, d) => { root.side-nudge(i, d); }
+                    item-moved-away(k) => { root.side-refocus(k); }
                     wants-keyboard => { root.wants-keyboard(); }
                     leave-focus => { root.focus-root(); }
                 }
@@ -1352,7 +1426,55 @@ export component DeskWindow inherits Window {
                 year <=> root.ym-year;
                 cursor: root.ym-cursor;
                 now: root.ym-now;
+                now-year: root.ym-now-year;
                 pick(y, m) => { ym-fly.close(); root.ym-pick(y, m); }
+            }
+        }
+        done-fly := Flyout {
+            padded: false;
+            // (the calendar with lunar days, and the panel's border)
+            panel-width: 316px + 2px;
+            label: @tr("修改完成日期");
+            VerticalLayout {
+                padding-top: 8px;
+                // (in line with the calendar's title: 4px margin, 8px inside its button)
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    Text {
+                        text: root.done-day-title;
+                        font-size: 12px;
+                        color: Theme.c.text-secondary;
+                        overflow: elide;
+                    }
+                }
+                CalendarView {
+                    selected: root.done-day;
+                    last-day: root.done-day-max;
+                    first-day: root.done-day-first;
+                    lunar: true;
+                    markers: true;
+                    title-ring: true;
+                    picked(d) => {
+                        done-fly.close();
+                        root.done-day-picked(d);
+                    }
+                }
+            }
+        }
+        filter-fly := Flyout {
+            padded: false;
+            panel-width: 244px;
+            label: @tr("按分组筛选");
+            closed => { root.filter-closed(); }
+            GroupFilterPanel {
+                rows: root.filter-rows;
+                all: !root.filter-on;
+                all-count: root.filter-all-count;
+                hint: root.filter-hint;
+                toggle(id, on) => { root.filter-toggle(id, on); }
+                clear => { root.filter-clear(); }
+                manage => { root.filter-manage(); }
             }
         }
         confirm := DialogHost {

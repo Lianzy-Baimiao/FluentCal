@@ -261,6 +261,10 @@ fn main() {
         player.tick(16);
         // creates what the overlay shows under `if`, so its transitions start now
         let _ = render(&sw, size);
+        // what is done in the overlay once it is open (`after`: events like `events`)
+        if let Some(events) = scenario.get("after").and_then(Value::as_array) {
+            player.play(events);
+        }
     } else if let Some(events) = scenario.get("events").and_then(Value::as_array) {
         player.play(events);
     }

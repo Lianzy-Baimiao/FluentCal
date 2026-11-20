@@ -36,6 +36,8 @@ impl App {
         } else if is(text, Key::Escape) {
             if self.desk.drag.is_some() {
                 self.desk_drag_end();
+            } else if self.desk.side_drag.is_some() {
+                self.desk_side_drag_end();
             } else {
                 self.desk_set_grid_focus(false);
             }

@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
     sidebarMode: 'inline',
     barDays: true,
     barProgress: true,
+    barDone: true,
     weeksRows: 5,
     weeksPast: 1,
     showLunar: true,

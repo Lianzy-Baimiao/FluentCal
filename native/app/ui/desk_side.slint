@@ -25,9 +25,38 @@ component SideItem inherits Rectangle {
     in property <ChipData> chip;
     in property <string> tag;
     in property <bool> read-only;
+    // being dragged to another place in its part
+    in property <bool> dragging;
+    // not 0, and changed: this row takes the focus (the to-do that had it is in this row now)
+    in property <int> focus-token;
     callback toggle();
     callback open();
     callback menu(length, length);
+    // the left button on it: down, moved while down, up (window coordinates), taken away
+    callback press(length, length);
+    callback drag-move(length, length);
+    callback release(length, length);
+    callback cancel();
+    // Alt+↑ / Alt+↓: one place up (-1) or down (1)
+    callback nudge(int);
+    // The rows are rewritten in place when the list changes (its order by hand, an undo, a
+    // sync): the keys would be with whichever to-do is in this row now, and Delete would take
+    // that one. The focus goes with the to-do: this row says which one it had.
+    callback moved-away(string);
+    property <string> shown-key: chip.key;
+    property <string> held-key;
+    changed shown-key => {
+        if kfs.has-focus && root.held-key != "" && root.held-key != root.shown-key {
+            root.moved-away(root.held-key);
+        }
+        root.held-key = kfs.has-focus ? root.shown-key : "";
+    }
+    changed focus-token => {
+        if self.focus-token != 0 {
+            kfs.focus();
+        }
+    }
+    opacity: root.dragging ? 0.4 : 1;
     property <float> fs: Theme.desk.fs;
     property <int> tip-token: -1;
     border-radius: 4px;
@@ -37,6 +66,7 @@ component SideItem inherits Rectangle {
     accessible-description: tag;
     kfs := FocusScope {
         focus-on-click: false;
+        changed has-focus => { root.held-key = self.has-focus ? root.shown-key : ""; }
         key-pressed(e) => {
             if e.text == Key.Return {
                 root.open();
@@ -52,6 +82,10 @@ component SideItem inherits Rectangle {
             }
             if e.text == Key.Menu || (e.modifiers.shift && e.text == Key.F10) {
                 ChipKeys.menu(root.chip, root.absolute-position.x, root.absolute-position.y, root.width, root.height);
+                return accept;
+            }
+            if e.modifiers.alt && (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                if !root.read-only { root.nudge(e.text == Key.UpArrow ? -1 : 1); }
                 return accept;
             }
             reject
@@ -74,8 +108,14 @@ component SideItem inherits Rectangle {
                 Tip.leave(root.tip-token);
                 Overlay.keyboard = false;
                 kfs.focus();
+                root.press(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.button == PointerEventButton.left && e.kind == PointerEventKind.up {
+                root.release(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y);
+            } else if e.kind == PointerEventKind.cancel {
+                root.cancel();
             }
         }
+        moved => { root.drag-move(root.absolute-position.x + self.mouse-x, root.absolute-position.y + self.mouse-y); }
     }
     HorizontalLayout {
         padding-left: 4px;
@@ -262,8 +302,47 @@ export component SidePanel inherits Rectangle {
     callback add(string, string);
     callback wants-keyboard();
     callback leave-focus();
+    // The order by hand: a to-do is dragged to another place in its part. `drag-key`: the one
+    // being dragged; `drop-row`: the row the line is drawn above, where it would go (-1: it
+    // stays). Rust decides both: a to-do stays in its part.
+    in property <string> drag-key;
+    in property <int> drop-row: -1;
+    // the row that takes the focus when the tick changes: where the to-do that had it is now
+    in property <int> focus-row: -1;
+    in property <int> focus-tick;
+    // the focused row shows another to-do now: (the key of the one it had)
+    callback item-moved-away(string);
+    // (the to-do, its row, x, y)
+    callback item-press(ChipData, int, length, length);
+    // (x, y, the row whose top edge is nearest: -1 beside the column)
+    callback item-move(length, length, int);
+    callback item-release(int);
+    callback item-cancel();
+    // (its row, -1 up | 1 down)
+    callback item-nudge(int, int);
     property <float> fs: Theme.desk.fs;
     property <length> rh: round(24 * fs) * 1px;
+    // where the pointer is while a to-do is dragged (window coordinates)
+    property <length> drag-x;
+    property <length> drag-y;
+    // Near the top or the bottom edge, a list longer than the column scrolls under the to-do.
+    property <int> scroll-dir: root.drag-key == "" || flick.content-height <= flick.height ? 0
+        : root.drag-y < flick.absolute-position.y + rh / 2 && flick.content-y < 0 ? -1
+        : root.drag-y > flick.absolute-position.y + flick.height - rh / 2 && flick.content-y > flick.height - flick.content-height ? 1 : 0;
+    pure function row-at(x: length, y: length) -> int {
+        if x < root.absolute-position.x - 24px || x > root.absolute-position.x + root.width + 24px {
+            return -1;
+        }
+        return clamp(round((y - flick.absolute-position.y - flick.content-y) / rh), 0, root.rows.length);
+    }
+    Timer {
+        interval: 40ms;
+        running: root.scroll-dir != 0;
+        triggered => {
+            flick.content-y = clamp(flick.content-y - root.scroll-dir * rh / 2, flick.height - flick.content-height, 0px);
+            root.item-move(root.drag-x, root.drag-y, root.row-at(root.drag-x, root.drag-y));
+        }
+    }
     border-radius: Theme.desk.radius;
     background: floating ? Theme.c.solid-base : Theme.desk.cell-bg;
     border-width: floating ? 1px : 0;
@@ -307,10 +386,35 @@ export component SidePanel inherits Rectangle {
                 chip: r.chip;
                 tag: r.tag;
                 read-only: root.read-only;
+                dragging: root.drag-key != "" && r.chip.key == root.drag-key;
+                focus-token: root.focus-row == i ? root.focus-tick : 0;
                 toggle => { root.toggle(r.chip); }
                 open => { root.open(r.chip); }
                 menu(x, y) => { root.menu(r.chip, x, y); }
+                press(x, y) => {
+                    root.drag-x = x;
+                    root.drag-y = y;
+                    root.item-press(r.chip, i, x, y);
+                }
+                drag-move(x, y) => {
+                    root.drag-x = x;
+                    root.drag-y = y;
+                    root.item-move(x, y, root.row-at(x, y));
+                }
+                release(x, y) => { root.item-release(root.row-at(x, y)); }
+                cancel => { root.item-cancel(); }
+                nudge(d) => { root.item-nudge(i, d); }
+                moved-away(k) => { root.item-moved-away(k); }
             }
+        }
+        // where the dragged to-do goes
+        if root.drop-row >= 0: Rectangle {
+            x: 2px;
+            y: root.drop-row * rh - 1px;
+            width: flick.width - 4px;
+            height: 2px;
+            border-radius: 1px;
+            background: Theme.c.accent-fill;
         }
         SideAdd {
             x: 0;

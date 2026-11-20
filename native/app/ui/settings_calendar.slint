@@ -98,6 +98,12 @@ export component CalendarPage inherits VerticalLayout {
             Toggle { checked: SetState.calendar.bar-progress; toggled(v) => { SetState.set-bool("calendar.barProgress", v); } }
         }
         SettingsCard {
+            icon: Glyph.completed;
+            title: @tr("多日任务显示完成日期");
+            description: @tr("勾选完成后，横条的名称后显示“26.11.27完成”：勾选那天的日期；取消勾选就清除。右键任务可以修改完成日期");
+            Toggle { checked: SetState.calendar.bar-done; toggled(v) => { SetState.set-bool("calendar.barDone", v); } }
+        }
+        SettingsCard {
             icon: Glyph.list;
             title: @tr("多周视图");
             description: @tr("显示的周数，以及其中已经过去的周数；日历每周自动向后滚动");

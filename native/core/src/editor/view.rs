@@ -38,6 +38,8 @@ pub struct View {
     /// "共 5 天 · 农历九月初三" (EditorApp spanText).
     pub span: String,
     pub show_progress: bool,
+    /// The day it was ticked done ("" = not done, or done before the day was kept).
+    pub done_on: String,
     /// A to-do without a day: what it is instead of dates ("每月一次（不定日）"); "" otherwise.
     pub flex: String,
     pub show_postpone: bool,
@@ -113,10 +115,13 @@ impl Editor {
         let mut gs: Vec<_> = doc.groups.values().collect();
         gs.sort_by(|a, b| a.order.partial_cmp(&b.order).unwrap_or(std::cmp::Ordering::Equal));
         groups.extend(gs.into_iter().map(|g| opt(g.id.clone(), g.name.clone())));
+        // the presets that aren't there yet (GitHub #14): made when first chosen
+        groups.extend(crate::tasks::open_presets(doc).into_iter().map(|(key, name)| opt(format!("{}{key}", crate::tasks::PRESET_PREFIX), name)));
         groups.push(opt("__new__", tr("新建分组…")));
         View {
             span: trf("{0}农历{1}", &[format!("{}", if t.is_milestone() || n == 1 { String::new() } else { trf("共 {0} 天 · ", &[n.to_string()]) }), format!("{}", lunar)]),
             show_progress: rule.is_none() && t.flex.is_none(),
+            done_on: t.done_on.clone().filter(|_| t.done && rule.is_none() && t.flex.is_none()).unwrap_or_default(),
             show_postpone: rule.is_none() && t.start == t.end && t.flex.is_none(),
             flex: crate::flex::describe(t).to_owned(),
             postpone: t.auto_postpone.unwrap_or(doc.settings.tasks.auto_postpone),

@@ -26,7 +26,7 @@ pub struct EditorWin {
 }
 
 /// Lunar text and 休/班 for the date pickers (EditorApp lunarOf / markerOf).
-fn day_labels(iso: &str) -> (String, String) {
+pub(crate) fn day_labels(iso: &str) -> (String, String) {
     let i = fluentcal_core::lunar::display_info(iso);
     let marker = i.legal.map(|l| if l.work { tr("班") } else { tr("休") }).unwrap_or_default();
     (i.text, marker.into())
@@ -43,7 +43,9 @@ pub fn make(today: &str) -> Result<EditorWindow, slint::PlatformError> {
 impl App {
     /// New task, optionally starting on `start`.
     pub fn open_editor_new(&mut self, start: Option<String>) {
-        self.open_editor(Payload::new_on(start));
+        // (while the calendar shows one group only, a new task starts in that group: #14)
+        let group_id = self.desk_new_task_group();
+        self.open_editor(Payload::New { start, end: None, group_id, title: None, milestone: None });
     }
 
     /// Edit a task; `date`: the occurrence clicked (repeating tasks).

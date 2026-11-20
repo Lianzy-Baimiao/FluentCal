@@ -188,3 +188,297 @@ fn merge_edit_keeps_changes_made_elsewhere() {
     assert_eq!(m2.notes, None);
     assert_eq!(m2.end, m2.start);
 }
+
+/// 10:00 on a day, local time.
+fn at(day: &str) -> i64 {
+    fluentcal_core::date::local_ms(day, 600, fluentcal_core::date::utc_offset_minutes())
+}
+
+// GitHub #15
+#[test]
+fn the_day_a_task_was_ticked_done_is_kept() {
+    let visit = Task { end: "2026-11-25".into(), ..mk("visit", "2026-11-23") };
+    let mut doc = doc_with(vec![visit], vec![]);
+    let tick = |doc: &mut Doc, done: bool, day: &str| {
+        let e = set_occurrence_done(doc, &doc.tasks["visit"].clone(), "2026-11-23", done, at(day));
+        apply(doc, &e);
+    };
+    // ticked two days after it ended: that day, not one of its own
+    tick(&mut doc, true, "2026-11-27");
+    assert_eq!(doc.tasks["visit"].done_on.as_deref(), Some("2026-11-27"));
+    assert_eq!(done_day(&doc.tasks["visit"], "2026-11-23"), Some("2026-11-27"));
+    assert_eq!(doc.tasks["visit"].to_value()["doneOn"], "2026-11-27");
+    // other edits leave it alone (a colour the next day, a move)
+    let e = set_color(&doc, &doc.tasks["visit"].clone(), "red", at("2026-11-28"));
+    apply(&mut doc, &e);
+    let e = move_task(&doc, &doc.tasks["visit"].clone(), "2026-11-24", at("2026-11-28"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["visit"].done_on.as_deref(), Some("2026-11-27"));
+    // corrected by hand
+    let e = set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "2026-11-25", at("2026-11-28"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["visit"].done_on.as_deref(), Some("2026-11-25"));
+    assert!(set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "2026-11-25", at("2026-11-28")).is_empty(), "the same day: nothing to write");
+    // nothing was done on a day that has not come; today itself is fine
+    assert!(set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "2026-11-29", at("2026-11-28")).is_empty());
+    assert!(set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "11月25日", at("2026-11-28")).is_empty(), "not a day at all");
+    assert!(!set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "2026-11-28", at("2026-11-28")).is_empty());
+    // unticked: gone; ticked again: the new day, whatever was set by hand
+    tick(&mut doc, false, "2026-11-29");
+    assert_eq!(doc.tasks["visit"].done_on, None);
+    assert_eq!(doc.tasks["visit"].to_value().get("doneOn"), None, "not written at all");
+    assert_eq!(done_day(&doc.tasks["visit"], "2026-11-24"), None);
+    assert!(set_done_day(&doc, &doc.tasks["visit"].clone(), "2026-11-24", "2026-11-25", at("2026-11-29")).is_empty(), "not done: no day to correct");
+    tick(&mut doc, true, "2026-11-30");
+    assert_eq!(doc.tasks["visit"].done_on.as_deref(), Some("2026-11-30"));
+    // progress: below 100 % is an untick, 100 % a tick
+    let e = set_progress(&doc, &doc.tasks["visit"].clone(), 60.0, at("2026-12-01"));
+    apply(&mut doc, &e);
+    assert_eq!((doc.tasks["visit"].done, doc.tasks["visit"].done_on.clone()), (false, None));
+    let e = set_progress(&doc, &doc.tasks["visit"].clone(), 100.0, at("2026-12-02"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["visit"].done_on.as_deref(), Some("2026-12-02"));
+}
+
+#[test]
+fn a_task_done_before_the_day_was_kept_has_none() {
+    let old = Task { done: true, progress: 100.0, ..mk("old", "2026-10-01") };
+    let mut doc = doc_with(vec![old], vec![]);
+    let e = set_color(&doc, &doc.tasks["old"].clone(), "teal", at("2026-11-27"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["old"].done_on, None, "not made up");
+    assert_eq!(done_day(&doc.tasks["old"], "2026-10-01"), None);
+    // … until the user says when
+    let e = set_done_day(&doc, &doc.tasks["old"].clone(), "2026-10-01", "2026-10-02", at("2026-11-27"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["old"].done_on.as_deref(), Some("2026-10-02"));
+    // a copy was done when the task was; a new task made done is done today, or when it says
+    let (_, copy) = duplicate_task(&doc, &doc.tasks["old"].clone(), at("2026-11-28"));
+    assert_eq!((copy.done, copy.done_on.as_deref()), (true, Some("2026-10-02")));
+    let (_, new) = add_task(&doc, Task { done: true, ..mk("", "2026-11-20") }, None, at("2026-11-28"));
+    assert_eq!(new.done_on.as_deref(), Some("2026-11-28"));
+    let (_, named) = add_task(&doc, Task { done: true, done_on: Some("2026-11-21".into()), ..mk("", "2026-11-20") }, None, at("2026-11-28"));
+    assert_eq!(named.done_on.as_deref(), Some("2026-11-21"));
+    // a day on a task that isn't done means nothing: dropped
+    let (_, open) = add_task(&doc, Task { done_on: Some("2026-11-21".into()), ..mk("", "2026-11-20") }, None, at("2026-11-28"));
+    assert_eq!(open.done_on, None);
+    // a version that doesn't know the field unticked the task (the day it left behind is
+    // stale): ticking it here is a new day
+    let stale = Task { done: false, done_on: Some("2026-10-02".into()), ..doc.tasks["old"].clone() };
+    doc.tasks.insert("old".into(), stale);
+    let e = set_occurrence_done(&doc, &doc.tasks["old"].clone(), "2026-10-01", true, at("2026-11-29"));
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["old"].done_on.as_deref(), Some("2026-11-29"));
+}
+
+#[test]
+fn a_repeating_task_keeps_the_day_of_each_time() {
+    let weekly = Task { repeat: Some(RepeatRule { freq: Some(Freq::Weekly), ..Default::default() }), end: "2026-11-03".into(), ..mk("w", "2026-11-02") };
+    let mut doc = doc_with(vec![weekly], vec![]);
+    let tick = |doc: &mut Doc, date: &str, done: bool, day: &str| {
+        let e = set_occurrence_done(doc, &doc.tasks["w"].clone(), date, done, at(day));
+        apply(doc, &e);
+    };
+    tick(&mut doc, "2026-11-02", true, "2026-11-04");
+    tick(&mut doc, "2026-11-09", true, "2026-11-09");
+    let w = doc.tasks["w"].clone();
+    assert_eq!((done_day(&w, "2026-11-02"), done_day(&w, "2026-11-09"), done_day(&w, "2026-11-16")), (Some("2026-11-04"), Some("2026-11-09"), None));
+    assert_eq!((w.done, w.done_on.clone()), (false, None), "the series itself is never done");
+    // by hand, for one of them; one that isn't done has no day to correct
+    let e = set_done_day(&doc, &w, "2026-11-02", "2026-11-03", at("2026-11-10"));
+    apply(&mut doc, &e);
+    assert_eq!(done_day(&doc.tasks["w"], "2026-11-02"), Some("2026-11-03"));
+    assert!(set_done_day(&doc, &doc.tasks["w"].clone(), "2026-11-16", "2026-11-16", at("2026-11-10")).is_empty());
+    // unticking one forgets its day only
+    tick(&mut doc, "2026-11-02", false, "2026-11-11");
+    let w = doc.tasks["w"].clone();
+    assert_eq!((done_day(&w, "2026-11-02"), done_day(&w, "2026-11-09")), (None, Some("2026-11-09")));
+    assert_eq!(w.to_value()["doneOnDates"], serde_json::json!({ "2026-11-09": "2026-11-09" }));
+    // an occurrence ticked before the days were kept has none, and ticking another leaves it so
+    let mut before = w.clone();
+    before.done_dates.as_mut().unwrap().push("2026-11-16".into());
+    doc.tasks.insert("w".into(), before);
+    tick(&mut doc, "2026-11-23", true, "2026-11-24");
+    let w = doc.tasks["w"].clone();
+    assert_eq!((done_day(&w, "2026-11-16"), done_day(&w, "2026-11-23")), (None, Some("2026-11-24")));
+    // a copy has the same times done, on the days the task has them: a day that isn't known is
+    // not made up for the copy either
+    let (_, copy) = duplicate_task(&doc, &w, at("2026-11-25"));
+    assert_eq!(copy.done_dates, w.done_dates);
+    assert_eq!((done_day(&copy, "2026-11-09"), done_day(&copy, "2026-11-16"), done_day(&copy, "2026-11-23")), (Some("2026-11-09"), None, Some("2026-11-24")));
+    // dragged out of the series: the task it becomes was done when the occurrence was
+    let occ = occurrence_on(&doc.tasks["w"], "2026-11-09").unwrap();
+    let e = move_occurrence(&doc, &occ, "2026-11-12", at("2026-11-26"));
+    apply(&mut doc, &e);
+    let copy = doc.tasks.values().find(|t| t.id != "w").unwrap();
+    assert_eq!((copy.done, copy.done_on.as_deref(), copy.done_on_dates.is_none()), (true, Some("2026-11-09"), true));
+    let occ = occurrence_on(&doc.tasks["w"], "2026-11-16").unwrap();
+    let e = move_occurrence(&doc, &occ, "2026-11-18", at("2026-11-26"));
+    let copy: Task = serde_json::from_value(e.items[1].2.clone().unwrap()).unwrap();
+    assert_eq!((copy.done, copy.done_on), (true, None), "not known for the occurrence: not made up for the task");
+}
+
+#[test]
+fn todos_without_a_day_keep_their_own_record_of_the_day() {
+    let today = fluentcal_core::date::today();
+    let month = Task { flex: Some("month".into()), ..mk("m", "2026-10-01") };
+    let mut doc = doc_with(vec![month], vec![]);
+    let slot = fluentcal_core::flex::month_slot(&today);
+    let e = set_occurrence_done(&doc, &doc.tasks["m"].clone(), &slot, true, at(&today));
+    apply(&mut doc, &e);
+    let m = doc.tasks["m"].clone();
+    assert_eq!(done_day(&m, &slot), Some(today.as_str()));
+    assert_eq!((m.done_on.clone(), m.done_on_dates.clone()), (None, None), "flexDone is the record");
+    // the day corrected through the slot (the column) and through the day (the calendar)
+    let first = fluentcal_core::date::start_of_month(&today);
+    let e = set_done_day(&doc, &m, &slot, &first, at(&today));
+    apply(&mut doc, &e);
+    assert_eq!(done_day(&doc.tasks["m"], &slot), Some(first.as_str()));
+    let second = fluentcal_core::date::add_days(&first, 1);
+    // (on the 1st the 2nd has not come: the clock is put a day on for this one)
+    let e = set_done_day(&doc, &doc.tasks["m"].clone(), &first, &second, at(&today).max(at(&second)));
+    apply(&mut doc, &e);
+    assert_eq!((done_day(&doc.tasks["m"], &slot), done_day(&doc.tasks["m"], &second), done_day(&doc.tasks["m"], &first)), (Some(second.as_str()), Some(second.as_str()), None));
+    // an open slot has no day to correct
+    assert!(set_done_day(&doc, &doc.tasks["m"].clone(), "m:2026-09", "2026-09-05", at(&today)).is_empty());
+}
+
+// GitHub #14
+#[test]
+fn preset_groups_are_made_when_first_chosen() {
+    let mut doc = doc_with(vec![mk("a", "2026-11-20"), mk("b", "2026-11-21")], vec![Group { id: "g1".into(), name: "工作".into(), color: "teal".into(), order: 1.0, ..Default::default() }]);
+    // offered: the ones no group has the name of
+    assert_eq!(open_presets(&doc).iter().map(|(k, _)| *k).collect::<Vec<_>>(), ["生日", "还款", "纪念日"]);
+    // a task put in one: the group is made with it, in one edit
+    let e = set_group(&doc, &doc.tasks["a"].clone(), Some("__preset__:生日"), 5000);
+    assert_eq!(e.items.iter().map(|(c, _, _)| c.as_str()).collect::<Vec<_>>(), ["groups", "tasks"]);
+    apply(&mut doc, &e);
+    let birthday = doc.groups.values().find(|g| g.name == "生日").expect("made").clone();
+    assert_eq!((birthday.color.as_str(), birthday.order), ("pink", 2.0));
+    assert_eq!(doc.tasks["a"].group_id.as_deref(), Some(birthday.id.as_str()));
+    assert_eq!(open_presets(&doc).iter().map(|(k, _)| *k).collect::<Vec<_>>(), ["还款", "纪念日"]);
+    // chosen again (the entry was still on a menu): the same group, not a second one
+    let e = set_group(&doc, &doc.tasks["b"].clone(), Some("__preset__:生日"), 6000);
+    assert_eq!(e.items.len(), 1);
+    apply(&mut doc, &e);
+    assert_eq!((doc.groups.len(), doc.tasks["b"].group_id.as_deref()), (2, Some(birthday.id.as_str())));
+    // the one a group of the user's has the name of is that group
+    let e = set_group(&doc, &doc.tasks["b"].clone(), Some("__preset__:工作"), 7000);
+    apply(&mut doc, &e);
+    assert_eq!((doc.groups.len(), doc.tasks["b"].group_id.as_deref()), (2, Some("g1")));
+    // an ordinary group, 未分组, the group it is in already, a preset there is none of
+    let e = set_group(&doc, &doc.tasks["b"].clone(), Some(birthday.id.as_str()), 8000);
+    apply(&mut doc, &e);
+    assert_eq!((doc.tasks["b"].group_id.as_deref(), doc.tasks["b"].updated_at), (Some(birthday.id.as_str()), 8000));
+    let e = set_group(&doc, &doc.tasks["b"].clone(), None, 9000);
+    apply(&mut doc, &e);
+    assert_eq!(doc.tasks["b"].group_id, None);
+    assert!(set_group(&doc, &doc.tasks["b"].clone(), None, 9500).is_empty());
+    assert!(set_group(&doc, &doc.tasks["b"].clone(), Some("__preset__:旅行"), 9500).is_empty());
+    // renamed, a preset is offered again
+    let renamed = Group { name: "家人生日".into(), ..birthday };
+    let e = save_group(&doc, renamed);
+    apply(&mut doc, &e);
+    assert_eq!(open_presets(&doc).iter().map(|(k, _)| *k).collect::<Vec<_>>(), ["生日", "还款", "纪念日"]);
+    // a group made while the calendar was in another language (or on another PC) is that preset
+    // here too: it isn't offered a second time under this language's name
+    for (id, name) in [("en", "Birthdays"), ("tw", "還款")] {
+        let e = save_group(&doc, Group { id: id.into(), name: name.into(), color: "gray".into(), order: 9.0, ..Default::default() });
+        apply(&mut doc, &e);
+    }
+    assert_eq!(open_presets(&doc).iter().map(|(k, _)| *k).collect::<Vec<_>>(), ["纪念日"]);
+    let groups = doc.groups.len();
+    let e = set_group(&doc, &doc.tasks["a"].clone(), Some("__preset__:还款"), 9800);
+    assert_eq!(e.items.len(), 1, "the task only: the group is there");
+    apply(&mut doc, &e);
+    assert_eq!((doc.groups.len(), doc.tasks["a"].group_id.as_deref()), (groups, Some("tw")));
+}
+
+// GitHub #7: the to-do column's order, by hand
+#[test]
+fn todo_column_is_ordered_by_hand() {
+    use fluentcal_core::flex;
+    let todo = |id: &str, kind: &str, order: f64| Task { id: id.into(), order, ..flex::new_task(kind, id, "2026-11-20") };
+    let mut doc = doc_with(
+        vec![todo("a", flex::SOMEDAY, 1.0), todo("b", flex::SOMEDAY, 2.0), todo("c", flex::SOMEDAY, 3.0), todo("d", flex::SOMEDAY, 4.0), todo("m1", flex::MONTH, 2.5), todo("m2", flex::MONTH, 9.0), mk("dated", "2026-11-20")],
+        vec![],
+    );
+    fn column(doc: &Doc) -> (String, String) {
+        let s = fluentcal_core::flex::side(doc.tasks.values(), "2026-11-20");
+        (s.someday.iter().map(|t| t.id.as_str()).collect::<Vec<_>>().join(" "), s.month.iter().map(|(t, _)| t.id.as_str()).collect::<Vec<_>>().join(" "))
+    }
+    // moves it, and says how many tasks were written
+    fn go(doc: &mut Doc, id: &str, after: Option<&str>, before: Option<&str>, now: i64) -> usize {
+        let e = reorder_flex(doc, id, after, before, now);
+        apply(doc, &e);
+        e.items.len()
+    }
+    assert_eq!(column(&doc), ("a b c d".to_owned(), "m1 m2".to_owned()));
+    // between two: a number between theirs, one task written
+    assert_eq!(go(&mut doc, "d", Some("a"), Some("b"), 5000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["d"].order, doc.tasks["d"].updated_at), ("a d b c", 1.5, 5000));
+    // to the front, to the end
+    assert_eq!(go(&mut doc, "c", None, Some("a"), 5000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["c"].order), ("c a d b", 0.0));
+    assert_eq!(go(&mut doc, "c", Some("b"), None, 5000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["c"].order), ("a d b c", 3.0));
+    assert_eq!(go(&mut doc, "a", Some("c"), None, 5000), 1);
+    assert_eq!(go(&mut doc, "a", None, Some("d"), 5000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["a"].order), ("a d b c", 0.5));
+    // where it is already: nothing is written
+    assert_eq!(go(&mut doc, "d", Some("a"), Some("b"), 6000), 0);
+    assert_eq!(go(&mut doc, "d", None, Some("b"), 6000), 0);
+    assert_eq!(go(&mut doc, "d", Some("a"), None, 6000), 0);
+    assert_eq!(go(&mut doc, "a", None, Some("d"), 6000), 0);
+    assert_eq!(go(&mut doc, "c", Some("b"), None, 6000), 0);
+    // not beside one of the other kind, a task with a day, or one that is gone; those don't move either
+    assert_eq!(go(&mut doc, "a", None, Some("m1"), 6000), 0);
+    assert_eq!(go(&mut doc, "a", Some("dated"), None, 6000), 0);
+    assert_eq!(go(&mut doc, "a", Some("gone"), Some("gone"), 6000), 0);
+    assert_eq!(go(&mut doc, "dated", None, Some("a"), 6000), 0);
+    assert_eq!(go(&mut doc, "gone", None, Some("a"), 6000), 0);
+    assert_eq!(column(&doc), ("a d b c".to_owned(), "m1 m2".to_owned()));
+    // each kind has its own order
+    assert_eq!(go(&mut doc, "m2", None, Some("m1"), 7000), 1);
+    assert_eq!((column(&doc), doc.tasks["m2"].order), (("a d b c".to_owned(), "m2 m1".to_owned()), 1.5));
+
+    // the ones the column doesn't show keep their places: `h` (done) stays behind `a`
+    let mut doc = doc_with(vec![todo("a", flex::SOMEDAY, 1.0), todo("h", flex::SOMEDAY, 2.0), todo("b", flex::SOMEDAY, 3.0), todo("c", flex::SOMEDAY, 4.0)], vec![]);
+    let mut hidden = doc.tasks["h"].clone();
+    flex::set_slot(&mut hidden, flex::SOMEDAY_SLOT, Some("2026-11-19"));
+    doc.tasks.insert("h".into(), hidden);
+    assert_eq!(column(&doc).0, "a b c");
+    assert_eq!(go(&mut doc, "c", Some("a"), Some("b"), 8000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["c"].order), ("a c b", 2.5), "between the hidden one and b");
+    assert_eq!(go(&mut doc, "b", None, Some("a"), 8000), 1);
+    assert_eq!(go(&mut doc, "b", Some("a"), Some("c"), 8000), 1);
+    assert_eq!((column(&doc).0.as_str(), doc.tasks["b"].order), ("a b c", 2.25));
+
+    // the same number (a copy has its original's; they are listed by id then): the ones behind
+    // it with that number are spread out with it
+    let mut doc = doc_with(vec![todo("x", flex::SOMEDAY, 5.0), todo("y", flex::SOMEDAY, 5.0), todo("z", flex::SOMEDAY, 5.0), todo("w", flex::SOMEDAY, 6.0)], vec![]);
+    assert_eq!(column(&doc).0, "x y z w");
+    assert_eq!(go(&mut doc, "z", Some("x"), Some("y"), 9000), 2, "z and y");
+    assert_eq!(column(&doc).0, "x z y w");
+    let n = |doc: &Doc, id: &str| doc.tasks[id].order;
+    assert!(n(&doc, "x") < n(&doc, "z") && n(&doc, "z") < n(&doc, "y") && n(&doc, "y") < n(&doc, "w"));
+    assert_eq!((n(&doc, "x"), n(&doc, "w"), doc.tasks["x"].updated_at, doc.tasks["y"].updated_at), (5.0, 6.0, 0, 9000));
+    // nothing behind them to stay under
+    let mut doc = doc_with(vec![todo("x", flex::SOMEDAY, 5.0), todo("y", flex::SOMEDAY, 5.0), todo("z", flex::SOMEDAY, 5.0)], vec![]);
+    assert_eq!(go(&mut doc, "z", None, Some("y"), 9000), 2);
+    assert_eq!((column(&doc).0.as_str(), n(&doc, "x"), n(&doc, "z"), n(&doc, "y")), ("x z y", 5.0, 6.0, 7.0));
+    assert_eq!(go(&mut doc, "y", None, Some("x"), 9000), 1);
+    assert_eq!((column(&doc).0.as_str(), n(&doc, "y")), ("y x z", 4.0));
+
+    // no number left between two: all are numbered anew
+    let next = f64::from_bits(1.0f64.to_bits() + 1);
+    let mut doc = doc_with(vec![todo("p", flex::SOMEDAY, 1.0), todo("q", flex::SOMEDAY, next), todo("r", flex::SOMEDAY, 8.0), todo("s", flex::SOMEDAY, 0.5)], vec![]);
+    assert_eq!(column(&doc).0, "s p q r");
+    assert_eq!(go(&mut doc, "r", Some("p"), Some("q"), 9500), 4);
+    assert_eq!(column(&doc).0, "s p r q");
+    assert_eq!((n(&doc, "s"), n(&doc, "p"), n(&doc, "r"), n(&doc, "q")), (1.0, 2.0, 3.0, 4.0));
+    // a new one still goes to the end
+    let (e, _) = add_task(&doc, flex::new_task(flex::SOMEDAY, "new", "2026-11-20"), None, 9600);
+    apply(&mut doc, &e);
+    assert!(column(&doc).0.starts_with("s p r q "));
+}

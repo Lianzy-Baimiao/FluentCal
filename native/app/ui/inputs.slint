@@ -629,7 +629,67 @@ export component Select {
         }
     }
 }
-// 0.2's FCalendarView: a month of days (lunar text and 休/班 when asked) or the 12 months.
+// The years of a calendar, four in a row, in a list that scrolls (the wheel, a drag): the way
+// to a year far away without paging there month by month (GitHub #16). It keeps `current`'s
+// row in the middle, when it opens and when its owner changes the year (the arrows, the keys).
+export component YearGrid inherits Rectangle {
+    in property <int> first: 1900;
+    in property <int> last: 2100;
+    // the year shown as chosen, and this year
+    in property <int> current;
+    in property <int> now;
+    in property <length> row-h: 40px;
+    callback picked(int);
+    property <length> step: row-h + 4px;
+    property <int> rows: ceil((last - first + 1) / 4);
+    property <length> content-h: rows * step - 4px;
+    property <length> cw: (self.width - 3 * 4px) / 4;
+    public function show(y: int) {
+        let top = floor((max(first, min(y, last)) - first) / 4) * step - (self.height - row-h) / 2;
+        flick.content-y = -max(0px, min(top, content-h - self.height));
+    }
+    init => { self.show(current); }
+    changed current => { self.show(current); }
+    clip: true;
+    accessible-role: list;
+    accessible-label: @tr("选择年份");
+    flick := Flickable {
+        width: parent.width;
+        height: parent.height;
+        content-width: parent.width;
+        content-height: root.content-h;
+        for i in root.last - root.first + 1: cell := Rectangle {
+            property <int> year: root.first + i;
+            property <bool> cur: year == root.current;
+            property <bool> is-now: year == root.now;
+            x: Math.mod(i, 4) * (root.cw + 4px);
+            y: floor(i / 4) * root.step;
+            width: root.cw;
+            height: root.row-h;
+            border-radius: min(20px, self.height / 2);
+            background: cur ? Theme.c.accent-fill : yta.pressed ? Theme.c.subtle-fill-pressed : yta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: list-item;
+            accessible-label: @tr("{0}年", year);
+            accessible-item-selectable: true;
+            accessible-item-selected: cur;
+            accessible-action-default => { root.picked(cell.year); }
+            Text {
+                text: cell.year;
+                font-weight: cell.is-now ? 600 : 400;
+                color: cell.cur ? Theme.c.text-on-accent : cell.is-now ? Theme.c.accent-text : Theme.c.text-primary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+            yta := TouchArea { clicked => { root.picked(cell.year); } }
+        }
+    }
+}
+
+// 0.2's FCalendarView: a month of days (lunar text and 休/班 when asked), the 12 months of a
+// year, or the years. The title goes up a level (days → months → years → days); a year, then
+// a month, come back down. The wheel turns the months over the days and the years over the
+// months; 今天 comes back to this month from wherever the view is (GitHub #16).
 export component CalendarView {
     in property <string> selected;
     in property <bool> lunar;
@@ -637,21 +697,26 @@ export component CalendarView {
     // 0 = Sunday first, 1 = Monday first.
     in property <int> first-day: 1;
     callback picked(string);
+    // The last day that can be picked ("" = any): the days after it are greyed out.
+    in property <string> last-day;
     // Show the focus ring on the title (0.2's FFlyout autofocus) until the next input.
     in-out property <bool> title-ring;
     property <string> cursor: selected != "" ? selected : Fluent.today;
     property <int> vy: Fluent.year-of(cursor);
     property <int> vm: Fluent.month-of(cursor);
-    property <bool> months;
+    // 0 = the days of a month, 1 = the months of a year, 2 = the years.
+    property <int> level;
+    property <length> wheel-acc;
     property <[CalDay]> days: Fluent.month-grid(vy, vm, first-day, lunar, markers);
     property <length> cw: (root.width - 8px) / 7;
     property <length> ch: lunar ? 44px : 42px;
     property <[string]> week: [@tr("日"), @tr("一"), @tr("二"), @tr("三"), @tr("四"), @tr("五"), @tr("六")];
+    property <string> title-text: level == 2 ? @tr("选择年份") : level == 1 ? @tr("{0}年" , vy) : @tr("{0}年{1}月" , vy, vm);
     forward-focus: fs;
     width: lunar ? 316px : 300px;
-    height: months ? 2px + 40px + 16px + 3 * 56px + 2 * 4px + 6px : 2px + 40px + 32px + 6 * ch + 6px;
+    height: level == 0 ? 2px + 40px + 32px + 6 * ch + 6px : 2px + 40px + 16px + 3 * 56px + 2 * 4px + 6px;
     accessible-role: table;
-    accessible-label: @tr("{0}年{1}月" , vy, vm);
+    accessible-label: title-text;
     changed selected => {
         if selected != "" {
             cursor = selected;
@@ -671,10 +736,30 @@ export component CalendarView {
         vm = Fluent.month-of(d);
     }
     function pick(d: string) {
+        if last-day != "" && d > last-day {
+            return;
+        }
         move-to(d);
         picked(d);
     }
-    // head: title button and the two arrows
+    function go-today() {
+        level = 0;
+        move-to(Fluent.today);
+    }
+    // One step of the arrows and of the wheel: a month, a year, or four rows of years.
+    function step(n: int) {
+        shift(level == 0 ? n : level == 1 ? 12 * n : 12 * 16 * n);
+    }
+    // A notch of a mouse wheel is about 60px; a touchpad sends many small steps.
+    function wheel(dy: length) {
+        wheel-acc += dy;
+        if Math.abs(wheel-acc / 1px) >= 40 {
+            let n = wheel-acc > 0 ? -1 : 1;
+            wheel-acc = 0;
+            step(n);
+        }
+    }
+    // head: the title button, 今天 and the two arrows
     HorizontalLayout {
         x: 4px;
         y: 2px;
@@ -691,15 +776,44 @@ export component CalendarView {
             border-radius: Theme.radius-control;
             background: tta.pressed ? Theme.c.subtle-fill-pressed : tta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
+            accessible-label: root.title-text;
+            accessible-description: root.level == 0 ? @tr("选择月份") : root.level == 1 ? @tr("选择年份") : @tr("返回日期");
+            accessible-action-default => { root.level = Math.mod(root.level + 1, 3); }
             Text {
                 x: 8px;
-                text: root.months ? @tr("{0}年" , root.vy) : @tr("{0}年{1}月" , root.vy, root.vm);
+                text: root.title-text;
                 font-weight: 600;
                 color: Theme.c.text-primary;
                 vertical-alignment: center;
+                accessible-role: none;
             }
-            tta := TouchArea { clicked => { root.months = !root.months; } }
+            tta := TouchArea { clicked => { root.level = Math.mod(root.level + 1, 3); } }
             if root.title-ring: FocusRing { show: true; width: parent.width; height: parent.height; }
+        }
+        Rectangle {
+            width: today-text.preferred-width + 20px;
+            min-height: 32px;
+            max-height: 32px;
+            preferred-height: 32px;
+            border-radius: Theme.radius-control;
+            background: yta.pressed ? Theme.c.subtle-fill-pressed : yta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            accessible-label: @tr("回到今天");
+            accessible-action-default => { root.go-today(); }
+            today-text := Text {
+                x: 10px;
+                text: @tr("今天");
+                font-size: 12px;
+                color: Theme.c.accent-text;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+            yta := TouchArea {
+                clicked => {
+                    root.go-today();
+                    fs.focus();
+                }
+            }
         }
         for d in [-1, 1]: Rectangle {
             width: 32px;
@@ -709,22 +823,20 @@ export component CalendarView {
             border-radius: Theme.radius-control;
             background: nta.pressed ? Theme.c.subtle-fill-pressed : nta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
-            accessible-label: root.months ? (d < 0 ? @tr("上一年") : @tr("下一年")) : (d < 0 ? @tr("上个月") : @tr("下个月"));
+            accessible-label: root.level == 2 ? (d < 0 ? @tr("更早的年份") : @tr("更晚的年份")) : root.level == 1 ? (d < 0 ? @tr("上一年") : @tr("下一年")) : (d < 0 ? @tr("上个月") : @tr("下个月"));
+            accessible-action-default => { root.step(d); }
             Icon { glyph: d < 0 ? Glyph.chevron-up : Glyph.chevron-down; size: 12px; color: Theme.c.text-secondary; }
-            nta := TouchArea {
-                clicked => {
-                    if root.months {
-                        root.vy += d;
-                    } else {
-                        root.shift(d);
-                    }
-                }
-            }
+            nta := TouchArea { clicked => { root.step(d); } }
         }
     }
-    if !root.months: Rectangle {
+    // (TouchAreas: the wheel over a cell comes up to them)
+    if root.level == 0: TouchArea {
         y: 42px;
         height: 32px + 6 * root.ch;
+        scroll-event(e) => {
+            root.wheel(e.delta-y);
+            accept
+        }
         for w[i] in root.week: Text {
             x: 4px + i * root.cw;
             y: 0;
@@ -741,19 +853,21 @@ export component CalendarView {
         for d[i] in root.days: cell := Rectangle {
             property <bool> today: d.iso == Fluent.today;
             property <bool> sel: d.iso == root.selected;
-            property <bool> hover: dta.has-hover;
+            property <bool> off: root.last-day != "" && d.iso > root.last-day;
+            property <bool> hover: dta.has-hover && !off;
             x: 4px + Math.mod(i, 7) * root.cw + 1px;
             y: 32px + floor(i / 7) * root.ch + 1px;
             width: root.cw - 2px;
             height: root.ch - 2px;
             border-radius: root.lunar ? 6px : min(self.width, self.height) / 2;
             background: today ? (hover ? Theme.c.accent-fill-hover : Theme.c.accent-fill)
-                : dta.pressed ? Theme.c.subtle-fill-pressed : hover ? Theme.c.subtle-fill-hover : transparent;
+                : dta.pressed && !off ? Theme.c.subtle-fill-pressed : hover ? Theme.c.subtle-fill-hover : transparent;
             border-width: sel ? 1px : 0;
             border-color: Theme.c.accent-fill;
             accessible-role: button;
             accessible-label: @tr("{0}年{1}月{2}" , Fluent.year-of(d.iso), Fluent.month-of(d.iso), d.day);
             accessible-checked: sel;
+            accessible-enabled: !off;
             // today + selected: inset 2px accent ring, then 1px on-accent ring
             if cell.today && cell.sel: Rectangle {
                 border-radius: parent.border-radius;
@@ -776,7 +890,7 @@ export component CalendarView {
                 text: d.day;
                 font-size: 14px;
                 font-weight: cell.today ? 600 : d.out ? 300 : 400;
-                color: cell.today ? Theme.c.text-on-accent : d.out ? Theme.c.text-secondary : Theme.c.text-primary;
+                color: cell.today ? Theme.c.text-on-accent : cell.off ? Theme.c.text-disabled : d.out ? Theme.c.text-secondary : Theme.c.text-primary;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -812,8 +926,13 @@ export component CalendarView {
             if d.iso == root.cursor && fs.has-focus && Overlay.keyboard: FocusRing { show: true; width: parent.width; height: parent.height; radius: cell.border-radius; }
         }
     }
-    if root.months: Rectangle {
+    if root.level == 1: TouchArea {
         y: 42px;
+        height: root.height - 42px;
+        scroll-event(e) => {
+            root.wheel(e.delta-y);
+            accept
+        }
         for m[i] in 12: Rectangle {
             property <length> mw: (root.width - 8px - 4px - 3 * 4px) / 4;
             property <bool> cur: i + 1 == root.vm;
@@ -824,19 +943,34 @@ export component CalendarView {
             border-radius: 28px;
             background: cur ? Theme.c.accent-fill : mta.has-hover ? Theme.c.subtle-fill-hover : transparent;
             accessible-role: button;
+            accessible-label: @tr("{0}月" , i + 1);
+            accessible-action-default => { mta.clicked(); }
             Text {
                 text: @tr("{0}月" , i + 1);
                 color: parent.cur ? Theme.c.text-on-accent : Theme.c.text-primary;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+                accessible-role: none;
             }
             mta := TouchArea {
                 clicked => {
                     root.vm = i + 1;
                     root.cursor = Fluent.make-date(root.vy, i + 1, min(Fluent.day-of(root.cursor), 28));
-                    root.months = false;
+                    root.level = 0;
                 }
             }
+        }
+    }
+    if root.level == 2: YearGrid {
+        x: 6px;
+        y: 42px + 8px;
+        width: root.width - 12px;
+        height: root.height - 42px - 8px - 6px;
+        current: root.vy;
+        now: Fluent.year-of(Fluent.today);
+        picked(y) => {
+            root.shift(12 * (y - root.vy));
+            root.level = 1;
         }
     }
     fs := FocusScope {
@@ -844,13 +978,36 @@ export component CalendarView {
         height: 0;
         key-pressed(e) => {
             root.title-ring = false;
-            let step = e.text == Key.LeftArrow ? -1 : e.text == Key.RightArrow ? 1 : e.text == Key.UpArrow ? -7 : e.text == Key.DownArrow ? 7 : 0;
-            if step != 0 {
-                root.move-to(Fluent.add-days(root.cursor, step));
+            // Ctrl+↑ / Ctrl+↓: up and down a level, as the title and a pick do
+            if e.modifiers.control && (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                root.level = e.text == Key.UpArrow ? min(2, root.level + 1) : max(0, root.level - 1);
+                return accept;
+            }
+            if e.modifiers.control && (e.text == Key.PageUp || e.text == Key.PageDown) {
+                root.shift(e.text == Key.PageUp ? -12 : 12);
                 return accept;
             }
             if e.text == Key.PageUp || e.text == Key.PageDown {
-                root.shift(e.text == Key.PageUp ? -1 : 1);
+                root.step(e.text == Key.PageUp ? -1 : 1);
+                return accept;
+            }
+            if root.level > 0 {
+                // the months, the years: four in a row
+                let k = root.level == 1 ? 1 : 12;
+                let n = e.text == Key.LeftArrow ? -1 : e.text == Key.RightArrow ? 1 : e.text == Key.UpArrow ? -4 : e.text == Key.DownArrow ? 4 : 0;
+                if n != 0 {
+                    root.shift(k * n);
+                    return accept;
+                }
+                if e.text == Key.Return || e.text == " " {
+                    root.level -= 1;
+                    return accept;
+                }
+                return reject;
+            }
+            let step = e.text == Key.LeftArrow ? -1 : e.text == Key.RightArrow ? 1 : e.text == Key.UpArrow ? -7 : e.text == Key.DownArrow ? 7 : 0;
+            if step != 0 {
+                root.move-to(Fluent.add-days(root.cursor, step));
                 return accept;
             }
             if e.text == Key.Home || e.text == Key.End {
@@ -894,6 +1051,8 @@ export component DatePicker {
     in property <bool> markers;
     in property <bool> clearable;
     in property <bool> enabled: true;
+    // The last day that can be chosen ("" = any); a later one typed is not taken.
+    in property <string> last-day;
     callback changed-value(string);
     property <string> draft;
     property <int> wd: value == "" ? -1 : Fluent.weekday-of(value);
@@ -915,7 +1074,7 @@ export component DatePicker {
         }
         let v = Fluent.parse-date(t);
         // (assign last: Slint 1.18.1 moves a local into an assignment and can't use it after)
-        if v != "" {
+        if v != "" && (last-day == "" || v <= last-day) {
             if v != value { changed-value(v); }
             draft = v;
         } else {
@@ -972,6 +1131,7 @@ export component DatePicker {
         label: @tr("日历");
         CalendarView {
             selected: root.value;
+            last-day: root.last-day;
             first-day: root.first-day;
             lunar: root.lunar;
             markers: root.markers;

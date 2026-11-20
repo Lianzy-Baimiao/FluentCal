@@ -32,7 +32,8 @@ pub struct Change {
     pub kind: String,
     /// What was changed: the task's title, "分组 工作", "日期颜色 2026-11-14".
     pub what: String,
-    /// What was done to it, for "edit": "done" | "undone" | "moved" | "progress" | "".
+    /// What was done to it, for "edit": "done" | "undone" | "moved" | "progress" | "doneDay" |
+    /// "order" | "".
     #[serde(default)]
     pub detail: String,
     /// Other items changed with it.
@@ -54,6 +55,8 @@ impl Change {
             (_, "undone") => trf("取消完成“{0}”", &[what]),
             (_, "moved") => trf("改期“{0}”", &[what]),
             (_, "progress") => trf("改进度“{0}”", &[what]),
+            (_, "doneDay") => trf("改完成日期“{0}”", &[what]),
+            (_, "order") => trf("调整顺序“{0}”", &[what]),
             _ => trf("修改“{0}”", &[what]),
         };
         if self.more > 0 { trf("{0}等 {1} 项", &[s, (self.more + 1).to_string()]) } else { s }
@@ -97,6 +100,14 @@ fn detail_of(prev: &Value, next: &Value) -> &'static str {
     }
     if differs("progress") {
         return "progress";
+    }
+    // the day it was done, corrected by hand (ticking and unticking are "done" / "undone")
+    if differs("doneOn") || differs("doneOnDates") {
+        return "doneDay";
+    }
+    // its place in the to-do column, by hand (GitHub #7)
+    if differs("order") {
+        return "order";
     }
     ""
 }

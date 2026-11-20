@@ -556,6 +556,10 @@ fn full(doc: &Doc, t: &Task, today: &str) -> Value {
             }
             None => {
                 m.insert("done".into(), json!(t.done));
+                // the day it was ticked (kept since 0.3.17)
+                if let Some(d) = crate::tasks::done_day(t, &t.start) {
+                    m.insert("doneOn".into(), json!(d));
+                }
                 m.insert("progress".into(), json!(t.progress.round() as i64));
             }
         }
@@ -1124,9 +1128,14 @@ fn update_task(host: &dyn Host, a: &Args) -> Res {
         patch(&c, &mut copy, &f)?;
         // as it is, not with the defaults make_task fills in for a new task
         let (color, reminders) = (copy.color.clone(), copy.reminders.clone());
+        let ticked_now = copy.done && !occ.done;
         let mut copy = make_task(doc, copy, Some(stored.order), now);
         copy.color = color;
         copy.reminders = reminders;
+        // done on the day the occurrence was, unless this call ticks it
+        if !ticked_now {
+            copy.done_on = crate::tasks::done_day(stored, &day).map(str::to_owned).filter(|_| copy.done);
+        }
         let mut series = stored.clone();
         let mut skipped: BTreeSet<String> = series.ex_dates.take().unwrap_or_default().into_iter().collect();
         skipped.insert(day.clone());

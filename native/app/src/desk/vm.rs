@@ -36,6 +36,9 @@ pub struct DeskUi {
     pub wheel_at: i64,
     /// The list view's 近期: days shown from today (显示更多日期 adds 30, up to 180).
     pub list_span: i32,
+    /// 按分组筛选 (GitHub #14): the groups whose tasks the calendar shows ("" = 未分组); empty =
+    /// all of them. For a look, not a setting: it is gone when the app is closed.
+    pub group_filter: Vec<String>,
 }
 
 impl DeskUi {
@@ -53,6 +56,47 @@ impl DeskUi {
 /// 近期 first shows 30 days; 显示更多日期 adds as many, up to 180 (the web page's numbers).
 pub const LIST_SPAN: i32 = 30;
 pub const LIST_SPAN_MAX: i32 = 180;
+
+/// Whether the calendar shows `t` under the group filter. A task whose group is gone counts
+/// as 未分组 (as in the Gantt chart).
+pub fn shown(doc: &Doc, ui: &DeskUi, t: &Task) -> bool {
+    if ui.group_filter.is_empty() {
+        return true;
+    }
+    let g = t.group_id.as_deref().filter(|g| doc.groups.contains_key(*g)).unwrap_or("");
+    ui.group_filter.iter().any(|f| f == g)
+}
+
+/// Groups that are gone leave the filter; every choice ticked is no filter at all.
+pub fn tidy_filter(doc: &Doc, ui: &mut DeskUi) {
+    if ui.group_filter.is_empty() {
+        return;
+    }
+    ui.group_filter.retain(|g| g.is_empty() || doc.groups.contains_key(g));
+    ui.group_filter.sort();
+    ui.group_filter.dedup();
+    if ui.group_filter.len() > doc.groups.len() {
+        ui.group_filter.clear();
+    }
+}
+
+/// The filter button's tooltip while it filters: "按分组筛选：生日、还款" (in the list's order);
+/// empty when everything shows.
+pub fn filter_tip(doc: &Doc, ui: &DeskUi) -> String {
+    if ui.group_filter.is_empty() {
+        return String::new();
+    }
+    let mut groups: Vec<_> = doc.groups.values().filter(|g| ui.group_filter.contains(&g.id)).collect();
+    groups.sort_by(|a, b| a.order.total_cmp(&b.order));
+    let mut names: Vec<String> = Vec::new();
+    if ui.group_filter.iter().any(String::is_empty) {
+        names.push(tr("未分组").into());
+    }
+    names.extend(groups.iter().map(|g| g.name.clone()));
+    let n = names.len();
+    let list = if n > 3 { trf("{0} 等 {1} 个分组", &[names[..3].join("、"), n.to_string()]) } else { names.join("、") };
+    trf("按分组筛选：{0}", &[list])
+}
 
 /// First and last day shown (month view: whole weeks around the month).
 pub fn shown_range(doc: &Doc, ui: &DeskUi) -> (String, String) {
@@ -176,6 +220,7 @@ pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, room: Option<Room>, t: &Tokens
     let occs: Vec<Occurrence> = doc
         .tasks
         .values()
+        .filter(|task| shown(doc, ui, task))
         .flat_map(|task| occurrences(task, &first, &last, 400))
         .filter(|o| show_done || !o.done)
         .collect();
@@ -278,11 +323,8 @@ pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRo
     let c = &doc.settings.calendar;
     let show_done = doc.settings.tasks.show_completed;
     let all = c.list_range == "all";
-    let days = if all {
-        all_tasks(doc.tasks.values(), today, show_done)
-    } else {
-        agenda(doc.tasks.values(), today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, show_done)
-    };
+    let tasks = doc.tasks.values().filter(|task| shown(doc, ui, task));
+    let days = if all { all_tasks(tasks, today, show_done) } else { agenda(tasks, today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, show_done) };
     let mut rows = Vec::new();
     let mut today_row = 0;
     for d in &days {
@@ -335,9 +377,9 @@ fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> L
 }
 
 /// The column of to-dos without a day (GitHub #7): a flat list of titles, to-dos and add boxes.
-pub fn side_rows(doc: &Doc, today: &str, t: &Tokens) -> Vec<crate::SideRowData> {
+pub fn side_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> Vec<crate::SideRowData> {
     use fluentcal_core::flex;
-    let s = flex::side(doc.tasks.values(), today);
+    let s = flex::side(doc.tasks.values().filter(|task| shown(doc, ui, task)), today);
     let show_done = doc.settings.tasks.show_completed;
     let head = |zone: &str, text: String| crate::SideRowData { kind: "head".into(), zone: zone.into(), text: text.into(), ..Default::default() };
     let add = |zone: &str| crate::SideRowData { kind: "add".into(), zone: zone.into(), ..Default::default() };
@@ -405,8 +447,10 @@ pub fn due_label(o: &Occurrence, all: bool, today: &str) -> (String, &'static st
 ///   0 before it starts, all of them after it ended. Worked out, never typed.
 /// - "进度 60%" (GitHub #10, #13): what the user set, also 0 % and 100 %, so "not begun" and
 ///   "done" can be told apart. Not for repeating tasks (each time has no progress of its own).
+/// - "26.11.27完成" (GitHub #15): the day it was ticked done, `done_day`. It stands for
+///   "进度 100%" then (the days go on being counted as time passes, done or not).
 /// Each has its switch in 设置 › 日历.
-fn bar_label(ch: &Chip, today: &str, days: bool, progress: bool) -> (String, f32) {
+fn bar_label(ch: &Chip, today: &str, days: bool, progress: bool, done_day: Option<&str>) -> (String, f32) {
     let task = ch.occ.task;
     if !ch.multi_day || task.is_milestone() {
         return (String::new(), 0.0);
@@ -419,7 +463,10 @@ fn bar_label(ch: &Chip, today: &str, days: bool, progress: bool) -> (String, f32
         parts.push(trf("第{0}-{1}天（{2}%）", &[total.to_string(), gone.to_string(), pct.to_string()]));
     }
     let mut fill = 0.0;
-    if progress && task.repeat.is_none() {
+    if let Some(day) = done_day {
+        let (y, m, d) = fluentcal_core::date::parts(day);
+        parts.push(trf("{0}.{1}.{2}完成", &[format!("{:02}", y.rem_euclid(100)), m.to_string(), d.to_string()]));
+    } else if progress && task.repeat.is_none() {
         let p = if task.done { 100.0 } else { task.progress.clamp(0.0, 100.0) };
         parts.push(trf("进度 {0}%", &[p.to_string()]));
         if !task.done {
@@ -433,8 +480,10 @@ fn bar_label(ch: &Chip, today: &str, days: bool, progress: bool) -> (String, f32
 
 pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
     let c = &doc.settings.calendar;
-    let (pct, fill) = bar_label(ch, today, c.bar_days, c.bar_progress);
     let task = ch.occ.task;
+    // the day it was ticked done, when that is known (a to-do without a day sits on that day)
+    let done_day = fluentcal_core::tasks::done_day(task, &ch.occ.date).filter(|_| ch.occ.done && !fluentcal_core::flex::is_flex(task));
+    let (pct, fill) = bar_label(ch, today, c.bar_days, c.bar_progress, done_day.filter(|_| c.bar_done));
     let col = task_color(task.color.as_deref(), t);
     let mut tip = vec![task.title.clone(), format_range(&ch.occ.start, &ch.occ.end, today) + &task.time.as_deref().map_or(String::new(), |tm| format!(" {tm}"))];
     if let Some(g) = task.group_id.as_deref().and_then(|id| doc.groups.get(id)) {
@@ -445,6 +494,9 @@ pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
     }
     if task.repeat.is_none() && task.progress > 0.0 && !task.done {
         tip.push(trf("进度：{0}%", &[format!("{}", task.progress)]));
+    }
+    if let Some(d) = done_day {
+        tip.push(trf("完成于 {0}", &[format_friendly(d, today)]));
     }
     if let Some(n) = task.notes.as_deref().filter(|n| !n.is_empty()) {
         let short: String = n.chars().take(120).collect();

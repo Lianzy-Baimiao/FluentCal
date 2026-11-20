@@ -2,6 +2,7 @@
 //! offscreen helper for the parity snapshots (`Desk`).
 
 pub mod actions;
+pub mod filter;
 pub mod gantt;
 pub mod input;
 pub mod live;
@@ -10,6 +11,7 @@ pub mod menus_act;
 pub mod menus_build;
 pub mod overlays;
 pub mod popups;
+pub mod reorder;
 pub mod sync;
 pub mod vm;
 pub mod wire;
@@ -39,11 +41,14 @@ pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Opt
     use slint::Model;
     let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, room, t).iter().collect();
     sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
+    // the group filter's button: red, and named after what it shows, while it filters
+    w.set_filter_on(!ui.group_filter.is_empty());
+    w.set_filter_tip(vm::filter_tip(doc, ui).into());
     push_list(w, doc, ui, today, t);
     let side = doc.settings.calendar.sidebar;
     w.set_side_open(side);
     w.set_side_mode(doc.settings.calendar.sidebar_mode.as_str().into());
-    let rows = if side { vm::side_rows(doc, today, t) } else { Vec::new() };
+    let rows = if side { vm::side_rows(doc, ui, today, t) } else { Vec::new() };
     let add_row = |zone: &str| rows.iter().position(|r| r.kind == "add" && r.zone == zone).unwrap_or(0) as i32;
     w.set_side_add_month_row(add_row("month"));
     w.set_side_add_someday_row(add_row("someday"));
@@ -112,13 +117,22 @@ impl Desk {
 
     /// Opens a flyout or panel as the parity scene says (`{"open": "dayList" | "ym" | "search"
     /// | "confirm", "anchor": [x, y, w, h], …}`), with the same view models as the app.
+    /// "sideDrag": a to-do of the column held over another place (`row` is dragged, the line
+    /// is above `drop`, the pointer is at the anchor's x, y).
     pub fn open(&mut self, spec: &serde_json::Value) {
         let s = |k: &str| spec.get(k).and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
         let a: Vec<f32> = spec.get("anchor").and_then(serde_json::Value::as_array).map_or(vec![0.0; 4], |v| v.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect());
+        // 按分组筛选 with the groups `groups` (ids, "" = 未分组) ticked; `closed`: only the
+        // filtered calendar and its red button.
+        if s("open") == "filter" {
+            let ids = spec.get("groups").and_then(serde_json::Value::as_array);
+            self.ui.group_filter = ids.map_or(Vec::new(), |v| v.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect());
+            self.refresh_weeks();
+        }
         let w = &self.window;
         match s("open").as_str() {
             "dayList" => {
-                let (title, lunar, chips) = overlays::day_list(&self.doc, &s("date"), &self.today, &self.tokens);
+                let (title, lunar, chips) = overlays::day_list(&self.doc, &self.ui, &s("date"), &self.today, &self.tokens);
                 w.set_day_list_title(title.into());
                 w.set_day_list_lunar(lunar.into());
                 w.set_day_list_chips(chips);
@@ -128,6 +142,7 @@ impl Desk {
                 w.set_ym_year(fluentcal_core::date::parts(&self.ui.cursor).0);
                 w.set_ym_cursor(self.ui.cursor[..7].into());
                 w.set_ym_now(self.today[..7].into());
+                w.set_ym_now_year(fluentcal_core::date::parts(&self.today).0);
                 w.invoke_open_ym(a[0], a[1], a[2], a[3]);
             }
             "search" => {
@@ -165,6 +180,27 @@ impl Desk {
                 let mut picks = crate::group_delete::Picks { checked, with_tasks };
                 crate::group_delete::push(w, &self.doc, &mut picks, &self.tokens);
                 w.invoke_open_group_delete();
+            }
+            "filter" => {
+                let (rows, all, hint) = overlays::filter_rows(&self.doc, &self.ui, &self.tokens);
+                w.set_filter_rows(slint::ModelRc::new(slint::VecModel::from(rows)));
+                w.set_filter_all_count(all.into());
+                w.set_filter_hint(hint.into());
+                if !spec.get("closed").and_then(serde_json::Value::as_bool).unwrap_or(false) {
+                    w.invoke_open_filter(a[0], a[1], a[2], a[3]);
+                }
+            }
+            "sideDrag" => {
+                use slint::Model;
+                let n = |k: &str| spec.get(k).and_then(serde_json::Value::as_i64).unwrap_or(-1);
+                if let Some(r) = usize::try_from(n("row")).ok().and_then(|i| w.get_side_rows().row_data(i)) {
+                    w.set_side_drag_key(r.chip.key.clone());
+                    w.set_drag_label(r.chip.title.clone());
+                    w.set_drag_active(true);
+                    w.set_drag_x(a[0]);
+                    w.set_drag_y(a[1]);
+                    w.set_side_drop_row(n("drop") as i32);
+                }
             }
             other => eprintln!("unknown overlay {other}"),
         }

@@ -96,6 +96,14 @@ pub struct Task {
     /// Repeating tasks: occurrence start dates marked done.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_dates: Option<Vec<String>>,
+    /// The day the task was ticked done (GitHub #15; tasks.rs `stamp_done`): written with
+    /// `done`, gone with it, and the user can correct it. A task done before 0.3.17, or by a
+    /// version that doesn't know the field, has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_on: Option<String>,
+    /// Repeating tasks: occurrence start → the day it was ticked done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_on_dates: Option<std::collections::BTreeMap<String, String>>,
     /// Repeating tasks: occurrence start dates deleted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ex_dates: Option<Vec<String>>,

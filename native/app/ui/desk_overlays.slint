@@ -4,8 +4,9 @@
 import { Theme } from "theme.slint";
 import { Glyph, Icon } from "icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "controls.slint";
-import { Tip, TipArea } from "overlay.slint";
-import { TextBox, Select, SelectOption } from "inputs.slint";
+import { Overlay, Tip, TipArea } from "overlay.slint";
+import { Checkbox } from "forms.slint";
+import { TextBox, Select, SelectOption, YearGrid } from "inputs.slint";
 import { ColorSwatches } from "menu.slint";
 import { Swatch } from "theme.slint";
 import { ChipData, TaskChip } from "chip.slint";
@@ -155,49 +156,92 @@ export component DayListPanel inherits VerticalLayout {
 }
 
 // The year/month picker under the title (inside a Flyout with panel-width 248px): `year` is
-// the shown year (the arrows change it here), `cursor` / `now` "YYYY-MM".
+// the shown year (the arrows and the wheel change it here), `cursor` / `now` "YYYY-MM". The
+// year is a button: it opens the list of years, for one far away (GitHub #16).
 export component YearMonthPanel inherits VerticalLayout {
     in-out property <int> year;
     in property <string> cursor;
     in property <string> now;
+    in property <int> now-year;
     callback pick(int, int);
+    // the years instead of the months
+    property <bool> years;
+    property <length> wheel-acc;
     HorizontalLayout {
         height: 32px;
         spacing: 2px;
-        HorizontalLayout {
+        year-btn := Rectangle {
+            property <string> label: root.years ? @tr("选择年份") : @tr("{0}年", root.year);
             horizontal-stretch: 1;
-            padding-left: 6px;
-            Text {
-                text: @tr("{0}年", root.year);
-                font-weight: 600;
-                vertical-alignment: center;
-                color: Theme.c.text-primary;
+            border-radius: 4px;
+            background: yta.pressed ? Theme.c.subtle-fill-pressed : yta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+            accessible-role: button;
+            accessible-label: self.label;
+            accessible-description: root.years ? @tr("返回月份") : @tr("选择年份");
+            accessible-action-default => { root.years = !root.years; }
+            HorizontalLayout {
+                padding-left: 6px;
+                spacing: 4px;
+                alignment: start;
+                cross-axis-alignment: center;
+                Text {
+                    text: year-btn.label;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    color: Theme.c.text-primary;
+                    accessible-role: none;
+                }
+                Icon {
+                    glyph: root.years ? Glyph.chevron-up : Glyph.chevron-down;
+                    size: 10px;
+                    color: Theme.c.text-secondary;
+                }
             }
+            yta := TouchArea { clicked => { root.years = !root.years; } }
         }
         Button {
             variant: ButtonVariant.subtle;
             size: ButtonSize.icon;
             icon: Glyph.chevron-up;
-            tip: @tr("上一年");
+            tip: root.years ? @tr("更早的年份") : @tr("上一年");
             tip-layer: 1;
-            accessible-label: @tr("上一年");
-            clicked => { root.year -= 1; }
+            accessible-label: self.tip;
+            // (the list shows three rows of four: an arrow is a page of it)
+            clicked => { root.year -= root.years ? 12 : 1; }
         }
         Button {
             variant: ButtonVariant.subtle;
             size: ButtonSize.icon;
             icon: Glyph.chevron-down;
-            tip: @tr("下一年");
+            tip: root.years ? @tr("更晚的年份") : @tr("下一年");
             tip-layer: 1;
-            accessible-label: @tr("下一年");
-            clicked => { root.year += 1; }
+            accessible-label: self.tip;
+            clicked => { root.year += root.years ? 12 : 1; }
         }
     }
     Rectangle { height: 6px; }
-    Rectangle {
+    if root.years: YearGrid {
+        height: 3 * 48px + 2 * 4px;
+        current: root.year;
+        now: root.now-year;
+        picked(y) => {
+            root.year = y;
+            root.years = false;
+        }
+    }
+    // (a TouchArea: the wheel over a month comes up to it and turns the years)
+    if !root.years: TouchArea {
         height: 3 * 48px + 2 * 4px;
         accessible-role: list;
         accessible-label: @tr("{0}年", root.year);
+        scroll-event(e) => {
+            root.wheel-acc += e.delta-y;
+            if Math.abs(root.wheel-acc / 1px) >= 40 {
+                root.year += root.wheel-acc > 0 ? -1 : 1;
+                root.wheel-acc = 0;
+            }
+            accept
+        }
         for m[i] in 12: Rectangle {
             property <string> key: root.year + "-" + (i < 9 ? "0" : "") + (i + 1);
             property <bool> cur: key == root.cursor;
@@ -385,6 +429,130 @@ export component SearchPanel inherits Rectangle {
 }
 
 export struct ChangeRowData { id: int, text: string, when: string, undone: bool }
+
+// 按分组筛选 (GitHub #14): a group (or 未分组, id "") with its colour, how many tasks it has, and
+// whether the calendar shows it.
+export struct FilterRowData { id: string, name: string, color: color, dot: bool, checked: bool, count: string }
+
+// A choice: the whole row ticks the box (the box is the accessible element).
+component FilterRow inherits Rectangle {
+    in property <string> name;
+    in property <color> dot;
+    in property <bool> has-dot;
+    in property <bool> checked;
+    in property <string> count;
+    callback toggled(bool);
+    height: 32px;
+    border-radius: Theme.radius-control;
+    background: ta.has-hover ? Theme.c.subtle-fill-hover : transparent;
+    ta := TouchArea {
+        clicked => { root.toggled(!root.checked); }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 8px;
+            cross-axis-alignment: center;
+            Checkbox {
+                horizontal-stretch: 0;
+                size: 18px;
+                checked: root.checked;
+                accessible-label: root.name;
+                accessible-description: root.count;
+                toggled(v) => { root.toggled(v); }
+            }
+            if root.has-dot: Rectangle { width: 10px; height: 10px; border-radius: 3px; background: root.dot; }
+            Text {
+                horizontal-stretch: 1;
+                min-width: 0;
+                text: root.name;
+                color: Theme.c.text-primary;
+                overflow: elide;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+            Text {
+                text: root.count;
+                font-size: 12px;
+                color: Theme.c.text-secondary;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+}
+
+// The list under the title bar's filter button: 全部 (no filter), then 未分组 and the groups,
+// any number of which can be ticked. It stays open while they are.
+export component GroupFilterPanel inherits VerticalLayout {
+    in property <[FilterRowData]> rows;
+    // nothing is filtered
+    in property <bool> all;
+    in property <string> all-count;
+    // said under the list while there are no groups
+    in property <string> hint;
+    callback toggle(string, bool);
+    callback clear();
+    callback manage();
+    property <length> list-h: root.rows.length * 32px;
+    padding: 5px;
+    spacing: 4px;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        height: 28px;
+        Text {
+            text: @tr("按分组筛选");
+            font-weight: 600;
+            vertical-alignment: center;
+            color: Theme.c.text-primary;
+        }
+    }
+    FilterRow {
+        name: @tr("全部");
+        checked: root.all;
+        count: root.all-count;
+        toggled(v) => { root.clear(); }
+    }
+    Rectangle { height: 1px; background: Theme.c.divider; }
+    Flickable {
+        // eight and a half show: a cut row says the list scrolls (less in a low window)
+        height: min(root.list-h, 272px, max(64px, Overlay.win-h - 200px));
+        content-height: root.list-h;
+        mouse-drag-pan-enabled: false;
+        for r[i] in root.rows: FilterRow {
+            y: i * 32px;
+            width: parent.width;
+            name: r.name;
+            dot: r.color;
+            has-dot: r.dot;
+            checked: r.checked;
+            count: r.count;
+            toggled(v) => { root.toggle(r.id, v); }
+        }
+    }
+    if root.hint != "": HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-bottom: 4px;
+        Text {
+            text: root.hint;
+            font-size: 12px;
+            wrap: word-wrap;
+            color: Theme.c.text-tertiary;
+        }
+    }
+    Rectangle { height: 1px; background: Theme.c.divider; }
+    HorizontalLayout {
+        alignment: start;
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.small;
+            icon: Glyph.settings;
+            text: @tr("管理分组…");
+            clicked => { root.manage(); }
+        }
+    }
+}
 
 // 最近更改 (GitHub #11): the last changes, newest first, each with 撤销 (恢复 once it is taken
 // back). A panel at the card's top right, like the search panel.

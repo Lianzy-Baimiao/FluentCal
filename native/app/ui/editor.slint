@@ -44,6 +44,9 @@ export struct EditorData {
     flex: string,
     progress: float,
     done: bool,
+    // the day it was ticked done ("" = not kept), and today: no later day can be chosen
+    done-on: string,
+    today: string,
     countdown: bool,
     show-postpone: bool,
     postpone: bool,
@@ -450,6 +453,19 @@ export component EditorWindow inherits Window {
                                     text: @tr("已完成");
                                     checked: root.data.done;
                                     toggled(v) => { root.edit("done", v ? "1" : "0"); }
+                                }
+                            }
+                            // (GitHub #15: ticking writes today; another day can be put here)
+                            if root.data.show-progress && root.data.done: Row {
+                                label: @tr("完成日期");
+                                DatePicker {
+                                    width: 150px;
+                                    value: root.data.done-on;
+                                    last-day: root.data.today;
+                                    placeholder: @tr("未记录");
+                                    lunar: true;
+                                    markers: true;
+                                    changed-value(v) => { root.edit("done-on", v); }
                                 }
                             }
                             Row {

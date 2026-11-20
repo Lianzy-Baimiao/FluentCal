@@ -29,12 +29,18 @@ pub enum At {
 pub struct Popups {
     /// What the open (or last) menu was opened on: its activations act on this.
     pub menu_target: Option<Target>,
+    /// … and where: what an entry opens next (修改完成日期's calendar) opens there too.
+    pub menu_at: Option<At>,
+    /// 修改完成日期 is open on this task and occurrence.
+    pub done_day: Option<(String, String)>,
     /// Runs on the confirmation's primary button.
     pub confirm: Option<Box<dyn FnOnce(&mut App)>>,
     /// 删除分组 is open: the ticked groups (crate::group_delete).
     pub group_delete: Option<crate::group_delete::Picks>,
     /// The day the "+N" list shows.
     pub day_list: Option<String>,
+    /// 按分组筛选's list is open (filter.rs).
+    pub filter_open: bool,
     pub search_open: bool,
     pub changes_open: bool,
     /// The warning bar (data folder missing, data file repaired).
@@ -56,6 +62,7 @@ impl App {
         let bottom_end = matches!(target, Target::More | Target::GanttOptions);
         w.set_menu_bottom_end(bottom_end);
         self.desk.popups.menu_target = Some(target);
+        self.desk.popups.menu_at = Some(at);
         match at {
             At::Point(x, y) => w.invoke_open_menu(x, y, 0.0, 0.0),
             At::Below(x, y, bw, bh) => w.invoke_open_menu(x, y, bw, bh),
@@ -167,6 +174,38 @@ impl App {
         w.invoke_close_menu();
         w.invoke_close_day_list();
         w.invoke_close_ym();
+        w.invoke_close_done_day();
+        w.invoke_close_filter();
+    }
+
+    // ------------------------------------------------------------- 修改完成日期 (GitHub #15)
+
+    /// The menu's 修改完成日期…: a calendar where the menu was, on the day the occurrence was
+    /// ticked done (none chosen when that isn't known). Days after today can't be picked.
+    pub fn desk_done_day_open(&mut self, task_id: &str, date: &str) {
+        let Some(t) = self.doc.tasks.get(task_id) else { return };
+        let today = self.today();
+        let w = &self.desk.window;
+        // (the window lives for days: its calendars' today is set when one opens)
+        w.global::<crate::Fluent>().set_today(today.as_str().into());
+        w.set_done_day(tasks::done_day(t, date).unwrap_or_default().into());
+        w.set_done_day_max(today.into());
+        w.set_done_day_title(trf("“{0}”的完成日期", &[t.title.clone()]).into());
+        w.set_done_day_first(self.doc.settings.calendar.week_start as i32);
+        self.desk.popups.done_day = Some((task_id.to_owned(), date.to_owned()));
+        match self.desk.popups.menu_at.unwrap_or(At::Point(0.0, 0.0)) {
+            At::Point(x, y) => w.invoke_open_done_day(x, y, 0.0, 0.0),
+            At::Below(x, y, bw, bh) => w.invoke_open_done_day(x, y, bw, bh),
+        }
+    }
+
+    pub fn desk_done_day_picked(&mut self, day: &str) {
+        let Some((id, date)) = self.desk.popups.done_day.take() else { return };
+        let Some(t) = self.doc.tasks.get(&id) else { return };
+        self.history.boundary();
+        let edit = tasks::set_done_day(&self.doc, t, &date, day, now_ms());
+        // (a to-do without a day is on the calendar on that day: its chip moves there)
+        self.apply(edit, true);
     }
 
     // ------------------------------------------------------------- "+N" day list
@@ -182,7 +221,7 @@ impl App {
     /// The list follows the data while it is open.
     pub fn desk_refresh_day_list(&mut self) {
         let Some(date) = self.desk.popups.day_list.clone() else { return };
-        let (title, lunar, chips) = overlays::day_list(&self.doc, &date, &self.today(), &self.tokens);
+        let (title, lunar, chips) = overlays::day_list(&self.doc, &self.desk.ui, &date, &self.today(), &self.tokens);
         let w = &self.desk.window;
         w.set_day_list_title(title.into());
         w.set_day_list_lunar(lunar.into());
@@ -201,8 +240,10 @@ impl App {
         }
         self.history.boundary();
         self.desk.window.set_day_list_text("".into());
-        let (edit, _) = tasks::add_task(&self.doc, Task { title, start: date, ..Default::default() }, None, now_ms());
+        let group_id = self.desk_new_task_group();
+        let (edit, _) = tasks::add_task(&self.doc, Task { title: title.clone(), start: date, group_id: group_id.clone(), ..Default::default() }, None, now_ms());
         self.apply(edit, true);
+        self.desk_filter_told(&title, group_id.as_deref());
     }
 
     // ------------------------------------------------------------- year / month
@@ -213,6 +254,7 @@ impl App {
         w.set_ym_year(y);
         w.set_ym_cursor(self.desk.ui.cursor[..7].into());
         w.set_ym_now(self.today()[..7].into());
+        w.set_ym_now_year(fluentcal_core::date::parts(&self.today()).0);
         w.invoke_open_ym(anchor.0, anchor.1, anchor.2, anchor.3);
     }
 
