@@ -63,6 +63,7 @@ pub fn wire(w: &DeskWindow) {
     w.on_day_list_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
     w.on_day_list_open(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
     w.on_day_list_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
+    w.on_day_list_press(|c, x, y| run(move |a| a.desk_day_list_press(&c.key, &c.task_id, &c.date, x, y)));
     w.on_day_list_add(|t| run(move |a| a.desk_day_list_add(&t)));
     w.on_day_list_closed(|| run(|a| a.desk_day_list_closed()));
     w.on_ym_pick(|y, m| run(move |a| a.desk_ym_pick(y, m)));

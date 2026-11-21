@@ -82,6 +82,9 @@ section!(Calendar {
     /// window (the calendar gets narrower), "left" = the window grows to the left and the
     /// calendar keeps its size, "float" = over the calendar's left part.
     sidebar_mode: String = "inline".into(),
+    /// How the floating column ("float") closes: "button" = its handle again, "outside" = also
+    /// a press anywhere outside it.
+    sidebar_close: String = "button".into(),
     /// Bars of tasks over several days say which day it is: "第5-2天（40%）" (GitHub #13).
     bar_days: bool = true,
     /// … and how far the task is: "进度 60%", the done part darker (GitHub #10, #13).

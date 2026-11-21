@@ -80,6 +80,10 @@ export component DayListPanel inherits VerticalLayout {
     callback toggle(ChipData);
     callback open(ChipData);
     callback menu(ChipData, length, length);
+    // One of them is pressed and dragged, out of the list onto another day (window coordinates).
+    callback press(ChipData, length, length);
+    callback drag-move(length, length);
+    callback release(length, length);
     callback add(string);
     callback wants-keyboard();
     spacing: 8px;
@@ -121,6 +125,9 @@ export component DayListPanel inherits VerticalLayout {
             toggle => { root.toggle(c); }
             open => { root.open(c); }
             menu(x, y) => { root.menu(c, x, y); }
+            press(x, y) => { root.press(c, x, y); }
+            drag-move(x, y) => { root.drag-move(x, y); }
+            release(x, y) => { root.release(x, y); }
         }
     }
     if root.chips.length == 0: VerticalLayout {

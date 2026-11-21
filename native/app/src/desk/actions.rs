@@ -205,6 +205,45 @@ impl App {
         self.patch_settings(json!({ "calendar": { "sidebar": on } }));
     }
 
+    /// Presses are watched while the floating column closes on one outside it, and only
+    /// then: on the calendar by its window procedure, anywhere else by the mouse hook.
+    pub fn desk_side_watch(&mut self) {
+        use crate::platform::{desk as pd, outside};
+        // (no window of its own under the testing backend: nothing to watch)
+        let on = crate::shell::side_closes_outside(&self.doc.settings) && pd::desk_hwnd().is_some();
+        pd::watch_presses(on);
+        // (posted: the hook answers at once, whatever closing the column takes; the press is
+        // another window's and waits for nothing of ours)
+        let away = || {
+            std::rc::Rc::new(|| {
+                crate::app::post(|a| {
+                    a.desk_side_pressed(None);
+                })
+            }) as std::rc::Rc<dyn Fn()>
+        };
+        outside::watch_elsewhere("desk-side", on.then(|| (Box::new(pd::desk_hwnd) as Box<dyn Fn() -> _>, away())));
+    }
+
+    /// A mouse button went down: on the calendar at `at` (window px), or somewhere else
+    /// (None). Outside the floating column that closes it, when the column closes that way
+    /// (CAL-17); true when it did. The press itself goes where it was going.
+    pub fn desk_side_pressed(&mut self, at: Option<(f32, f32)>) -> bool {
+        if !crate::shell::side_closes_outside(&self.doc.settings) || self.desk.side_drag.is_some() {
+            return false;
+        }
+        if at.is_some_and(|(x, y)| self.desk.window.invoke_side_keeps(x, y)) {
+            return false;
+        }
+        self.desk_side_set(false);
+        true
+    }
+
+    /// … on the calendar, in the window's physical px (its window procedure tells).
+    pub fn desk_side_pressed_px(&mut self, x: i32, y: i32) {
+        let scale = slint::ComponentHandle::window(&self.desk.window).scale_factor();
+        self.desk_side_pressed(Some((x as f32 / scale, y as f32 / scale)));
+    }
+
     /// "+N" count of a shown day.
     fn desk_overflow_on(&self, date: &str) -> Option<i32> {
         let weeks = self.desk.window.get_weeks();

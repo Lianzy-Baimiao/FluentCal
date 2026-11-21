@@ -53,6 +53,11 @@ export interface Task {
   repeat?: RepeatRule;
   /** Repeating tasks: occurrence start dates marked done. */
   doneDates?: ISODate[];
+  /** The day the task was ticked done (GitHub #15; lib/tasks.ts `stampDone`): written with
+   * `done`, gone with it. A task done before this was recorded has none. */
+  doneOn?: ISODate;
+  /** Repeating tasks: occurrence start → the day it was ticked done. */
+  doneOnDates?: Record<ISODate, ISODate>;
   /** Repeating tasks: occurrence start dates deleted. */
   exDates?: ISODate[];
   /** Show "N days until" at the bottom of the calendar. */
@@ -138,7 +143,9 @@ export interface Settings {
     fitRows: boolean;
     /** Where the to-do column takes its room: beside the calendar, left of the window, or over it. */
     sidebarMode: 'inline' | 'left' | 'float';
-    /** Bars over several days say which day it is (GitHub #13); native only so far. */
+    /** How the floating column closes: its handle again, or also a press anywhere outside it. */
+    sidebarClose: 'button' | 'outside';
+    /** Bars over several days say which day it is (GitHub #13). */
     barDays: boolean;
     /** … and the task's progress (GitHub #10, #13). */
     barProgress: boolean;

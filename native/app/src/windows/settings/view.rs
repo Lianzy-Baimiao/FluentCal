@@ -291,6 +291,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         bar_progress: c.bar_progress,
         bar_done: c.bar_done,
         sidebar_mode: s(&c.sidebar_mode),
+        sidebar_close: s(&c.sidebar_close),
         weeks_rows: c.weeks_rows as f32,
         weeks_past: c.weeks_past as f32,
         show_lunar: c.show_lunar,

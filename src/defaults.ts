@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
     monthRows: 'auto',
     fitRows: false,
     sidebarMode: 'inline',
+    sidebarClose: 'button',
     barDays: true,
     barProgress: true,
     barDone: true,

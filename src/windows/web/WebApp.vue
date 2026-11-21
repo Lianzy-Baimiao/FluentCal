@@ -13,6 +13,7 @@ import SearchPanel from '../desk/SearchPanel.vue';
 import CountdownBar from '../desk/CountdownBar.vue';
 import AgendaView from './AgendaView.vue';
 import TaskDetails from './TaskDetails.vue';
+import GroupFilter from './GroupFilter.vue';
 
 /** Read-only calendar for phones and other computers in the local network (WEB, 需求文档 4.10). */
 const GanttView = defineAsyncComponent(() => import('../desk/gantt/GanttView.vue'));
@@ -152,7 +153,8 @@ onBeforeUnmount(() => {
         :width="152"
         @update:model-value="setWebLanguage(String($event))"
       />
-      <FSegmented v-model="viewModel" :options="views" size="small" :label="tr('视图')" />
+      <FSegmented v-model="viewModel" class="views" :options="views" size="small" :label="tr('视图')" />
+      <GroupFilter v-if="view !== 'gantt'" />
       <FButton variant="subtle" size="icon" icon="search" :title="tr('搜索')" @click="ui.searchOpen = !ui.searchOpen" />
     </header>
     <FInfoBar v-if="notice" class="notice" :severity="notice.sev">{{ notice.text }}</FInfoBar>
@@ -284,5 +286,11 @@ onBeforeUnmount(() => {
 }
 .narrow .title {
   font-size: 18px;
+}
+/* A phone: the two selects take a line of their own, under the title and the buttons.
+   (:deep: the language box has two roots, so this component's scope isn't on it) */
+.narrow :deep(.language),
+.narrow :deep(.views) {
+  order: 1;
 }
 </style>

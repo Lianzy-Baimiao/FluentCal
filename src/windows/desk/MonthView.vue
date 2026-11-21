@@ -8,9 +8,9 @@ import { almanac, displayInfo as dayInfo } from '@/lib/lunar';
 import { occurrences, type Occurrence } from '@/lib/recur';
 import { layoutWeek, type Chip } from '@/lib/layout';
 import { moveOccurrence, setOccurrenceDone } from '@/lib/tasks';
-import { doc, storeState, taskList } from '@/stores/doc';
+import { doc, storeState } from '@/stores/doc';
 import { now } from '@/composables/now';
-import { defaultWeeksStart, goToday, openEditor, page, ui } from './state';
+import { defaultWeeksStart, goToday, openEditor, page, shownTasks, ui } from './state';
 import { cellMenu, chipMenu, removeTask } from './menus';
 import type { CellInfo } from './types';
 import WeekRow from './WeekRow.vue';
@@ -36,7 +36,7 @@ const focusMonth = computed(() => (props.mode === 'month' ? ui.cursor.slice(0, 7
 const occs = computed<Occurrence[]>(() => {
   const show = doc.settings.tasks.showCompleted;
   const out: Occurrence[] = [];
-  for (const t of taskList.value) {
+  for (const t of shownTasks.value) {
     for (const o of occurrences(t, rangeStart.value, rangeEnd.value)) if (show || !o.done) out.push(o);
   }
   return out;

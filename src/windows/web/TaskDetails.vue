@@ -2,7 +2,8 @@
 import { t as tr } from '@/i18n';
 import { computed } from 'vue';
 import { FDialog, taskColor } from '@/fluent';
-import { formatRange } from '@/lib/date';
+import { formatFriendly, formatRange } from '@/lib/date';
+import { doneDay } from '@/lib/done';
 import { describeRule, occurrenceOn } from '@/lib/recur';
 import { doc } from '@/stores/doc';
 import { isDark } from '@/composables/theme';
@@ -18,6 +19,8 @@ const when = computed(() => {
   return t.time ? `${r} ${t.time}` : r;
 });
 const done = computed(() => occ.value?.done ?? task.value?.done ?? false);
+// the day it was ticked done, when that is known (GitHub #15)
+const doneOn = computed(() => (task.value && done.value ? doneDay(task.value, occ.value?.date ?? details.date ?? task.value.start) : undefined));
 const group = computed(() => (task.value?.groupId ? doc.groups[task.value.groupId]?.name : ''));
 const deps = computed(() => (task.value?.deps ?? []).map((id) => doc.tasks[id]?.title).filter(Boolean).join('、'));
 const color = computed(() => taskColor(task.value?.color, isDark.value).bar);
@@ -39,6 +42,10 @@ const color = computed(() => taskColor(task.value?.color, isDark.value).bar);
       <template v-if="!task.repeat && !task.milestone && task.progress > 0">
         <dt>{{ tr("进度") }}</dt>
         <dd>{{ task.done ? 100 : task.progress }}%</dd>
+      </template>
+      <template v-if="doneOn">
+        <dt>{{ tr("完成日期") }}</dt>
+        <dd>{{ formatFriendly(doneOn) }}</dd>
       </template>
       <template v-if="deps">
         <dt>{{ tr("前置任务") }}</dt>

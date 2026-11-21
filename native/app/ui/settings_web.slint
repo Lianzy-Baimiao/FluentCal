@@ -155,7 +155,7 @@ export component AboutPage inherits VerticalLayout {
         first: false;
         title: @tr("使用技巧");
         SettingsCard { icon: Glyph.help; title: @tr("双击日期空白处快速添加任务"); description: @tr("回车保存后可继续输入下一条，Esc 结束"); has-content: false; }
-        SettingsCard { icon: Glyph.mouse; title: @tr("拖动任务改期"); description: @tr("在月视图中拖到其他日期；在甘特图中拖动任务条、两端或底部圆点调整日期和进度"); has-content: false; }
+        SettingsCard { icon: Glyph.mouse; title: @tr("拖动任务改期"); description: @tr("在月视图中拖到其他日期，“+N”列表里的任务也可以拖；在甘特图中拖动任务条、两端或底部圆点调整日期和进度"); has-content: false; }
         SettingsCard { icon: Glyph.filter; title: @tr("按分组筛选日历"); description: @tr("标题栏的筛选按钮：只显示勾选分组的任务，筛选时按钮是红色；选“全部”恢复"); has-content: false; }
         SettingsCard { icon: Glyph.sort; title: @tr("调整不定日待办的顺序"); description: @tr("在待办栏里上下拖动一项；或点一下选中它，再按 Alt+↑ / Alt+↓"); has-content: false; }
         SettingsCard { icon: Glyph.keyboard; title: @tr("键盘"); description: @tr("方向键选择日期，Enter 添加，PageUp/PageDown 翻页，Home 回到今天，Ctrl+F 搜索。嵌入桌面时点日历不会抢走键盘，先按 Ctrl+Alt+D 唤出日历再用"); has-content: false; }

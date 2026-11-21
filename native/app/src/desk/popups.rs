@@ -221,6 +221,13 @@ impl App {
     /// The list follows the data while it is open.
     pub fn desk_refresh_day_list(&mut self) {
         let Some(date) = self.desk.popups.day_list.clone() else { return };
+        // One of its tasks is held (pressed, or on its way to another day): a new list would
+        // take the pointer from its chip, and the release would never come. Afterwards
+        // (desk_drag_end).
+        if let Some(d) = self.desk.drag.as_mut().filter(|d| d.from_list) {
+            d.stale = true;
+            return;
+        }
         let (title, lunar, chips) = overlays::day_list(&self.doc, &self.desk.ui, &date, &self.today(), &self.tokens);
         let w = &self.desk.window;
         w.set_day_list_title(title.into());
@@ -230,6 +237,11 @@ impl App {
 
     pub fn desk_day_list_closed(&mut self) {
         self.desk.popups.day_list = None;
+        // Closed under a task on its way out of it (a press outside the calendar): the chip is
+        // gone, and its release with it.
+        if self.desk.drag.as_ref().is_some_and(|d| d.from_list) {
+            self.desk_drag_end();
+        }
     }
 
     pub fn desk_day_list_add(&mut self, text: &str) {

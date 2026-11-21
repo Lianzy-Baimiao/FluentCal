@@ -1001,6 +1001,8 @@ export component DeskWindow inherits Window {
     callback day-list-toggle(ChipData);
     callback day-list-open(ChipData);
     callback day-list-menu(ChipData, length, length);
+    // A task of the list is pressed: it can be dragged onto another day (chip-move / chip-release go on).
+    callback day-list-press(ChipData, length, length);
     callback day-list-add(string);
     callback day-list-closed();
     public function open-day-list(x: length, y: length, w: length, h: length) { day-fly.open-at(x, y, w, h); }
@@ -1072,6 +1074,20 @@ export component DeskWindow inherits Window {
     out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open;
     callback popups-changed(bool);
     changed any-popup => { root.popups-changed(self.any-popup); }
+    // 设置 › 日历 › 浮动待办栏的收起方式 = 点击栏外也收起: whether a press at this point of the window
+    // leaves the column open. It does on the column and its handle, on the toast, and anywhere
+    // while a menu, a flyout or a dialog of the calendar is open (the press is theirs).
+    public pure function side-keeps(x: length, y: length) -> bool {
+        if root.any-popup || confirm.is-open || group-delete.is-open {
+            return true;
+        }
+        let cx = x - card.x;
+        let cy = y - card.y;
+        if cx >= 0 && cx < body.x + body.side-w && cy >= body.y && cy < body.y + body.height {
+            return true;
+        }
+        return toast.visible && cx >= toast.x && cx < toast.x + toast.width && cy >= toast.y && cy < toast.y + toast.height;
+    }
     title: "FluentCal";
     no-frame: true;
     background: transparent;
@@ -1405,6 +1421,10 @@ export component DeskWindow inherits Window {
         day-fly := Flyout {
             panel-width: 280px;
             label: root.day-list-title;
+            // One of its tasks is on its way to another day: the days under the list show. (No
+            // other drag can begin while the list is open: a press beside it closes it.)
+            hidden: root.drag-active;
+            cancel-hidden => { root.key(Key.Escape, false, false, false); }
             closed => { root.day-list-closed(); }
             DayListPanel {
                 title: root.day-list-title;
@@ -1415,6 +1435,9 @@ export component DeskWindow inherits Window {
                 toggle(c) => { root.day-list-toggle(c); }
                 open(c) => { root.day-list-open(c); }
                 menu(c, x, y) => { root.day-list-menu(c, x, y); }
+                press(c, x, y) => { root.day-list-press(c, x, y); }
+                drag-move(x, y) => { root.chip-move(x, y); }
+                release(x, y) => { root.chip-release(x, y); }
                 add(t) => { root.day-list-add(t); }
                 wants-keyboard => { root.wants-keyboard(); }
             }

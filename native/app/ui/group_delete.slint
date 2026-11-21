@@ -67,6 +67,7 @@ component GroupPickRow inherits Rectangle {
 }
 
 export component GroupDeleteDialog {
+    out property <bool> is-open: host.is-open;
     width: 0;
     height: 0;
     public function open() { host.open(); }

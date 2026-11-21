@@ -96,8 +96,18 @@ export function readDocument(text: string): Doc {
       )
         throw new Error(`任务 ${v.title} 的重复规则无效`);
     }
+    // The day it was ticked done (GitHub #15) is only shown: what isn't a day is left out,
+    // the backup is not refused for it.
+    const doneOn = isISODate(v.doneOn) ? v.doneOn : undefined;
+    const doneOnDates = object(v.doneOnDates)
+      ? Object.fromEntries(Object.entries(v.doneOnDates).filter(([k, d]) => isISODate(k) && isISODate(d)))
+      : {};
+    delete v.doneOn;
+    delete v.doneOnDates;
     out.tasks[id] = {
       ...v,
+      ...(doneOn ? { doneOn } : {}),
+      ...(Object.keys(doneOnDates).length ? { doneOnDates } : {}),
       id,
       progress:
         typeof v.progress === "number" && Number.isFinite(v.progress)

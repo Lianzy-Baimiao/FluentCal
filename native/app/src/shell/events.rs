@@ -104,6 +104,7 @@ impl App {
 pub fn tick(app: &mut App) {
     if app.doc.settings.general.language == "system" { app.refresh_language(); }
     crate::startup::ensure_desk_window(app);
+    crate::platform::outside::renew();
     let today = app.today();
     if today == app.day {
         return;

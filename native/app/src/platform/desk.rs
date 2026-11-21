@@ -9,8 +9,9 @@
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU8, Ordering};
 use std::sync::OnceLock;
 use windows::core::{s, w, BOOL, PCWSTR};
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWMWCP_ROUND};
+use windows::Win32::Graphics::Gdi::ScreenToClient;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -77,6 +78,9 @@ static MSG_TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 static ON_EVENT: OnceLock<Box<dyn Fn(DeskEvent) + Send + Sync>> = OnceLock::new();
 /// Window that was in front before the hotkey summoned the calendar.
 static PREV_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+/// Presses on the desk window are reported (`watch_presses`).
+static PRESS_WATCH: AtomicBool = AtomicBool::new(false);
+static ON_PRESS: OnceLock<Box<dyn Fn(i32, i32) + Send + Sync>> = OnceLock::new();
 
 const SUBCLASS_ID: usize = 0xFC01;
 const WM_APP_RESTORE_LAYER: u32 = WM_APP + 1;
@@ -101,6 +105,17 @@ fn emit(e: DeskEvent) {
 /// procedure or from helper threads: post the work to the event loop, don't do it inline.
 pub fn on_event(f: impl Fn(DeskEvent) + Send + Sync + 'static) {
     let _ = ON_EVENT.set(Box::new(f));
+}
+
+/// Sets the handler for mouse presses on the desk window (once): where, in client px. It is
+/// called on the UI thread inside the window procedure, before the window itself gets the
+/// press, and only while `watch_presses` is on.
+pub fn on_press(f: impl Fn(i32, i32) + Send + Sync + 'static) {
+    let _ = ON_PRESS.set(Box::new(f));
+}
+
+pub fn watch_presses(on: bool) {
+    PRESS_WATCH.store(on, Ordering::Relaxed);
 }
 
 /// Subclasses the desk window. Call once per window, on the main thread.
@@ -292,6 +307,18 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
                     emit(DeskEvent::DisplayChanged);
                 }
             });
+        }
+        // A button went down on the calendar while that is watched (the floating to-do column
+        // closes on a press outside it): told first, then the calendar gets the press as ever.
+        // (a finger or a pen: WM_POINTERDOWN, with the place on the screen)
+        WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_POINTERDOWN if PRESS_WATCH.load(Ordering::Relaxed) => {
+            let mut pt = POINT { x: (lp.0 & 0xFFFF) as i16 as i32, y: ((lp.0 >> 16) & 0xFFFF) as i16 as i32 };
+            if msg == WM_POINTERDOWN {
+                let _ = ScreenToClient(hwnd, &mut pt);
+            }
+            if let Some(f) = ON_PRESS.get() {
+                f(pt.x, pt.y);
+            }
         }
         // End of a drag or resize by the user (also through drag_window): the new home.
         WM_EXITSIZEMOVE => emit(DeskEvent::MovedByUser),

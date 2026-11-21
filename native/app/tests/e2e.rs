@@ -2092,3 +2092,294 @@ fn todo_column_scrolls_under_a_dragged_one() {
     }
     assert_eq!(item(&t, "待办02").absolute_position().y, y);
 }
+
+/// 0.3.18 (CAL-10): a task in the "+N" list can be dragged onto another day. Past 12px the list
+/// goes out of sight (it lies over days) and the day under the pointer is marked; let go there
+/// and the task is on that day, the list is closed, a line says where the task went, and it is
+/// one step to take back. Let go on the list's own day or off the days, or Esc: nothing, and
+/// the list is back. A task over several days is held by the list's day; of a repeating one
+/// only this time moves.
+#[test]
+fn day_list_task_drags_to_another_day() {
+    use fluentcal_core::date::{add_days, format_friendly, format_range};
+    use i_slint_backend_testing::AccessibleRole as R;
+    let (day, beside) = ("2026-11-10", "2026-11-13");
+    let mut tasks: Vec<Value> = (0..8).map(|i| json!({ "title": format!("事项{i}"), "start": day })).collect();
+    // three days from the 9th (the 10th is its second), and every Tuesday: first in the list
+    tasks.push(json!({ "id": "trip", "title": "出差", "start": "2026-11-09", "end": "2026-11-11", "order": 0.1 }));
+    tasks.push(json!({ "id": "weekly", "title": "周会", "start": "2026-11-03", "repeat": { "freq": "weekly", "interval": 1 }, "order": 0.2 }));
+    let t = start("daylist-drag", Some(doc_with(&tasks, json!({ "calendar": { "weekStart": 1 } }))));
+    t.w.invoke_jump(day.into());
+    settle();
+    let today = t.today();
+    let button = PointerEventButton::Left;
+    let esc = slint::SharedString::from(Key::Escape);
+    let open = |t: &T| {
+        t.click(&t.find_prefix("还有 ").accessible_label().unwrap());
+        assert!(t.w.get_any_popup(), "the day list is open");
+    };
+    // the list's panel, and a task in it (a task may be on the calendar as well; the last ones
+    // are further down the list than it shows at once)
+    let panel = |t: &T| ElementHandle::find_by_accessible_label(&t.w, &format_friendly(day, &today)).find(|e| e.accessible_role() == Some(R::Groupbox)).expect("the list's panel");
+    let within = |e: &ElementHandle, p: LogicalPosition| {
+        let (o, s) = (e.absolute_position(), e.size());
+        p.x >= o.x && p.x < o.x + s.width && p.y >= o.y && p.y < o.y + s.height
+    };
+    let in_list = |t: &T, title: &str| {
+        let p = panel(t);
+        // (its row in the list is as wide as the list; the list may lie over its chip on the calendar)
+        let wide = p.size().width - 34.0;
+        let e = ElementHandle::find_by_accessible_label(&t.w, title).find(|e| within(&p, e.absolute_position()) && (e.size().width - wide).abs() < 0.5).unwrap_or_else(|| panic!("{title:?} is not in the list"));
+        t.at(&e, 40.0, e.size().height / 2.0)
+    };
+    let on_day = |t: &T, date: &str| {
+        let (_, m, d) = fluentcal_core::date::parts(date);
+        let label = format!("{m}月{d}日 ");
+        let cell = t.w.root_element().query_descendants().match_predicate(move |e| e.accessible_role() == Some(R::ListItem) && e.accessible_label().is_some_and(|l| l.starts_with(&label))).find_first().unwrap_or_else(|| panic!("no day {date}"));
+        let p = t.at(&cell, 40.0, 50.0);
+        assert_eq!(with(|a| a.desk_date_at(p.x, p.y)).flatten().as_deref(), Some(date));
+        p
+    };
+    let changes = || with(|a| a.changes.list().len()).unwrap();
+
+    // out of the list onto a day the list lies over (it opens under its day, or above it)
+    open(&t);
+    assert_eq!(t.w.get_day_list_chips().row_count(), 10);
+    let under = ["2026-11-17", "2026-11-18", "2026-11-03", "2026-11-04"].into_iter().find(|d| within(&panel(&t), on_day(&t, d))).expect("a day under the list");
+    let (from, to) = (in_list(&t, "事项5"), on_day(&t, under));
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x + 6.0, from.y + 6.0) });
+    assert!(!t.w.get_drag_active(), "not yet: a click that slipped");
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x + 12.0, from.y + 12.0) });
+    assert!(t.w.get_drag_active() && t.w.get_drag_label() == "事项5", "held: the list is out of sight");
+    t.ev(WindowEvent::PointerMoved { position: to });
+    settle();
+    assert_eq!(t.w.get_drop_date(), under, "the day under the pointer is marked");
+    assert!(t.w.get_any_popup(), "the list is still there, out of sight");
+    t.ev(WindowEvent::PointerReleased { position: to, button });
+    settle();
+    assert_eq!(t.task("事项5")["start"], json!(under));
+    assert!(!t.w.get_any_popup() && !t.w.get_drag_active(), "landed: the list is closed");
+    assert_eq!(t.w.get_toast_text(), format!("已移到 {}", format_friendly(under, &today)));
+    assert!(t.w.get_toast_undo());
+    assert_eq!(with(|a| a.desk.popups.day_list.clone()).unwrap(), None);
+    // one step, and the keys are with the calendar
+    t.ctrl("z");
+    assert_eq!(t.task("事项5")["start"], json!(day));
+    t.ctrl("y");
+    assert_eq!(t.task("事项5")["start"], json!(under));
+    t.ctrl("z");
+
+    // let go on the list's own day, and off the days: nothing, the list is back
+    open(&t);
+    let before = changes();
+    t.drag(in_list(&t, "事项5"), on_day(&t, day));
+    assert_eq!((t.task("事项5")["start"].clone(), changes()), (json!(day), before));
+    assert!(t.w.get_any_popup() && !t.w.get_drag_active() && t.w.get_drop_date() == "", "the list is back");
+    let title_bar = LogicalPosition::new(300.0, 20.0);
+    assert_eq!(with(|a| a.desk_date_at(title_bar.x, title_bar.y)).unwrap(), None);
+    t.drag(in_list(&t, "事项5"), title_bar);
+    assert_eq!((t.task("事项5")["start"].clone(), changes()), (json!(day), before));
+    assert!(t.w.get_any_popup() && !t.w.get_drag_active());
+    assert_eq!(t.w.get_day_list_chips().row_count(), 10);
+
+    // Esc on the way: the task stays, and so does the list
+    let (from, to) = (in_list(&t, "事项5"), on_day(&t, beside));
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x + 20.0, from.y + 20.0) });
+    t.ev(WindowEvent::PointerMoved { position: to });
+    assert!(t.w.get_drag_active() && t.w.get_drop_date() == beside);
+    t.key(&esc);
+    assert!(!t.w.get_drag_active() && t.w.get_drop_date() == "", "Esc ends the drag");
+    assert!(t.w.get_any_popup(), "… and leaves the list open");
+    t.ev(WindowEvent::PointerReleased { position: to, button });
+    settle();
+    assert_eq!((t.task("事项5")["start"].clone(), changes()), (json!(day), before));
+    assert!(t.w.get_any_popup());
+    // (then Esc closes the list, as ever)
+    t.key(&esc);
+    assert!(!t.w.get_any_popup());
+
+    // three days, held by the list's day (its second): that day goes under the pointer
+    open(&t);
+    t.drag(in_list(&t, "出差"), on_day(&t, under));
+    let trip = t.task("出差");
+    let (first, last) = (add_days(under, -1), add_days(under, 1));
+    assert_eq!((trip["start"].as_str(), trip["end"].as_str()), (Some(first.as_str()), Some(last.as_str())));
+    assert_eq!(t.w.get_toast_text(), format!("已移到 {}", format_range(&first, &last, &today)));
+    assert!(!t.w.get_any_popup());
+
+    // every Tuesday: this one alone goes to Thursday
+    open(&t);
+    t.drag(in_list(&t, "周会"), on_day(&t, beside));
+    let weekly: Vec<Value> = t.tasks().into_iter().filter(|x| x["title"] == "周会").collect();
+    assert_eq!(weekly.len(), 2, "the series and the one that left it");
+    let series = weekly.iter().find(|x| x["id"] == "weekly").unwrap();
+    assert_eq!(series["exDates"], json!([day]));
+    let one = weekly.iter().find(|x| x["id"] != "weekly").unwrap();
+    assert_eq!((one["start"].as_str(), one.get("repeat")), (Some(beside), None));
+    t.ctrl("z");
+    assert_eq!(t.tasks().into_iter().filter(|x| x["title"] == "周会").count(), 1, "one step for both");
+}
+
+/// The list isn't filled again under a task that is held in it (a new list would take the
+/// pointer from the pressed chip, and its release would never come): it follows the data when
+/// the task is let go. A list that closes under a held task ends the drag.
+#[test]
+fn day_list_waits_for_a_held_task() {
+    let day = fluentcal_core::date::today();
+    let tasks: Vec<Value> = (0..8).map(|i| json!({ "id": format!("t{i}"), "title": format!("事项{i}"), "start": day })).collect();
+    let t = start("daylist-held", Some(doc_with(&tasks, json!({}))));
+    let button = PointerEventButton::Left;
+    t.click(&t.find_prefix("还有 ").accessible_label().unwrap());
+    let chip = t.find("事项7");
+    let from = t.at(&chip, 40.0, chip.size().height / 2.0);
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    // another one is done meanwhile (a sync, the phone)
+    with(|a| a.desk_chip_toggle("t0", &a.today(), false)).unwrap();
+    settle();
+    assert_eq!(t.task("事项0")["done"], json!(true));
+    let done = |t: &T| t.w.get_day_list_chips().iter().filter(|c| c.done).count();
+    assert_eq!(done(&t), 0, "held: the list waits");
+    t.ev(WindowEvent::PointerReleased { position: from, button });
+    settle();
+    assert_eq!(done(&t), 1, "let go: the list shows it");
+    assert!(t.w.get_any_popup());
+    // held over the calendar, and the list is closed from outside (a press on another window)
+    let chip = t.find("事项7");
+    let from = t.at(&chip, 40.0, chip.size().height / 2.0);
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x + 30.0, from.y) });
+    assert!(t.w.get_drag_active());
+    with(|a| a.desk_close_popups()).unwrap();
+    settle();
+    assert!(!t.w.get_any_popup() && !t.w.get_drag_active(), "the drag ends with the list");
+    assert!(with(|a| a.desk.drag.is_none()).unwrap());
+    t.ev(WindowEvent::PointerReleased { position: from, button });
+    settle();
+    assert_eq!(t.task("事项7")["start"], json!(day));
+}
+
+/// 0.3.18 (CAL-17): the to-do column that floats over the calendar can close on a press
+/// outside it (设置 › 日历 › 浮动待办栏的收起方式; off by default). The press goes where it was
+/// going: on a day it selects that day. On the column, its handle and the toast it stays open,
+/// and while a menu of the calendar is open; a column beside the calendar never closes this way.
+#[test]
+fn floating_todo_column_closes_on_a_press_outside() {
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let tasks = [
+        json!({ "id": "s1", "title": "整理相册", "start": today, "flex": "someday" }),
+        json!({ "id": "s2", "title": "学吉他", "start": today, "flex": "someday" }),
+        json!({ "id": "rent", "title": "交房租", "start": today }),
+    ];
+    // (the week begins two days after today's weekday: today is in its sixth column, right of
+    // the column)
+    let cal = json!({ "sidebar": true, "sidebarMode": "float", "view": "weeks", "weekStart": (fluentcal_core::date::weekday(&today) + 2) % 7 });
+    let t = start("side-outside", Some(doc_with(&tasks, json!({ "calendar": cal }))));
+    // The real window tells of a press before the calendar gets it (platform::desk's window
+    // procedure); here the test does both.
+    let press = |t: &T, p: LogicalPosition| {
+        let closed = with(|a| a.desk_side_pressed(Some((p.x, p.y)))).unwrap();
+        t.click_at(p);
+        closed
+    };
+    let centre = |e: &ElementHandle| LogicalPosition::new(e.absolute_position().x + e.size().width / 2.0, e.absolute_position().y + e.size().height / 2.0);
+    let item = |t: &T, label: &str| ElementHandle::find_by_accessible_label(&t.w, label).find(|e| e.accessible_role() == Some(R::ListItem)).unwrap_or_else(|| panic!("no {label:?}"));
+    // a day in the last column: far from the column
+    let far_day = |t: &T, row: usize| {
+        let weeks = t.w.get_weeks();
+        let date = weeks.row_data(row).unwrap().cells.row_data(6).unwrap().date.to_string();
+        let (gx, gy, cw, ch, gap) = (t.w.get_grid_x(), t.w.get_grid_y(), t.w.get_cell_w(), t.w.get_cell_h(), t.w.get_cell_gap());
+        let p = LogicalPosition::new(gx + 6.0 * (cw + gap) + cw / 2.0, gy + row as f32 * (ch + gap) + ch - 12.0);
+        assert_eq!(with(|a| a.desk_date_at(p.x, p.y)).flatten(), Some(date.clone()));
+        (date, p)
+    };
+    let set = |v: Value| {
+        with(|a| a.patch_settings(v)).unwrap();
+        settle();
+    };
+    let closes = || with(|a| fluentcal_app::shell::side_closes_outside(&a.doc.settings)).unwrap();
+    let (_, day) = far_day(&t, 1);
+
+    // as before: only the handle closes it
+    assert!(!closes());
+    assert!(!press(&t, day) && t.w.get_side_open());
+
+    set(json!({ "calendar": { "sidebarClose": "outside" } }));
+    assert!(closes());
+    // on the column: a to-do, the add box, the column's own free room
+    let panel = t.find("不定日待办");
+    assert!(!press(&t, centre(&item(&t, "整理相册"))) && t.w.get_side_open(), "a to-do");
+    assert!(!press(&t, centre(&t.find("添加无日期待办"))) && t.w.get_side_open(), "the add box");
+    t.key(&slint::SharedString::from(Key::Escape));
+    assert!(!press(&t, t.at(&panel, panel.size().width - 3.0, panel.size().height - 3.0)) && t.w.get_side_open(), "the column's corner");
+    // its handle closes it as ever (the press doesn't close it first, or the click would open it again)
+    assert!(!press(&t, centre(&t.find("收起待办栏"))));
+    assert!(!t.w.get_side_open(), "the handle closed it");
+    assert!(!press(&t, centre(&t.find("展开待办栏（不定日待办）"))));
+    assert!(t.w.get_side_open(), "… and opens it");
+
+    // a menu of the calendar is open: the press is the menu's
+    t.right_click_at(centre(&item(&t, "学吉他")));
+    assert!(t.w.get_any_popup());
+    assert!(!press(&t, day), "the press that dismisses the menu");
+    assert!(!t.w.get_any_popup() && t.w.get_side_open());
+    // the toast
+    with(|a| a.notify("已保存", false)).unwrap();
+    settle();
+    assert!(!press(&t, centre(&t.find("关闭"))) && t.w.get_side_open(), "the toast's button");
+    assert_eq!(t.w.get_toast_text(), "");
+
+    // a to-do on its way to another place in the column: a second button doesn't end it
+    let from = centre(&item(&t, "学吉他"));
+    t.ev(WindowEvent::PointerMoved { position: from });
+    t.ev(WindowEvent::PointerPressed { position: from, button: PointerEventButton::Left });
+    t.ev(WindowEvent::PointerMoved { position: LogicalPosition::new(from.x, from.y - 20.0) });
+    assert!(t.w.get_drag_active());
+    assert!(!with(|a| a.desk_side_pressed(Some((day.x, day.y)))).unwrap());
+    t.ev(WindowEvent::PointerReleased { position: from, button: PointerEventButton::Left });
+    settle();
+    assert!(t.w.get_side_open());
+
+    // a day: the column closes, and the day is selected by the same press
+    let (date, day) = far_day(&t, 2);
+    assert_ne!(with(|a| a.desk.ui.selected.clone()).unwrap(), date);
+    assert!(press(&t, day));
+    assert!(!t.w.get_side_open() && !with(|a| a.doc.settings.calendar.sidebar).unwrap());
+    assert_eq!(with(|a| a.desk.ui.selected.clone()).unwrap(), date, "the press went on to the day");
+    assert!(!closes() && !press(&t, day), "closed: nothing to close");
+
+    // a task's check circle: the column closes, and the same press ticks the task
+    set(json!({ "calendar": { "sidebar": true } }));
+    let chip = ElementHandle::find_by_accessible_label(&t.w, "交房租").next().expect("the task on the calendar");
+    let panel = t.find("不定日待办");
+    assert!(chip.absolute_position().x > panel.absolute_position().x + panel.size().width, "the task is beside the column");
+    assert!(press(&t, t.at(&chip, 9.0, chip.size().height / 2.0)));
+    assert!(!t.w.get_side_open());
+    assert_eq!(t.task("交房租")["done"], json!(true), "the press went on to the check circle");
+
+    // anywhere else (the desktop, another program's window: the mouse hook tells)
+    set(json!({ "calendar": { "sidebar": true } }));
+    assert!(with(|a| a.desk_side_pressed(None)).unwrap());
+    settle();
+    assert!(!t.w.get_side_open());
+
+    // not while the calendar is being moved or lets the mouse through, nor beside the calendar
+    set(json!({ "calendar": { "sidebar": true }, "desk": { "locked": false } }));
+    assert!(!with(|a| a.desk_side_pressed(None)).unwrap() && t.w.get_side_open());
+    set(json!({ "desk": { "locked": true, "clickThrough": true } }));
+    assert!(!with(|a| a.desk_side_pressed(None)).unwrap() && t.w.get_side_open());
+    set(json!({ "desk": { "clickThrough": false }, "calendar": { "sidebarMode": "inline" } }));
+    let (_, day) = far_day(&t, 1);
+    assert!(!press(&t, day) && !with(|a| a.desk_side_pressed(None)).unwrap() && t.w.get_side_open());
+    set(json!({ "calendar": { "sidebarMode": "left" } }));
+    assert!(!with(|a| a.desk_side_pressed(None)).unwrap() && t.w.get_side_open());
+    // … nor in the views without the column
+    set(json!({ "calendar": { "sidebarMode": "float", "view": "list" } }));
+    assert!(!with(|a| a.desk_side_pressed(None)).unwrap() && with(|a| a.doc.settings.calendar.sidebar).unwrap());
+}

@@ -64,6 +64,7 @@ pub fn apply_settings(app: &mut App, old: &Settings) {
     if list(&new.calendar).is_some() && list(&old.calendar) != list(&new.calendar) {
         app.desk_list_scroll_today();
     }
+    app.desk_side_watch();
     tray_refresh(app);
     if old.reminders != new.reminders || old.tasks != new.tasks {
         app.schedule_reminders();
@@ -88,6 +89,13 @@ pub fn apply_desk_platform(app: &mut App) {
 /// The to-do column is shown (the month and multi-week views have it).
 pub fn side_shown(s: &Settings) -> bool {
     s.calendar.sidebar && s.calendar.view != "gantt" && s.calendar.view != "list"
+}
+
+/// The to-do column floats over the calendar, is open, and closes on a press outside it
+/// (设置 › 日历 › 浮动待办栏的收起方式). Not while the calendar is being moved or lets the mouse
+/// through: the column can't be used then either.
+pub fn side_closes_outside(s: &Settings) -> bool {
+    side_shown(s) && s.calendar.sidebar_mode == "float" && s.calendar.sidebar_close == "outside" && s.desk.locked && !s.desk.click_through
 }
 
 /// Physical px the window grows on its left for the to-do column (设置 › 日历 › 向左扩展窗口

@@ -22,6 +22,10 @@ pub struct Drag {
     /// under the pointer.
     pub offset: i32,
     pub active: bool,
+    /// Out of the "+N" list (the list hides while it is on its way and closes when it lands).
+    pub from_list: bool,
+    /// … and the list's data changed meanwhile: it is filled again when the drag ends.
+    pub stale: bool,
 }
 
 pub struct DeskLive {

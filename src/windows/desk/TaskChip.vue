@@ -5,7 +5,9 @@ import { FIcon, taskColor, vTip } from '@/fluent';
 import type { Chip } from '@/lib/layout';
 import { doc, storeState } from '@/stores/doc';
 import { isDark } from '@/composables/theme';
-import { formatRange } from '@/lib/date';
+import { now } from '@/composables/now';
+import { barLabel, occDoneDay } from '@/lib/bar';
+import { formatFriendly, formatRange } from '@/lib/date';
 import { describeRule } from '@/lib/recur';
 
 const props = defineProps<{ chip: Chip; dragging?: boolean }>();
@@ -21,6 +23,22 @@ const occ = computed(() => props.chip.occ);
 const task = computed(() => occ.value.task);
 const colors = computed(() => taskColor(task.value.color, isDark.value));
 
+// A bar over several days: which day it is, the progress or the day it was done, after the
+// title (设置 › 日历 on the PC has a switch for each), and how much of this piece is done.
+const doneOn = computed(() => occDoneDay(occ.value));
+const bar = computed(() => {
+  const c = doc.settings.calendar;
+  if (!props.chip.multiDay) return { text: '', fill: 0 };
+  return barLabel(occ.value, props.chip.segStart, props.chip.span, now.value, { days: c.barDays, progress: c.barProgress, done: c.barDone });
+});
+// The label shows when there is room for all of it or for "第5-2天…" at the least (4.5em):
+// about its own width, a full-width character 1em and the others 0.6em.
+const labelMin = computed(() => {
+  let em = 0;
+  for (const ch of bar.value.text) em += ch.charCodeAt(0) > 0x2e7f ? 1 : 0.6;
+  return `${Math.min(4.5, em).toFixed(1)}em`;
+});
+
 const tip = computed(() => {
   const t = task.value;
   const lines = [t.title, formatRange(occ.value.start, occ.value.end) + (t.time ? ` ${t.time}` : '')];
@@ -28,6 +46,7 @@ const tip = computed(() => {
   if (g) lines.push(tr("分组：{0}", g.name));
   if (t.repeat) lines.push(tr("重复：{0}", describeRule(t.repeat, t.start)));
   if (!t.repeat && t.progress > 0 && !t.done) lines.push(tr("进度：{0}%", t.progress));
+  if (doneOn.value) lines.push(tr("完成于 {0}", formatFriendly(doneOn.value)));
   if (t.notes) lines.push(t.notes.length > 120 ? `${t.notes.slice(0, 120)}…` : t.notes);
   return { text: lines.join('\n'), placement: 'top' as const };
 });
@@ -64,6 +83,7 @@ const style = computed(() =>
     @pointerdown="emit('pointerdown', $event)"
     @keydown="emit('key', $event)"
   >
+    <span v-if="bar.fill > 0" class="fill" :style="{ width: `${bar.fill * 100}%` }" aria-hidden="true" />
     <button
       class="check"
       type="button"
@@ -78,13 +98,21 @@ const style = computed(() =>
       <svg v-if="occ.done" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.6 6.2 5 8.5l4.4-4.9" /></svg>
     </button>
     <span v-if="task.time && !chip.contLeft" class="time">{{ task.time }}</span>
-    <span class="title">{{ task.title }}</span>
+    <!-- The title comes first: the label gets the room that is left, is cut short with "…"
+         there, and goes (to a second line that is cut off) when that is too little. -->
+    <span v-if="bar.text" class="words">
+      <span class="title">{{ task.title }}</span>
+      <span class="pct" :style="{ flexBasis: labelMin }">{{ bar.text }}</span>
+    </span>
+    <span v-else class="title">{{ task.title }}</span>
     <FIcon v-if="task.repeat" name="repeat" class="rep" :size="10" />
   </div>
 </template>
 
 <style scoped>
 .chip {
+  position: relative;
+  z-index: 0;
   height: 100%;
   display: flex;
   align-items: center;
@@ -128,6 +156,39 @@ const style = computed(() =>
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+/* the done part of a bar, darker (as in the Gantt chart); under the text */
+.fill {
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #00000038;
+  pointer-events: none;
+}
+/* one line of a wrapping row: what doesn't fit on it is out of sight */
+.words {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 1.3em;
+  line-height: 1.3;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 4px;
+  overflow: hidden;
+}
+.words .title {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+/* (as strong as the title: paler, it falls short of 4.5:1 on some of the bar colours) */
+.pct {
+  flex: 1 1 4.5em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .time {
   font-variant-numeric: tabular-nums;

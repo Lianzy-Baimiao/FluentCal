@@ -85,6 +85,17 @@ export component CalendarPage inherits VerticalLayout {
                 selected(v) => { SetState.set-str("calendar.sidebarMode", v); }
             }
         }
+        if SetState.calendar.sidebar-mode == "float": SettingsCard {
+            icon: Glyph.list;
+            title: @tr("浮动待办栏的收起方式");
+            description: @tr("点击栏外也收起：在待办栏以外的任何地方按下鼠标（日历、桌面、其他窗口）时自动收起，这一下点击照常生效");
+            Select {
+                width: 170px;
+                value: SetState.calendar.sidebar-close;
+                options: [{ value: "button", label: @tr("再点一次按钮") }, { value: "outside", label: @tr("点击栏外也收起") }];
+                selected(v) => { SetState.set-str("calendar.sidebarClose", v); }
+            }
+        }
         SettingsCard {
             icon: Glyph.calendar-day;
             title: @tr("多日任务显示第几天");

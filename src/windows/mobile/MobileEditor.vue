@@ -22,7 +22,7 @@ const props = defineProps<{
   date?: ISODate;
   groupId?: string;
 }>();
-const emit = defineEmits<{ close: []; saved: [message: string] }>();
+const emit = defineEmits<{ close: []; saved: [message: string, task?: Task] }>();
 
 const draft = ref<Task | null>(null);
 const isNew = computed(() => !props.task);
@@ -40,6 +40,11 @@ const repeat = ref("");
 const interval = ref(1);
 const reminder = ref("");
 const milestone = ref(false);
+/** 完成日期: the day it was ticked done ("" = not recorded). Not for repeating tasks and to-dos. */
+const doneOn = ref("");
+let wasDone = false;
+/** It was done when the editor opened (a day that is missing then was never recorded). */
+const doneBefore = ref(false);
 const error = ref("");
 const busy = ref(false);
 const deleting = ref(false);
@@ -64,6 +69,7 @@ const state = () =>
     repeat.value === "daily" ? interval.value : 1,
     reminder.value,
     milestone.value,
+    doneOn.value,
   ]);
 
 function load() {
@@ -83,6 +89,9 @@ function load() {
   interval.value = t?.repeat?.freq === "daily" ? Math.max(1, Math.floor(t.repeat.interval ?? 1)) : 1;
   reminder.value = JSON.stringify(t?.reminders ?? []);
   milestone.value = !!t?.milestone;
+  doneOn.value = t && t.done && !t.repeat && !flexKind(t) && isISODate(t.doneOn) ? t.doneOn : "";
+  wasDone = done.value;
+  doneBefore.value = !!t?.done && !t.repeat;
   error.value = "";
   deleting.value = discard.value = showNewGroup.value = false;
   newGroupName.value = "";
@@ -150,6 +159,12 @@ function rule(base?: Task["repeat"]): Task["repeat"] {
 const dailyRange = computed(
   () => !!dailyRangeEnd({ start: start.value, end: end.value, repeat: rule() } as Task),
 );
+/** Ticked: done today, until 完成日期 says another day; unticked: no day (as on the PC). */
+function doneChanged() {
+  if (done.value === wasDone) return;
+  wasDone = done.value;
+  doneOn.value = done.value && !repeat.value ? today() : "";
+}
 function normalizeDates() {
   if (!start.value) start.value = today();
   if (!end.value || end.value < start.value) end.value = start.value;
@@ -186,6 +201,11 @@ async function save() {
     error.value = "请输入任务名称";
     return;
   }
+  const dated = done.value && !repeat.value && !flex.value;
+  if (dated && doneOn.value && (!isISODate(doneOn.value) || doneOn.value > today())) {
+    error.value = "完成日期不能晚于今天";
+    return;
+  }
   const base = draft.value;
   const next: Task = base
     ? {
@@ -214,6 +234,10 @@ async function save() {
         done: done.value || progress.value >= 100,
         repeat: rule(),
       });
+  // 完成日期 as chosen. Emptied: no day (one that was never recorded is not made up); a
+  // fresh tick without one is stamped today when the task is saved.
+  if (dated && doneOn.value) next.doneOn = doneOn.value;
+  else if (dated) delete next.doneOn;
   next.reminders = JSON.parse(reminder.value || "[]");
   next.milestone = milestone.value || undefined;
   if (base && flexKind(base)) {
@@ -239,8 +263,9 @@ async function save() {
   try {
     if (base && !doc.tasks[base.id])
       throw new Error("这个任务已经被删除，请关闭编辑器后重新创建");
-    await saveTask(base ? mergeEdit(base, next, doc.tasks[base.id]) : next);
-    emit("saved", "任务已保存");
+    const saved = base ? mergeEdit(base, next, doc.tasks[base.id]) : next;
+    await saveTask(saved);
+    emit("saved", "任务已保存", saved);
     emit("close");
   } catch (e) {
     error.value = `保存失败：${e}`;
@@ -455,18 +480,39 @@ async function remove(all = false) {
                 min="0"
                 max="100"
                 step="5"
-                @change="done = progress >= 100"
+                @change="
+                  done = progress >= 100;
+                  doneChanged();
+                "
             /></template>
             <label class="done-row"
               ><input
                 v-model="done"
                 type="checkbox"
                 @change="
-                  progress = done ? 100 : progress === 100 ? 0 : progress
+                  progress = done ? 100 : progress === 100 ? 0 : progress;
+                  doneChanged();
                 "
               />
               {{ repeat ? "本次已完成" : "已完成" }}</label
             >
+            <label v-if="done && !repeat" class="field done-on"
+              ><span>完成日期</span
+              ><input
+                v-model="doneOn"
+                type="date"
+                min="1901-01-01"
+                :max="today()"
+                aria-label="完成日期"
+                @change="error = ''"
+            /></label>
+            <p v-if="done && !repeat && !doneOn" class="rule-note">
+              {{
+                doneBefore
+                  ? "没有记录是哪天完成的，可以在这里补上。"
+                  : "不填则记为今天完成。"
+              }}
+            </p>
             <label class="done-row"
               ><input v-model="milestone" type="checkbox" /> 里程碑</label
             >
@@ -647,6 +693,12 @@ async function remove(all = false) {
   flex: none;
   color: var(--text-secondary);
   font-size: 13px;
+}
+.field.done-on {
+  border-top: 1px solid var(--divider);
+}
+.field.done-on > span {
+  width: auto;
 }
 .field input,
 .field select,

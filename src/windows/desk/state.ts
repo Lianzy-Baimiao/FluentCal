@@ -1,9 +1,10 @@
 import { t as tr } from '@/i18n';
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import type { ISODate } from '@/types';
 import { addDays, addMonths, parts, startOfMonth, startOfWeek } from '@/lib/date';
 import { call } from '@/api';
-import { doc, patchSettings, storeState } from '@/stores/doc';
+import { shown, tidyFilter } from '@/lib/filter';
+import { doc, patchSettings, storeState, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
 
 /** UI state shared by the desk window's components (and the web view, which reuses them). */
@@ -21,6 +22,18 @@ export const ui = reactive({
   ganttFocus: '',
   /** Transient message at the bottom of the calendar, e.g. after a delete. */
   toast: null as null | { text: string; undo: boolean },
+  /** 按分组筛选 (the web view): the group ids that show, '' for 未分组; empty: everything.
+   * Kept here only: it is for a look. */
+  groupFilter: [] as string[],
+});
+
+/** The filter as it applies now (groups that are gone have left it). */
+export const groupFilter = computed(() => tidyFilter(doc.groups, ui.groupFilter));
+/** The tasks the month, the weeks, the list and "+N" show. Search, the countdowns and the
+ * Gantt chart take all of them. */
+export const shownTasks = computed(() => {
+  const f = groupFilter.value;
+  return f.length ? taskList.value.filter((t) => shown(doc.groups, f, t)) : taskList.value;
 });
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;

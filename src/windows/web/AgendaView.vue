@@ -6,10 +6,10 @@ import { addDays, formatRange, weekday, WEEKDAY_SHORT } from '@/lib/date';
 import { displayInfo as dayInfo } from '@/lib/lunar';
 import { agenda, allTasks, dayHeading } from '@/lib/agenda';
 import { describeRule, type Occurrence } from '@/lib/recur';
-import { doc, taskList } from '@/stores/doc';
+import { doc } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { isDark } from '@/composables/theme';
-import { openEditor } from '../desk/state';
+import { openEditor, shownTasks } from '../desk/state';
 
 /**
  * The web view's list (WEB-03): 近期 is today and the next days, by day; 所有 every task once
@@ -20,8 +20,8 @@ const span = ref(30);
 const all = computed(() => props.range === 'all');
 const days = computed(() =>
   all.value
-    ? allTasks(taskList.value, now.value, doc.settings.tasks.showCompleted)
-    : agenda(taskList.value, now.value, addDays(now.value, span.value - 1), now.value, doc.settings.tasks.showCompleted),
+    ? allTasks(shownTasks.value, now.value, doc.settings.tasks.showCompleted)
+    : agenda(shownTasks.value, now.value, addDays(now.value, span.value - 1), now.value, doc.settings.tasks.showCompleted),
 );
 
 function sub(date: string): string {

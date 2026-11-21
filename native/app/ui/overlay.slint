@@ -255,12 +255,17 @@ export component Flyout {
     // 16px padding (0.2's .pad) or none.
     in property <bool> padded: true;
     in property <string> label;
+    // Out of sight without closing: the day list while one of its tasks is dragged over the
+    // calendar (the panel stays, the pressed chip keeps the pointer). Esc then asks
+    // `cancel-hidden` instead of closing.
+    in property <bool> hidden;
     out property <bool> is-open;
     out property <length> anchor-x;
     out property <length> anchor-y;
     out property <length> anchor-w;
     out property <length> anchor-h;
     callback closed();
+    callback cancel-hidden();
     // Keys inside the flyout that the content didn't take (Esc is handled here).
     callback key(KeyEvent) -> EventResult;
     width: 0;
@@ -294,7 +299,11 @@ export component Flyout {
             init => { self.focus(); }
             key-pressed(e) => {
                 if e.text == Key.Escape {
-                    root.close();
+                    if root.hidden {
+                        root.cancel-hidden();
+                    } else {
+                        root.close();
+                    }
                     return accept;
                 }
                 return root.key(e);
@@ -324,7 +333,7 @@ export component Flyout {
                 y: at.y + (1 - slide) * (at.side == "bottom" ? -8px : at.side == "top" ? 8px : 0);
                 width: w;
                 height: h;
-                opacity: fade;
+                opacity: root.hidden ? 0 : fade;
                 accessible-role: groupbox;
                 accessible-label: root.label;
                 BoxShadow {
@@ -346,7 +355,8 @@ export component Flyout {
                     @children
                 }
             }
-            TipLayer { layer: 1; }
+            // (none over a panel that is out of sight)
+            if !root.hidden: TipLayer { layer: 1; }
         }
     }
 }

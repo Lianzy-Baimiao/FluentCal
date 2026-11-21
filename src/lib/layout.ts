@@ -9,6 +9,8 @@ export interface Chip {
   /** 0–6 */
   col: number;
   span: number;
+  /** The first day of this piece (the task's start, or the week's when it began before). */
+  segStart: ISODate;
   lane: number;
   /** Continues from the previous / into the next week. */
   contLeft: boolean;
@@ -72,6 +74,7 @@ export function layoutWeek(weekStart: ISODate, occs: Occurrence[], opt: LayoutOp
       occ,
       col,
       span,
+      segStart: s,
       lane,
       contLeft: occ.start < weekStart,
       contRight: occ.end > weekEnd,

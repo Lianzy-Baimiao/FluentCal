@@ -2,7 +2,8 @@
 //! MonthView onGridKey/onWheel/chipDown…, DeskApp onAdjustDown/onGripDown).
 
 use crate::app::App;
-use fluentcal_core::date::{add_days, add_months, diff_days, now_ms};
+use fluentcal_core::date::{add_days, add_months, diff_days, format_range, now_ms};
+use fluentcal_core::i18n::trf;
 use fluentcal_core::recur::occurrence_on;
 use fluentcal_core::tasks;
 use slint::platform::Key;
@@ -115,21 +116,37 @@ impl App {
     // ------------------------------------------------------------- dragging a chip
 
     pub fn desk_chip_press(&mut self, key: &str, task_id: &str, date: &str, x: f32, y: f32) {
+        let held = self.desk_date_at(x, y);
+        self.desk_drag_begin(key, task_id, date, (x, y), held, false);
+    }
+
+    /// A task in the "+N" list is pressed: it can be dragged out of the list, onto another day
+    /// (CAL-10). It is held by the list's day: a task over several days keeps that day under
+    /// the pointer, whatever lies under the list.
+    pub fn desk_day_list_press(&mut self, key: &str, task_id: &str, date: &str, x: f32, y: f32) {
+        let Some(day) = self.desk.popups.day_list.clone() else { return };
+        self.desk_drag_begin(key, task_id, date, (x, y), Some(day), true);
+    }
+
+    /// `held`: the day the occurrence is held by.
+    fn desk_drag_begin(&mut self, key: &str, task_id: &str, date: &str, (x, y): (f32, f32), held: Option<String>, from_list: bool) {
         if self.desk.window.get_read_only() {
             return;
         }
         let Some(t) = self.doc.tasks.get(task_id) else { return };
         let start = occurrence_on(t, date).map_or_else(|| t.start.clone(), |o| o.start);
-        let offset = self.desk_date_at(x, y).map_or(0, |at| diff_days(&start, &at));
+        let offset = held.map_or(0, |at| diff_days(&start, &at));
         let title = t.title.clone();
-        self.desk.drag = Some(super::live::Drag { key: key.into(), task_id: task_id.into(), date: date.into(), title, x, y, offset, active: false });
+        self.desk.drag = Some(super::live::Drag { key: key.into(), task_id: task_id.into(), date: date.into(), title, x, y, offset, active: false, from_list, stale: false });
     }
 
     pub fn desk_chip_move(&mut self, x: f32, y: f32) {
         let over = self.desk_date_at(x, y).unwrap_or_default();
         let Some(d) = self.desk.drag.as_mut() else { return };
         if !d.active {
-            if (x - d.x).hypot(y - d.y) < 5.0 {
+            // Out of the list it takes more: the list goes out of sight, and a click that
+            // slipped must not send the task to whatever day lies under the list.
+            if (x - d.x).hypot(y - d.y) < if d.from_list { 12.0 } else { 5.0 } {
                 return;
             }
             d.active = true;
@@ -147,14 +164,26 @@ impl App {
     pub fn desk_chip_release(&mut self, x: f32, y: f32) {
         let target = self.desk.drag.as_ref().filter(|d| d.active).and_then(|_| self.desk_date_at(x, y));
         let Some(d) = self.desk_drag_end() else { return };
+        // Out of the list onto the list's own day: nothing to move, the list is back as it was.
+        let target = target.filter(|t| !d.from_list || Some(t) != self.desk.popups.day_list.as_ref());
         let (Some(target), Some(t)) = (target, self.doc.tasks.get(&d.task_id)) else { return };
         let Some(occ) = occurrence_on(t, &d.date) else { return };
+        let start = add_days(&target, -d.offset);
+        let moved_to = d.from_list.then(|| format_range(&start, &add_days(&start, diff_days(&occ.start, &occ.end)), &self.today()));
         self.history.boundary();
-        let edit = tasks::move_occurrence(&self.doc, &occ, &add_days(&target, -d.offset), now_ms());
+        let edit = tasks::move_occurrence(&self.doc, &occ, &start, now_ms());
+        if d.from_list {
+            // The task has left the list's day: the list closes, and a line says where it went.
+            self.desk.popups.day_list = None;
+            self.desk.window.invoke_close_day_list();
+        }
         // Moving to another week removes the focused chip. Keep the keyboard on a
         // stable item before refreshing the models so undo/redo and search still work.
         self.desk.window.invoke_focus_root();
         self.apply(edit, true);
+        if let Some(day) = moved_to {
+            self.notify(&trf("已移到 {0}", &[day]), true);
+        }
     }
 
     pub fn desk_drag_end(&mut self) -> Option<super::live::Drag> {
@@ -162,7 +191,12 @@ impl App {
         w.set_drag_active(false);
         w.set_drop_date("".into());
         w.set_dragging_key("".into());
-        self.desk.drag.take()
+        let d = self.desk.drag.take();
+        // The "+N" list didn't follow the data while one of its tasks was held.
+        if d.as_ref().is_some_and(|d| d.stale) {
+            self.desk_refresh_day_list();
+        }
+        d
     }
 
     /// The day cell under a point (window logical px); None over a gap or outside the grid.

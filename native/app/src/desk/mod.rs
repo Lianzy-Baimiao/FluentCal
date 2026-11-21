@@ -133,6 +133,21 @@ impl Desk {
         match s("open").as_str() {
             "dayList" => {
                 let (title, lunar, chips) = overlays::day_list(&self.doc, &self.ui, &s("date"), &self.today, &self.tokens);
+                // `drag`: the task in row `row` is on its way to the day `over`, the pointer at
+                // `at` (CAL-10: the list is out of sight meanwhile).
+                if let Some(d) = spec.get("drag") {
+                    use slint::Model;
+                    let at: Vec<f32> = d.get("at").and_then(serde_json::Value::as_array).map_or(vec![0.0; 2], |v| v.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect());
+                    let row = d.get("row").and_then(serde_json::Value::as_u64).unwrap_or(0) as usize;
+                    if let Some(c) = chips.row_data(row) {
+                        w.set_dragging_key(c.key.clone());
+                        w.set_drag_label(c.title.clone());
+                        w.set_drag_x(at[0]);
+                        w.set_drag_y(at[1]);
+                        w.set_drop_date(d.get("over").and_then(serde_json::Value::as_str).unwrap_or("").into());
+                        w.set_drag_active(true);
+                    }
+                }
                 w.set_day_list_title(title.into());
                 w.set_day_list_lunar(lunar.into());
                 w.set_day_list_chips(chips);

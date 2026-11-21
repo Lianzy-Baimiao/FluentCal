@@ -8,8 +8,8 @@ import { displayInfo as dayInfo } from '@/lib/lunar';
 import { occurrences } from '@/lib/recur';
 import type { Chip } from '@/lib/layout';
 import { addTask, setOccurrenceDone } from '@/lib/tasks';
-import { doc, storeState, taskList } from '@/stores/doc';
-import { openEditor } from './state';
+import { doc, storeState } from '@/stores/doc';
+import { openEditor, shownTasks } from './state';
 import { chipMenu } from './menus';
 import TaskChip from './TaskChip.vue';
 
@@ -18,7 +18,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const chips = computed<Chip[]>(() => {
   if (!props.date) return [];
-  const list = taskList.value.flatMap((t) => occurrences(t, props.date, props.date));
+  const list = shownTasks.value.flatMap((t) => occurrences(t, props.date, props.date));
   const shown = doc.settings.tasks.showCompleted ? list : list.filter((o) => !o.done);
   return shown
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.task.time ?? '').localeCompare(b.task.time ?? '') || a.task.order - b.task.order)
@@ -27,6 +27,7 @@ const chips = computed<Chip[]>(() => {
       occ,
       col: 0,
       span: 1,
+      segStart: occ.start,
       lane: 0,
       contLeft: false,
       contRight: false,

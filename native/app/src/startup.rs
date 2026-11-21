@@ -179,6 +179,8 @@ pub fn init(app: &mut App, headless: bool) {
         let _ = app.desk.window.show();
     } else {
         pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
+        // (at once, not posted: the column is gone before the calendar gets the press)
+        pd::on_press(|x, y| run(move |app| app.desk_side_pressed_px(x, y)));
         show_desk_window(app);
     }
     seed_if_first_run(app);
@@ -273,6 +275,7 @@ fn show_desk_window(app: &mut App) {
             shell::apply_desk_platform(app);
             shell::apply_layout(app, false);
             app.desk_apply_theme(); // the window's real scale factor
+            app.desk_side_watch();
             app.last_monitor = shell::current_screen(app);
             shell::tray_refresh(app);
         });

@@ -17,6 +17,8 @@ import {
 } from "@/lib/date";
 import { dayInfo } from "@/lib/lunar";
 import { agenda, dayHeading } from "@/lib/agenda";
+import { barLabel, occDoneDay } from "@/lib/bar";
+import { filterNames, newTaskGroup, shown, tidyFilter } from "@/lib/filter";
 import { occurrences, type Occurrence } from "@/lib/recur";
 import {
   doc,
@@ -49,6 +51,7 @@ import { call } from "@/api";
 import { now, startClock } from "@/composables/now";
 import { startThemeSync, isDark } from "@/composables/theme";
 import MobileEditor from "./MobileEditor.vue";
+import MobileFilter from "./MobileFilter.vue";
 import MobileGantt from "./MobileGantt.vue";
 import MobileSync from "./MobileSync.vue";
 import MobileUpdates from "./MobileUpdates.vue";
@@ -65,6 +68,11 @@ const editorGroup = ref("");
 const editorRef = ref<InstanceType<typeof MobileEditor>>();
 const search = ref("");
 const showSearch = ref(false);
+// 按分组筛选 (CAL-20): the groups the 日程 and 月历 pages show ("" = 未分组; none = everything).
+// For a look: kept until the app is closed. The Gantt chart has its own, and a search looks
+// through everything.
+const groupFilter = ref<string[]>([]);
+const filterOpen = ref(false);
 const toast = ref("");
 const error = ref("");
 const loading = ref(true);
@@ -86,20 +94,32 @@ const activeTitle = computed(
       settings: "设置",
     })[tab.value],
 );
-const taskCount = computed(
-  () =>
-    taskList.value.filter((t) =>
-      flexKind(t)
-        ? flexOpen(t, now.value)
-        : t.repeat
-          ? occurrences(t, now.value, now.value, 10).some((o) => !o.done)
-          : !t.done,
-    ).length,
+/** The filter as it applies now (groups that are gone have left it). */
+const activeFilter = computed(() => tidyFilter(doc.groups, groupFilter.value));
+const filtering = computed(() => activeFilter.value.length > 0 && !search.value.trim());
+const shownList = computed(() =>
+  filtering.value ? taskList.value.filter((t) => shown(doc.groups, activeFilter.value, t)) : taskList.value,
 );
+/** "工作、生日" (more than three: "工作、生日、还款 等 5 个分组"). */
+const filterText = computed(() => {
+  const names = filterNames(doc.groups, activeFilter.value);
+  return names.length > 3 ? `${names.slice(0, 3).join("、")} 等 ${names.length} 个分组` : names.join("、");
+});
+const openCount = (list: Task[]) =>
+  list.filter((t) =>
+    flexKind(t)
+      ? flexOpen(t, now.value)
+      : t.repeat
+        ? occurrences(t, now.value, now.value, 10).some((o) => !o.done)
+        : !t.done,
+  ).length;
+/** Everything that is open (the badge), and what the page shows of it (its headline). */
+const taskCount = computed(() => openCount(taskList.value));
+const shownCount = computed(() => openCount(shownList.value));
 const hasSamples = computed(() => taskList.value.some((t) => t.sample));
 const filteredTasks = computed(() => {
   const q = search.value.trim().toLowerCase();
-  return taskList.value.filter(
+  return shownList.value.filter(
     (t) => !q || (t.title + " " + (t.notes ?? "")).toLowerCase().includes(q),
   );
 });
@@ -175,10 +195,19 @@ async function action(fn: () => Promise<unknown>) {
     error.value = String(e);
   }
 }
+/** The one group that shows alone: a task made on the 日程 or 月历 page goes into it (it would
+ * vanish as it is made otherwise). */
+const newGroup = () => (filtering.value && tab.value !== "gantt" ? newTaskGroup(activeFilter.value) : undefined);
+/** A task was made or changed that the filter hides: says so, or it would look as if nothing
+ * happened. */
+function saved(message: string, task?: Task) {
+  const hidden = !!task && filtering.value && tab.value !== "gantt" && !shown(doc.groups, activeFilter.value, task);
+  notify(hidden ? message + "（当前筛选下不显示）" : message);
+}
 function openNew(date = selected.value, groupId = "") {
   editorTask.value = undefined;
   editorDate.value = date;
-  editorGroup.value = groupId;
+  editorGroup.value = groupId || newGroup() || "";
   editorOpen.value = true;
 }
 function openTask(t: Task, date = t.start) {
@@ -212,7 +241,7 @@ function pickDay(d: ISODate) {
 // and the ones without a date.
 const flexText = ref<Record<string, string>>({ month: "", someday: "" });
 const flexGroups = computed(() => {
-  const s = flexSide(taskList.value, now.value);
+  const s = flexSide(shownList.value, now.value);
   const row = (task: Task, slot: string, done?: ISODate) => ({ task, slot, done });
   return [
     {
@@ -244,7 +273,7 @@ function flexFold() {
   localStorage.setItem(FLEX_OPEN_KEY, flexOpened.value ? "1" : "0");
 }
 const flexSummary = computed(() => {
-  const s = flexSide(taskList.value, now.value);
+  const s = flexSide(shownList.value, now.value);
   const open = s.month.filter((x) => !x.done).length + s.someday.length;
   return { open, overdue: s.overdue.length };
 });
@@ -255,13 +284,26 @@ function flexAdd(kind: "month" | "someday") {
   const title = flexText.value[kind].trim();
   if (!title) return;
   flexText.value[kind] = "";
-  void action(() => addTask(newFlex(kind, title, now.value)));
+  void action(async () => {
+    const t = await addTask({ ...newFlex(kind, title, now.value), groupId: newGroup() });
+    if (filtering.value && !shown(doc.groups, activeFilter.value, t)) notify(`已添加“${title}”（当前筛选下不显示）`);
+  });
 }
 function occurrenceDone(o: Occurrence) {
   void action(() => setOccurrenceDone(o.task, o.date, !o.done));
 }
 function displayTime(t: Task) {
   return t.time || "全天";
+}
+/** "第5-2天（40%）" for a task over several days: 5 days in all, today is the 2nd. */
+const dayText = (o: Occurrence) =>
+  barLabel(o, o.start, 1, now.value, { days: true, progress: false, done: false }).text;
+/** "11月27日完成": the day it was ticked done, when that was recorded (GitHub #15). */
+function doneText(o: Occurrence) {
+  const day = occDoneDay(o);
+  if (!day) return "";
+  const [y, m, d] = parts(day);
+  return `${y === parts(now.value)[0] ? "" : y + "年"}${m}月${d}日完成`;
 }
 function groupName(t: Task) {
   return t.groupId ? doc.groups[t.groupId]?.name : "";
@@ -377,6 +419,7 @@ async function setTheme(e: Event) {
 }
 function back() {
   if (editorOpen.value) editorRef.value?.cancel();
+  else if (filterOpen.value) filterOpen.value = false;
   else if (pendingImport.value && !importing.value)
     pendingImport.value = undefined;
   else if (showSearch.value) {
@@ -441,7 +484,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="mobile-app">
-    <div class="app-main" :inert="editorOpen || !!pendingImport">
+    <div class="app-main" :inert="editorOpen || filterOpen || !!pendingImport">
       <header class="app-bar">
         <div class="brand">
           <span class="brand-mark">F</span>
@@ -458,6 +501,17 @@ onBeforeUnmount(() => {
             @click="undoLast"
           >
             <FIcon name="undo" :size="19" />
+          </button>
+          <button
+            v-if="tab === 'agenda' || tab === 'calendar'"
+            type="button"
+            class="bar-btn"
+            :class="{ filtering: activeFilter.length > 0 }"
+            :aria-label="activeFilter.length ? '按分组筛选：' + filterText : '按分组筛选'"
+            :aria-pressed="activeFilter.length > 0"
+            @click="filterOpen = true"
+          >
+            <FIcon name="filter" :size="19" />
           </button>
           <button
             v-if="tab !== 'settings'"
@@ -494,6 +548,14 @@ onBeforeUnmount(() => {
           ×
         </button>
       </div>
+      <div
+        v-if="filtering && (tab === 'agenda' || tab === 'calendar')"
+        class="filter-strip"
+        role="status"
+      >
+        <span>只显示：{{ filterText }}</span
+        ><button type="button" @click="groupFilter = []">显示全部</button>
+      </div>
       <p v-if="error" class="error-banner" role="alert">
         {{ error }}<button @click="error = ''">关闭</button>
       </p>
@@ -508,7 +570,7 @@ onBeforeUnmount(() => {
           <div class="hero">
             <div>
               <p class="eyebrow">未来 30 天</p>
-              <h1>{{ taskCount }} <span>项待完成</span></h1>
+              <h1>{{ shownCount }} <span>项待完成</span></h1>
             </div>
             <button type="button" class="primary-round" @click="openNew()">
               ＋
@@ -647,7 +709,9 @@ onBeforeUnmount(() => {
                   ><span v-if="groupName(o.task)"
                     >· {{ groupName(o.task) }}</span
                   ><span v-if="o.task.repeat">· 重复</span
-                  ><span v-if="o.task.flex === 'month'">· 每月一次</span></span
+                  ><span v-if="o.task.flex === 'month'">· 每月一次</span
+                  ><span v-if="dayText(o)">· {{ dayText(o) }}</span
+                  ><span v-if="doneText(o)">· {{ doneText(o) }}</span></span
                 ><span
                   v-if="!o.task.repeat && percent(o.task) > 0"
                   class="mini-progress"
@@ -753,8 +817,11 @@ onBeforeUnmount(() => {
               <span
                 class="task-accent"
                 :style="{ background: taskColor(o.task.color, isDark).bar }"
-              /><span>{{ o.task.title }}</span
-              ><small>{{ displayTime(o.task) }}</small>
+              /><span :class="{ struck: o.done }">{{ o.task.title }}</span
+              ><small
+                >{{ displayTime(o.task)
+                }}{{ doneText(o) ? " · " + doneText(o) : o.done ? " · 已完成" : "" }}</small
+              >
             </button>
           </div>
         </section>
@@ -877,7 +944,12 @@ onBeforeUnmount(() => {
       :task="editorTask"
       :date="editorDate"
       @close="closeEditor"
-      @saved="notify"
+      @saved="saved"
+    />
+    <MobileFilter
+      v-model:filter="groupFilter"
+      :open="filterOpen"
+      @close="filterOpen = false"
     />
     <div v-if="pendingImport && mergePlan" class="import-layer">
       <section role="dialog" aria-modal="true" aria-label="合并备份">
@@ -945,6 +1017,27 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+/* (a narrow phone with every button in the bar: the line under the name is cut short) */
+.brand > div {
+  min-width: 0;
+}
+.brand strong,
+.brand small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The narrowest phones, with every button in the bar: 今天 is its icon alone. */
+@media (max-width: 345px) {
+  .bar-actions .bar-today {
+    min-width: 38px;
+    padding: 0;
+  }
+  .bar-actions .bar-today span {
+    display: none;
+  }
 }
 .brand-mark,
 .profile-icon {
@@ -976,7 +1069,13 @@ onBeforeUnmount(() => {
 }
 .bar-actions {
   display: flex;
+  flex: none;
   gap: 4px;
+}
+/* red, on a tinted ground, while some tasks are hidden (as on the PC) */
+.bar-btn.filtering {
+  background: color-mix(in srgb, var(--critical) 12%, transparent);
+  color: var(--critical);
 }
 .bar-btn,
 .nav-btn,
@@ -1082,18 +1181,28 @@ h1 span {
   font-size: 26px;
   box-shadow: 0 7px 16px color-mix(in srgb, var(--accent-fill) 28%, transparent);
 }
-.selected-strip {
+.filter-strip {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: -6px 0 14px;
-  padding: 9px 12px;
+  gap: 8px;
+  margin: 8px 16px 0;
+  padding: 2px 4px 2px 12px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--accent-fill) 10%, transparent);
   color: var(--accent-text);
   font-size: 12px;
 }
-.selected-strip button {
+.filter-strip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filter-strip button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 8px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -1188,8 +1297,18 @@ h1 span {
   font-size: 14px;
 }
 .task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 3px;
   color: var(--text-secondary);
   font-size: 11px;
+}
+/* (a line breaks between two of them, not inside one) */
+.task-meta span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .mini-progress {
   display: block;
@@ -1400,7 +1519,12 @@ h1 span {
   white-space: nowrap;
 }
 .compact-task small {
+  flex: none;
   color: var(--text-secondary);
+}
+.compact-task .struck {
+  color: var(--text-secondary);
+  text-decoration: line-through;
 }
 .settings-profile {
   display: flex;

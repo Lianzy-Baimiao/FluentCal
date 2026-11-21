@@ -3,10 +3,11 @@ import { doc, put } from '@/stores/doc';
 import { addDays, diffDays, today } from './date';
 import type { Occurrence } from './recur';
 import { clearDay, flexKind, isSlot, setSlot } from './flex';
+import { doneDay, stampDone } from './done';
 
 import { uid } from './uid';
 
-export { uid };
+export { doneDay, stampDone, uid };
 
 function nextOrder(): number {
   let max = 0;
@@ -18,7 +19,8 @@ function nextOrder(): number {
 export function makeTask(p: Partial<Task> & { title: string; start: ISODate }): Task {
   const now = Date.now();
   const offsets = doc.settings.reminders.defaultOffsets;
-  return {
+  // made done (the editor's 已完成 box): done today
+  return stampDone(undefined, {
     end: p.start,
     progress: 0,
     done: false,
@@ -29,13 +31,14 @@ export function makeTask(p: Partial<Task> & { title: string; start: ISODate }): 
     order: p.order ?? nextOrder(),
     createdAt: now,
     updatedAt: now,
-  };
+  }, today());
 }
 
 export function saveTask(t: Task): Promise<void> {
+  const old = doc.tasks[t.id];
   // A renamed sample task is the user's own now: "清除示例数据" must not take it.
-  const own = t.sample && doc.tasks[t.id] && doc.tasks[t.id].title !== t.title;
-  return put('tasks', { [t.id]: { ...t, sample: own ? undefined : t.sample, updatedAt: Date.now() } });
+  const own = t.sample && old && old.title !== t.title;
+  return put('tasks', { [t.id]: { ...stampDone(old, t, today()), sample: own ? undefined : t.sample, updatedAt: Date.now() } });
 }
 
 export function addTask(p: Partial<Task> & { title: string; start: ISODate }): Promise<Task> {
@@ -100,6 +103,10 @@ export function moveOccurrence(occ: Occurrence, start: ISODate): Promise<void> {
     done: occ.done,
     progress: occ.done ? 100 : 0,
   });
+  // done on the day the occurrence was (not known: not made up)
+  const day = doneDay(t, occ.date);
+  if (day) copy.doneOn = day;
+  else delete copy.doneOn;
   const series = { ...t, exDates: [...new Set([...(t.exDates ?? []), occ.date])].sort(), updatedAt: Date.now() };
   return put('tasks', { [t.id]: series, [copy.id]: copy });
 }
@@ -113,7 +120,11 @@ export function deleteOccurrence(t: Task, date: ISODate, mode: DeleteMode): Prom
 }
 
 export function duplicateTask(t: Task): Promise<Task> {
-  return addTask({ ...t, title: `${t.title}（副本）`, order: undefined, sample: undefined });
+  const copy = makeTask({ ...t, title: `${t.title}（副本）`, order: undefined, sample: undefined });
+  // a copy of a done task was done when the task was (not known: not made up)
+  if (copy.done && t.doneOn) copy.doneOn = t.doneOn;
+  else delete copy.doneOn;
+  return put('tasks', { [copy.id]: copy }).then(() => copy);
 }
 
 /** Moves overdue single-day tasks (late by at most 30 days) to today. */
