@@ -14,7 +14,9 @@
 - [x] 2026-11-21 收尾回归：原生 245 项通过、7 项需外部环境或真实桌面的测试按原设置忽略；前端 219 项、类型检查、1133 条三语言翻译检查通过；安卓 14 组交互、7 组双客户端同步/更新回归通过。网页浅色/深色、英文、窄屏、筛选和完成日期详情已检查。正式 Windows EXE 三种语言隔离启动正常。发版前通读全部功能改动。
 - [x] 正式产物：Windows 安装包、独立 EXE、MSIX 版本与 SHA-256 核对通过，MSIX 内 EXE 与独立包一致；安卓 0.3.5 正式包和迁移包构建、包配置检查、升级签名链检查通过。空闲测量新旧版本各三次，均为 16 线程、约 10.6 MB 私有工作集、12.2 MB 私有字节。
 - 验证边界：安卓尚未在实体手机验收；跨其他应用点击的系统鼠标钩子没有用真实鼠标单独验收。日志在本机 `C:\Users\30694\tools\issues\round5\closeout-*.log`。
-- [ ] 发版：桌面 0.3.18（GitHub、微软商店）、Android 0.3.5（`android-latest`），本机换成 0.3.18。
+- [x] 发版：功能提交 `f0e9acc` 已推送，GitHub [v0.3.18](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.18) 于 2026-11-21 20:03 公开并设为 Latest，附安装包、独立 EXE 及校验文件。Android 0.3.5 正式包和迁移包发布到 [android-latest](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)，标签 `android-v0.3.5` 和 `android-latest` 指向同一功能提交，线上附件摘要与本地一致。README、设置 › 关于及 GitHub About 已更新。
+- [x] 微软商店：0.3.17.0 已上架；0.3.18.0 于 2026-11-21 20:03 提交 **Submission 15 / 1152921505702467862**，后台确认“正在认证”，通过后自动发布；三种语言的更新说明保存后回读一致，描述与简短描述保持原文。详见 `docs/STORE-LISTING.md`。
+- [x] 本机已覆盖安装并重启 0.3.18，安装文件与正式 EXE 摘要一致；原有 93 个任务的完整记录未变。旧 EXE 保存在 `%LOCALAPPDATA%\FluentCal\fluentcal.exe.0.3.17.bak`，工作区和数据备份在 `C:\Users\30694\tools\backup\fluentcal-closeout-20261121-194407\`。
 
 ## 桌面 0.3.17：GitHub #16 #15 #14 #7（2026-11-20）
 > 用户：“处理所有Iss”，随后“做完之后直接推送提交发版本，包括微软商店”。四条都是 BlueCores 提的：#16 改年份麻烦、要“今天”按钮；#15 多日任务勾选完成后显示完成日期；#14 按分组筛选日历、预设分组；#7（2026-11-19 的追加）待办栏手动拖动排序。需求见 CAL-06、CAL-17、CAL-19、CAL-20、TSK-04。
@@ -35,7 +37,7 @@
 - [x] 微软商店 0.3.17.0：Submission 14 / 1152921505702459639，2026-11-20 19:11 送审，状态“正在认证”；只换了包和“此版本的新增功能”，商店描述没有改，详见 `docs/STORE-LISTING.md`。
 - [x] 2026-11-20 19:17 在 #16、#15、#14、#7 下回复了做法和用法（回复草稿在 `tools\issues\round4\replies\`）；#16、#15、#14 提出的每一点都做了，已关闭；#7 是待办栏的长期讨论，保持打开。
 - [x] 2026-11-21 商店目录（CN）确认 0.3.17.0 已上架，`docs/STORE-LISTING.md` 已记录。
-- [ ] 本机安装的仍是 0.3.16（覆盖安装会关掉正在运行的日历，没有替用户装）。
+- [x] 本机后续已安装 0.3.17，并在 2026-11-21 本轮收尾中升级到 0.3.18，见上节。
 
 ## 桌面 0.3.16：设置页给 Claude Code 的命令在 PowerShell 里报错；给其他 AI 助手的一句话（2026-11-19）
 > 用户：“你做的AI助手，第二段的执行会报错”：在 PowerShell 里粘贴 `claude mcp add --scope user fluentcal -- "…\fluentcal.exe" --mcp`，得到 `error: unknown option '--mcp'`。

@@ -389,3 +389,12 @@ FluentCal 位於所有視窗下方、不佔用工作列，按 Win+D 顯示桌面
 - 提交选项仍是通过认证后立即发布，runFullTrust 用途说明 453 字符未变。2026-11-20 19:11 点击“提交进行认证”，概述页显示 **产品更新：正在认证（Submission 14）**。是否上架以商店目录查询为准。各步截图在 `release/store-0.3.17/17-*.png`。
 - 审核说明（Additional testing info）没有改：新功能都在主界面上，不需要额外说明。
 - 2026-11-21 收尾时商店目录（CN）返回 `ice.FluentCal_0.3.17.0_x64__rz8m2sa64m4em`，Partner Center 同时显示 Submission 14 已上架。
+
+### 0.3.18.0 “+N”列表拖动、浮动待办栏收起、网页与安卓功能补齐（2026-11-21 20:03 送审，正在认证）
+
+- 用户明确要求修复后推送、发布 Windows 和安卓版本、提交微软商店并替换本机程序。本次接续 Claude 会话 `7e5df893-6cac-40b3-b2be-ba777d2144db` 完成构建和发布。开始时 0.3.17.0 已上架，因此直接创建 **Submission 15 / 1152921505702467862**。
+- 对应 GitHub [v0.3.18](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.18)，功能提交 `f0e9acc100073059abfa83cd4740fb4903826236`。商店包 `release/FluentCal_0.3.18.0_x64.msix`，11,218,723 字节，SHA-256 `b78ebe9a77e9a2dc51ba9704439fb90539156034b058df57332f9f745f05ecbf`。包内 EXE 与独立 EXE 一致，SHA-256 `677abb9660c1b0035ea6c16d4cdcc2ec6bbbd337bb7ff917d59624f68e2e98e4`。
+- 固定配置的隐藏 Edge 自动完成登录。上传后只有既有的 `runFullTrust` 能力提醒；设备系列只勾选 Windows 10/11 Desktop，保存后概述页只列出 `FluentCal_0.3.18.0_x64.msix / Validated / 已更新`。
+- 更新说明存于 `release/store-0.3.18/whats-new-*.txt`，介绍“+N”列表拖动、浮动待办栏点外部收起、网页查看的完成日期与分组筛选及配套 Android 0.3.5。三种语言保存后重新进入页面逐字核对一致（简体 220、英文 667、繁体 225 字符）。
+- 说明正文与上一份已验证文本一致（简体 770、英文 2152、繁体 770 字符），简短描述也核对未变；功能列表、关键词、截图未编辑。核对结果在 `release/store-0.3.18/listing-*-verified.json`。
+- 提交选项保持通过认证后立即发布，`runFullTrust` 用途说明仍为 453 字符。2026-11-21 20:03（北京时间）点击“提交进行认证”，后台确认 **正在认证更新 / 产品更新：正在认证（Submission 15）**。证明截图在 `release/store-0.3.18/submitted.png`。截至本次收尾，上架版本仍是 0.3.17.0，0.3.18.0 尚待微软审核。
