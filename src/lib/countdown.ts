@@ -37,14 +37,14 @@ export function nextHoliday(now: ISODate): { name: string; date: ISODate } | und
 }
 
 /** Countdown entries: tasks flagged as countdown (next occurrence) plus, optionally, the next holiday. */
-export function countdowns(tasks: Task[], now: ISODate, withHoliday: boolean): CountdownItem[] {
+export function countdowns(tasks: Task[], now: ISODate, withHoliday: boolean, marked = true, groups: readonly string[] = []): CountdownItem[] {
   const out: CountdownItem[] = [];
   if (withHoliday) {
     const h = nextHoliday(now);
     if (h) out.push({ key: `holiday:${h.date}`, label: h.name, date: h.date, days: diffDays(now, h.date) });
   }
   for (const t of tasks) {
-    if (!t.countdown || (t.done && !t.repeat)) continue;
+    if (!(marked && t.countdown || groups.includes(t.groupId ?? '')) || (t.done && !t.repeat)) continue;
     // The running or next occurrence; one that already started counts as "today".
     const occ = occurrences(t, now, addDays(now, 800), 1)[0];
     if (!occ) continue;

@@ -37,7 +37,7 @@ const occs = computed<Occurrence[]>(() => {
   const show = doc.settings.tasks.showCompleted;
   const out: Occurrence[] = [];
   for (const t of shownTasks.value) {
-    for (const o of occurrences(t, rangeStart.value, rangeEnd.value)) if (show || !o.done) out.push(o);
+    for (const o of occurrences(t, rangeStart.value, rangeEnd.value)) if (show || !o.done || t.id === ui.revealTask) out.push(o);
   }
   return out;
 });

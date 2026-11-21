@@ -491,6 +491,10 @@ component FilterRow inherits Rectangle {
 // The list under the title bar's filter button: 全部 (no filter), then 未分组 and the groups,
 // any number of which can be ticked. It stays open while they are.
 export component GroupFilterPanel inherits VerticalLayout {
+    in property <bool> countdown-mode;
+    in property <bool> marked;
+    in property <bool> holiday;
+    callback source(string, bool);
     in property <[FilterRowData]> rows;
     // nothing is filtered
     in property <bool> all;
@@ -508,18 +512,20 @@ export component GroupFilterPanel inherits VerticalLayout {
         padding-right: 8px;
         height: 28px;
         Text {
-            text: @tr("按分组筛选");
+            text: root.countdown-mode ? @tr("倒计时显示内容") : @tr("按分组筛选");
             font-weight: 600;
             vertical-alignment: center;
             color: Theme.c.text-primary;
         }
     }
-    FilterRow {
+    if !root.countdown-mode: FilterRow {
         name: @tr("全部");
         checked: root.all;
         count: root.all-count;
         toggled(v) => { root.clear(); }
     }
+    if root.countdown-mode: FilterRow { name: @tr("手工标记的倒数日"); checked: root.marked; toggled(v) => { root.source("countdownMarked", v); } }
+    if root.countdown-mode: FilterRow { name: @tr("下一个法定假期"); checked: root.holiday; toggled(v) => { root.source("holidayCountdown", v); } }
     Rectangle { height: 1px; background: Theme.c.divider; }
     Flickable {
         // eight and a half show: a cut row says the list scrolls (less in a low window)

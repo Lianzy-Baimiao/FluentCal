@@ -9,7 +9,7 @@ import { describeRule, type Occurrence } from '@/lib/recur';
 import { doc } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { isDark } from '@/composables/theme';
-import { openEditor, shownTasks } from '../desk/state';
+import { openEditor, shownTasks, ui } from '../desk/state';
 
 /**
  * The web view's list (WEB-03): 近期 is today and the next days, by day; 所有 every task once
@@ -17,10 +17,10 @@ import { openEditor, shownTasks } from '../desk/state';
  */
 const props = withDefaults(defineProps<{ range?: 'upcoming' | 'all' }>(), { range: 'upcoming' });
 const span = ref(30);
-const all = computed(() => props.range === 'all');
+const all = computed(() => props.range === 'all' || !!ui.revealTask);
 const days = computed(() =>
   all.value
-    ? allTasks(shownTasks.value, now.value, doc.settings.tasks.showCompleted)
+    ? allTasks(shownTasks.value, now.value, doc.settings.tasks.showCompleted || !!ui.revealTask)
     : agenda(shownTasks.value, now.value, addDays(now.value, span.value - 1), now.value, doc.settings.tasks.showCompleted),
 );
 
@@ -34,8 +34,9 @@ const dot = (o: Occurrence) => taskColor(o.task.color, isDark.value).bar;
 const range = (o: Occurrence) => (o.start !== o.end ? formatRange(o.start, o.end) : '');
 const rule = (o: Occurrence) => (all.value && o.task.repeat ? describeRule(o.task.repeat, o.task.start) : '');
 const group = (o: Occurrence) => (o.task.groupId ? doc.groups[o.task.groupId]?.name ?? '' : '');
-const meta = (o: Occurrence) => [range(o), rule(o), group(o)].filter(Boolean).join(' · ');
+const meta = (o: Occurrence) => [range(o), rule(o), doc.settings.calendar.listGroupLabels ? '' : group(o)].filter(Boolean).join(' · ');
 const open = (o: Occurrence) => openEditor({ mode: 'edit', taskId: o.task.id, date: o.date });
+const visibleItems = (items: Occurrence[]) => items.filter(o => doc.settings.tasks.showCompleted || !o.done || o.task.id === ui.revealTask);
 
 // 所有 opens on today, with what came before above it.
 const list = ref<HTMLElement>();
@@ -47,6 +48,13 @@ async function showToday() {
 }
 onMounted(showToday);
 watch(() => props.range, showToday);
+watch(() => ui.locateRevision, async () => {
+  const id = ui.flashTask;
+  if (!id) return;
+  await nextTick();
+  const target = [...(list.value?.querySelectorAll<HTMLElement>('[data-task]') ?? [])].find(el => el.dataset.task === id);
+  target?.scrollIntoView({ block: 'center', behavior: 'instant' });
+});
 defineExpose({ showToday });
 </script>
 
@@ -58,11 +66,11 @@ defineExpose({ showToday });
         <span class="sub">{{ sub(d.date) }}</span>
       </h2>
       <p v-if="!d.items.length" class="empty">{{ tr("没有任务") }}</p>
-      <button v-for="o in d.items" :key="`${o.task.id}@${o.date}`" type="button" class="item" :class="{ done: o.done }" @click="open(o)">
+      <button v-for="o in visibleItems(d.items)" :key="`${o.task.id}@${o.date}`" type="button" class="item" :data-task="o.task.id" :class="{ done: o.done, located: ui.flashTask === o.task.id }" @click="open(o)">
         <span class="time">{{ o.task.time ?? tr("全天") }}</span>
         <span class="dot" :style="{ background: dot(o) }" aria-hidden="true" />
         <span class="text">
-          <span class="title">{{ o.task.title }}</span>
+          <span class="title-line"><span v-if="doc.settings.calendar.listGroupLabels && group(o)" class="group-badge" :title="group(o)" :style="{ background: taskColor(doc.groups[o.task.groupId!]?.color, isDark).bar, color: taskColor(doc.groups[o.task.groupId!]?.color, isDark).onBar }">{{ group(o) }}</span><span class="title">{{ o.task.title }}</span></span>
           <span v-if="meta(o)" class="meta">{{ meta(o) }}</span>
         </span>
         <FIcon v-if="o.task.repeat" name="repeat" :size="12" class="rep" :title="tr('重复')" />
@@ -131,6 +139,11 @@ h2 {
 .item:hover {
   background: var(--subtle-fill-hover);
 }
+.item.located { outline: 2px solid var(--accent-fill); outline-offset: -2px; background: color-mix(in srgb, var(--accent-fill) 16%, var(--cell-bg)); }
+.group-badge { display: inline-block; max-width: min(120px, 25vw); border-radius: 4px; padding: 2px 6px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.title-line .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.title-line .group-badge { flex: none; }
 .time {
   width: 40px;
   flex: none;

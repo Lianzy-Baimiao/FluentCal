@@ -9,6 +9,7 @@ import { now } from '@/composables/now';
 import { barLabel, occDoneDay } from '@/lib/bar';
 import { formatFriendly, formatRange } from '@/lib/date';
 import { describeRule } from '@/lib/recur';
+import { ui } from './state';
 
 const props = defineProps<{ chip: Chip; dragging?: boolean }>();
 const emit = defineEmits<{
@@ -83,6 +84,7 @@ const style = computed(() =>
     @pointerdown="emit('pointerdown', $event)"
     @keydown="emit('key', $event)"
   >
+    <span v-if="ui.flashTask === task.id" class="located-ring" aria-hidden="true" />
     <span v-if="bar.fill > 0" class="fill" :style="{ width: `${bar.fill * 100}%` }" aria-hidden="true" />
     <button
       class="check"
@@ -167,6 +169,7 @@ const style = computed(() =>
   background: #00000038;
   pointer-events: none;
 }
+.located-ring { position: absolute; inset: 0; border: 2px solid var(--accent-fill); border-radius: inherit; pointer-events: none; z-index: 1; }
 /* one line of a wrapping row: what doesn't fit on it is out of sight */
 .words {
   flex: 0 1 auto;

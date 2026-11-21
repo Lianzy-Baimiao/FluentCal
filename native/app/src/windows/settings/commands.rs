@@ -16,6 +16,12 @@ const ERROR: Severity = Severity::Error;
 impl App {
     pub fn settings_action(&mut self, key: &str, arg: &str) {
         match key {
+            "countdown-group" => {
+                let mut groups = self.doc.settings.calendar.countdown_groups.clone();
+                if groups.iter().any(|g| g == arg) { groups.retain(|g| g != arg); }
+                else if arg.is_empty() || self.doc.groups.contains_key(arg) { groups.push(arg.to_owned()); }
+                self.patch_settings(json!({ "calendar": { "countdownGroups": groups } }));
+            }
             "pair-start" => self.settings_pair_start(),
             "pair-cancel" => self.settings_pair_cancel(),
             "pair-address" => self.settings_pair_address(arg),

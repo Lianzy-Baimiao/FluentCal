@@ -133,7 +133,7 @@ impl App {
     }
 
     pub fn settings_navigate(&mut self, page: &str) {
-        const PAGES: [&str; 10] = ["general", "appearance", "calendar", "gantt", "reminders", "data", "sync", "web", "mcp", "about"];
+        const PAGES: [&str; 11] = ["general", "appearance", "calendar", "gantt", "groups", "reminders", "data", "sync", "web", "mcp", "about"];
         let Some(s) = &mut self.settings_win else { return };
         if !PAGES.contains(&page) {
             return;

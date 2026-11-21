@@ -42,6 +42,7 @@ export struct ChipData {
 // Keys on a focused chip that need Rust (Delete, the menu key): one global for every chip,
 // in the week rows and the "+N" list.
 export global ChipKeys {
+    in property <string> located-task;
     callback remove(ChipData);
     callback menu(ChipData, length, length, length, length);
     // A chip took the focus (the arrow keys then move the selected day, as in 0.2).
@@ -87,6 +88,9 @@ export component TaskChip inherits Rectangle {
     clip: true;
     accessible-role: groupbox;
     accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
+    if ChipKeys.located-task != "" && ChipKeys.located-task == root.chip.task-id: Rectangle {
+        border-width: 2px; border-color: Theme.c.accent-fill; border-radius: 4px;
+    }
     // A tab stop (0.2: tabindex 0): Enter opens, Space toggles, Delete deletes, the menu key /
     // Shift+F10 opens the menu; other keys go on to the calendar.
     // the done part of a bar, darker (as in the Gantt chart)

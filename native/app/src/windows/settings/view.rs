@@ -238,7 +238,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
     let (d, off, now) = (&st.desk, info.offset, info.now_ms);
 
     let cur_screen = info.screens.iter().find(|x| x.2).map_or(String::new(), |x| x.0.clone());
-    g.set_screens(model(info.screens.iter().map(|(v, l, _)| SelectOption { value: s(v), label: s(l), icon: s(""), disabled: false }).collect()));
+    g.set_screens(model(info.screens.iter().map(|(v, l, _)| SelectOption { value: s(v), label: s(l), ..Default::default() }).collect()));
     g.set_general(SGeneral {
         language: s(&st.general.language),
         autostart: st.general.autostart,
@@ -287,6 +287,8 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         week_start: s(&c.week_start.to_string()),
         month_rows: s(&c.month_rows),
         fit_rows: c.fit_rows,
+        list_group_labels: c.list_group_labels,
+        countdown_marked: c.countdown_marked,
         bar_days: c.bar_days,
         bar_progress: c.bar_progress,
         bar_done: c.bar_done,
@@ -317,7 +319,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         can_add: r.default_offsets.len() < 5,
     });
     let opts = sp::offset_options(&r.default_offsets);
-    g.set_offset_options(model(opts.into_iter().map(|(v, l)| SelectOption { value: s(&v.to_string()), label: s(&l), icon: s(""), disabled: false }).collect()));
+    g.set_offset_options(model(opts.into_iter().map(|(v, l)| SelectOption { value: s(&v.to_string()), label: s(&l), ..Default::default() }).collect()));
     let list: Vec<_> = doc.tasks.values().cloned().collect();
     let due = fluentcal_core::reminders::compute_reminders(&list, now, &r.all_day_time, fluentcal_core::reminders::HORIZON_MS, fluentcal_core::reminders::GRACE_MS, off);
     let upcoming: Vec<SUpcoming> =
@@ -420,14 +422,9 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
     g.set_about(SAbout { version: s(&info.version), build: s(&info.build.to_string()), update_checking: local.update_checking,
         update_message: s(&local.update_message) });
 
-    let mut groups: Vec<&fluentcal_core::model::Group> = doc.groups.values().collect();
-    groups.sort_by(|a, b| a.order.total_cmp(&b.order));
-    let groups: Vec<SGroup> = groups
-        .iter()
-        .map(|gr| {
-            let n = doc.tasks.values().filter(|t| t.group_id.as_deref() == Some(gr.id.as_str())).count();
-            SGroup { id: s(&gr.id), name: s(&gr.name), color: s(&gr.color), desc: s(&trf("{0} 个任务", &[format!("{}", n)])) }
-        })
+    let groups: Vec<SGroup> = fluentcal_core::groups::summaries(doc)
+        .into_iter()
+        .map(|gr| SGroup { countdown: c.countdown_groups.contains(&gr.id), id: s(&gr.id), name: s(&gr.name), color: s(gr.color.as_deref().unwrap_or("")), desc: s(&trf("{0} 个任务", &[gr.count.to_string()])) })
         .collect();
     update(g.get_groups(), groups, |m| g.set_groups(m));
 

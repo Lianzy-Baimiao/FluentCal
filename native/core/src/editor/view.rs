@@ -118,6 +118,7 @@ impl Editor {
         // the presets that aren't there yet (GitHub #14): made when first chosen
         groups.extend(crate::tasks::open_presets(doc).into_iter().map(|(key, name)| opt(format!("{}{key}", crate::tasks::PRESET_PREFIX), name)));
         groups.push(opt("__new__", tr("新建分组…")));
+        groups.push(opt("__manage__", tr("管理分组…")));
         View {
             span: trf("{0}农历{1}", &[format!("{}", if t.is_milestone() || n == 1 { String::new() } else { trf("共 {0} 天 · ", &[n.to_string()]) }), format!("{}", lunar)]),
             show_progress: rule.is_none() && t.flex.is_none(),

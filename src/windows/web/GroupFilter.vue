@@ -5,7 +5,7 @@ import { FButton, FCheckbox, FFlyout, taskColor } from '@/fluent';
 import { filterRows, filterTip, toggleFilter } from '@/lib/filter';
 import { doc, taskList } from '@/stores/doc';
 import { isDark } from '@/composables/theme';
-import { groupFilter, ui } from '../desk/state';
+import { clearReveal, groupFilter, ui } from '../desk/state';
 
 /**
  * 按分组筛选 in the web view (CAL-20): the button in the header and its list, as on the PC
@@ -20,8 +20,10 @@ const tip = computed(() => filterTip(doc.groups, groupFilter.value) || tr("按�
 const dot = (color: string) => taskColor(color, isDark.value).bar;
 
 function toggle(id: string, v: boolean) {
+  clearReveal();
   ui.groupFilter = toggleFilter(doc.groups, groupFilter.value, id, v);
 }
+function clear() { clearReveal(); ui.groupFilter = []; }
 </script>
 
 <template>
@@ -32,7 +34,7 @@ function toggle(id: string, v: boolean) {
     <div class="panel">
       <div class="hd">{{ tr("按分组筛选") }}</div>
       <label class="row">
-        <FCheckbox :model-value="!on" :size="18" :aria-label="tr('全部')" @update:model-value="ui.groupFilter = []" />
+        <FCheckbox :model-value="!on" :size="18" :aria-label="tr('全部')" @update:model-value="clear" />
         <span class="name">{{ tr("全部") }}</span>
         <span class="count">{{ taskList.length }}</span>
       </label>

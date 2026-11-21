@@ -13,6 +13,7 @@ pub mod editor;
 pub mod export;
 pub mod flex;
 pub mod gantt;
+pub mod groups;
 pub mod history;
 pub mod httpd;
 pub mod i18n;

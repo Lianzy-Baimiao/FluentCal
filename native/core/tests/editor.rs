@@ -303,7 +303,7 @@ fn new_group_is_saved_and_picked() {
     assert_eq!((doc.groups[&gid].name.as_str(), doc.groups[&gid].color.as_str(), doc.groups[&gid].order), ("生活", "blue", 4.0));
     let labels: Vec<String> = e.view(&doc, TODAY).groups.into_iter().map(|o| o.label).collect();
     // (and the presets no group has the name of, since 0.3.17: `preset_groups_in_the_editor`)
-    assert_eq!(labels, ["未分组", "工作", "生活", "生日", "还款", "纪念日", "新建分组…"]);
+    assert_eq!(labels, ["未分组", "工作", "生活", "生日", "还款", "纪念日", "新建分组…", "管理分组…"]);
 }
 
 // GitHub #15
@@ -364,7 +364,7 @@ fn preset_groups_in_the_editor() {
     let choices = |e: &Editor, doc: &Doc| e.view(doc, TODAY).groups.iter().map(|o| (o.value.clone(), o.label.clone())).collect::<Vec<_>>();
     let s = |v: &str, l: &str| (v.to_owned(), l.to_owned());
     // 未分组, the groups, the presets that aren't there yet, 新建分组…
-    assert_eq!(choices(&e, &doc), [s("", "未分组"), s("g1", "还款"), s("__preset__:生日", "生日"), s("__preset__:工作", "工作"), s("__preset__:纪念日", "纪念日"), s("__new__", "新建分组…")]);
+    assert_eq!(choices(&e, &doc), [s("", "未分组"), s("g1", "还款"), s("__preset__:生日", "生日"), s("__preset__:工作", "工作"), s("__preset__:纪念日", "纪念日"), s("__new__", "新建分组…"), s("__manage__", "管理分组…")]);
     // one chosen: made at once, the draft is in it
     let edit = e.pick_preset(&doc, "纪念日").expect("made");
     apply(&mut doc, &edit);

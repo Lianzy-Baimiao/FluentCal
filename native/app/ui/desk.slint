@@ -14,7 +14,7 @@ import { DayListPanel, YearMonthPanel, SearchPanel, SearchHitData, ChangesPanel,
 import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
 import { SidePanel, SideHandle, SideRowData } from "desk_side.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
-import { CalendarView } from "inputs.slint";
+import { CalendarView, Fluent } from "inputs.slint";
 import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData, ChangeRowData, FilterRowData }
 export { ChipData, ListRowData, SideRowData }
@@ -59,6 +59,7 @@ export struct WeekData {
 }
 
 export struct CountdownData {
+    task-id: string,
     key: string,
     label: string,
     date: string,
@@ -131,12 +132,10 @@ component DayCell inherits Rectangle {
         border-color: Theme.c.accent-fill;
     }
     if flash && !drop: Rectangle {
-        property <float> k: 1;
-        init => { k = 0; }
-        animate k { delay: Theme.reduce-motion ? 0ms : 900ms; duration: Theme.reduce-motion ? 0ms : 600ms; easing: cubic-bezier(0, 0, 0, 1); }
         border-radius: 4px;
-        border-width: 2px * k;
-        border-color: Theme.c.accent-fill.transparentize(1 - k);
+        border-width: 2px;
+        border-color: Theme.c.accent-fill;
+        background: Theme.c.accent-fill.transparentize(0.84);
     }
     property <int> tip-token: -1;
     changed head-hover => {
@@ -243,6 +242,7 @@ component WeekRow inherits Rectangle {
     in property <string> selected;
     in property <string> drop-date;
     in property <string> flash-date;
+    in property <string> flash-end;
     in property <string> dragging-key;
     in property <bool> read-only;
     // Quick add: the day with the inline box (0.2's ui.quickAdd), and the box's text.
@@ -286,7 +286,7 @@ component WeekRow inherits Rectangle {
         head-h: root.head-h;
         selected: c.date == root.selected;
         drop: c.date == root.drop-date;
-        flash: c.date == root.flash-date;
+        flash: root.flash-date != "" && Fluent.days-between(root.flash-date, c.date) >= 0 && Fluent.days-between(c.date, root.flash-end) >= 0;
         select => { root.select(c.date); }
         quick-add => { root.quick-add(c.date); }
         menu(x, y) => { root.cell-menu(c.date, x, y); }
@@ -422,6 +422,7 @@ component MonthView inherits TouchArea {
     in property <string> selected;
     in property <string> drop-date;
     in property <string> flash-date;
+    in property <string> flash-end;
     in property <string> dragging-key;
     in property <bool> read-only;
     property <float> fs: Theme.desk.fs;
@@ -499,6 +500,7 @@ component MonthView inherits TouchArea {
         selected: root.selected;
         drop-date: root.drop-date;
         flash-date: root.flash-date;
+                    flash-end: root.flash-end;
         dragging-key: root.dragging-key;
         read-only: root.read-only;
         quick-add-date: root.quick-add-date;
@@ -771,6 +773,7 @@ component TitleBar inherits Rectangle {
 
 // Countdown pills under the calendar ("距 妈妈生日 还有 10 天").
 component CountdownBar inherits Rectangle {
+    callback locate(string, string);
     in property <[CountdownData]> items;
     callback jump(string);
     property <float> fs: Theme.desk.fs;
@@ -811,7 +814,7 @@ component CountdownBar inherits Rectangle {
                 focus-on-click: false;
                 key-pressed(e) => {
                     if e.text == Key.Return || e.text == " " {
-                        root.jump(c.date);
+                        root.locate(c.task-id, c.date);
                         return accept;
                     }
                     reject
@@ -825,7 +828,7 @@ component CountdownBar inherits Rectangle {
                         Tip.leave(pill.tip-token);
                     }
                 }
-                clicked => { root.jump(c.date); }
+                clicked => { root.locate(c.task-id, c.date); }
             }
             FocusRing { show: pfs.has-focus && Overlay.keyboard; radius: 11px; }
         }
@@ -881,8 +884,18 @@ export component DeskWindow inherits Window {
     public function list-scroll-to(i: int) { list.scroll-to-row(i); }
     public function list-page(dir: int) { list.page(dir); }
     in property <[CountdownData]> countdowns;
+    in property <[CountdownData]> all-countdowns;
+    public function close-countdown-list() { countdown-list.close(); }
+    in property <bool> countdown-filter-mode;
+    in property <bool> countdown-marked;
+    in property <bool> countdown-holiday;
+    callback countdown-source(string, bool);
+    in property <string> flash-task;
+    callback locate(string, string);
+    callback countdown-filter(length, length, length, length);
     in property <string> selected;
     in property <string> flash-date;
+    in property <string> flash-end;
     in property <string> today-tip;
     in property <bool> sync-enabled;
     in property <bool> sync-busy;
@@ -1071,7 +1084,7 @@ export component DeskWindow inherits Window {
     callback onboarded();
     callback notice-closed();
     // A menu or flyout is open (Rust then watches for presses outside the window).
-    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open;
+    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open || countdown-list.is-open;
     callback popups-changed(bool);
     changed any-popup => { root.popups-changed(self.any-popup); }
     // 设置 › 日历 › 浮动待办栏的收起方式 = 点击栏外也收起: whether a press at this point of the window
@@ -1196,6 +1209,7 @@ export component DeskWindow inherits Window {
                     show-week-no: root.show-week-no;
                     selected: root.selected;
                     flash-date: root.flash-date;
+                    flash-end: root.flash-end;
                     drop-date: root.drop-date;
                     dragging-key: root.dragging-key;
                     read-only: root.read-only;
@@ -1248,6 +1262,7 @@ export component DeskWindow inherits Window {
                 }
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {
+                    flash-task: root.flash-task;
                     visible: root.view == "list";
                     rows: root.list-rows;
                     read-only: root.read-only;
@@ -1259,9 +1274,24 @@ export component DeskWindow inherits Window {
                     leave-focus => { root.focus-root(); }
                 }
                 }
-                if root.countdowns.length > 0 && root.view != "gantt": CountdownBar {
-                    items: root.countdowns;
-                    jump(d) => { root.jump(d); }
+                if root.view != "gantt": HorizontalLayout {
+                    spacing: 4px;
+                    height: 24px;
+                    Button {
+                        horizontal-stretch: 0; variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.filter;
+                        tip: @tr("倒计时显示内容");
+                        clicked => { root.countdown-filter(self.absolute-position.x, self.absolute-position.y, self.width, self.height); }
+                    }
+                    CountdownBar {
+                        items: root.countdowns;
+                        locate(id, d) => { root.locate(id, d); }
+                        jump(d) => { root.jump(d); }
+                    }
+                    Button {
+                        horizontal-stretch: 0; variant: ButtonVariant.subtle; size: ButtonSize.small; text: @tr("展开倒计时");
+                        enabled: root.all-countdowns.length > 0;
+                        clicked => { countdown-list.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height); }
+                    }
                 }
             }
             // The to-do column's handle, in the card's left margin (the layout's padding) beside
@@ -1488,9 +1518,13 @@ export component DeskWindow inherits Window {
         filter-fly := Flyout {
             padded: false;
             panel-width: 244px;
-            label: @tr("按分组筛选");
+            label: root.countdown-filter-mode ? @tr("倒计时显示内容") : @tr("按分组筛选");
             closed => { root.filter-closed(); }
             GroupFilterPanel {
+                countdown-mode: root.countdown-filter-mode;
+                marked: root.countdown-marked;
+                holiday: root.countdown-holiday;
+                source(k, v) => { root.countdown-source(k, v); }
                 rows: root.filter-rows;
                 all: !root.filter-on;
                 all-count: root.filter-all-count;
@@ -1498,6 +1532,21 @@ export component DeskWindow inherits Window {
                 toggle(id, on) => { root.filter-toggle(id, on); }
                 clear => { root.filter-clear(); }
                 manage => { root.filter-manage(); }
+            }
+        }
+        countdown-list := Flyout {
+            panel-width: 300px;
+            label: @tr("倒数日");
+            Flickable {
+                height: min(root.all-countdowns.length * 34px, max(68px, Overlay.win-h - 80px), 340px);
+                content-height: root.all-countdowns.length * 34px;
+                mouse-drag-pan-enabled: false;
+                for c[i] in root.all-countdowns: Button {
+                    y: i * 34px; width: parent.width; height: 32px;
+                    variant: ButtonVariant.subtle;
+                    text: c.days == 0 ? @tr("{0} 就是今天", c.label) : @tr("距{0}还有 {1} 天", c.label, c.days);
+                    clicked => { countdown-list.close(); root.locate(c.task-id, c.date); }
+                }
             }
         }
         confirm := DialogHost {

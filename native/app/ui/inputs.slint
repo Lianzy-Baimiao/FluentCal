@@ -9,11 +9,13 @@ import { Overlay, Tip, FocusRing, Flyout, Placement, PlacedRect } from "overlay.
 import { ElevBorder, Button, ButtonVariant } from "controls.slint";
 
 export struct CalDay { iso: string, day: int, out: bool, lunar: string, marker: string }
+export struct HsvData { h: float, s: float, v: float, r: float, g: float, b: float }
 
 export global Fluent {
     // Today for the calendars (Rust keeps it current; parity runs fix it).
     in-out property <string> today: "2026-10-14";
     pure callback add-days(string, int) -> string;
+    pure callback days-between(string, string) -> int;
     // Month shift keeping the day where the month allows (FCalendarView.shift).
     pure callback add-months(string, int) -> string;
     pure callback make-date(int, int, int) -> string;
@@ -33,10 +35,14 @@ export global Fluent {
     // "#abc" / "0078d4" → "#AABBCC"; "" when not a hex colour (theme.ts normalizeHex).
     pure callback normalize-hex(string) -> string;
     pure callback hex-color(string) -> color;
+    pure callback hsv(string) -> HsvData;
+    pure callback hsv-hex(float, float, float) -> string;
+    pure callback rgb-hex(float, float, float) -> string;
     // White or black, whichever reads on the colour (theme.ts bestTextOn).
     pure callback text-on(string) -> color;
     // The selected value as a custom hex when it isn't one of the swatches' keys, else "".
     pure callback custom-value(string, [Swatch]) -> string;
+    pure callback selected-hex(string, [Swatch]) -> string;
     // Minutes since midnight now (the time list opens there when empty).
     in-out property <int> now-minutes: 600;
     // "Ctrl+Alt+D" → ["Ctrl", "Alt", "D"] (keycap labels).
@@ -242,6 +248,7 @@ export component TextBox {
 // 0.2's FNumberBox: typed value committed on Enter / focus loss (clamped, rounded to the
 // step's decimals), spin buttons and arrow keys step it.
 export component NumberBox {
+    in property <bool> show-buttons: true;
     in property <float> value;
     in property <float> minimum: -1000000000;
     in property <float> maximum: 1000000000;
@@ -372,7 +379,7 @@ export component NumberBox {
                 vertical-alignment: center;
             }
         }
-        for d[i] in [1, -1]: VerticalLayout {
+        for d[i] in (root.show-buttons ? [1, -1] : []): VerticalLayout {
             alignment: center;
             Rectangle {
                 property <bool> can: root.enabled && (d > 0 ? root.value < root.maximum : root.value > root.minimum);
@@ -398,7 +405,7 @@ export component NumberBox {
     }
 }
 
-export struct SelectOption { value: string, label: string, icon: string, disabled: bool }
+export struct SelectOption { value: string, label: string, icon: string, disabled: bool, has-dot: bool, dot-color: color, detail: string }
 
 // 0.2's FSelect: a button showing the choice, with the list in a flyout at least as wide.
 export component Select {
@@ -584,7 +591,8 @@ export component Select {
                 // The option's natural width (0.2: the list is at least as wide as the button and
                 // grows to fit its longest option): padding 12px, the icon and gap, 4px margins.
                 lw := Text { visible: false; text: o.label; accessible-role: none; }
-                preferred-width: 8px + 24px + (o.icon != "" ? 16px + 12px : 0) + lw.preferred-width;
+                dw := Text { visible: false; text: o.detail; font-size: 12px; accessible-role: none; }
+                preferred-width: 8px + 24px + (o.icon != "" ? 16px + 12px : 0) + (o.has-dot ? 22px : 0) + lw.preferred-width + (o.detail != "" ? dw.preferred-width + 18px : 0);
                 accessible-role: list-item;
                 accessible-label: o.label;
                 accessible-item-selected: is-sel;
@@ -609,11 +617,14 @@ export component Select {
                         spacing: 12px;
                         cross-axis-alignment: center;
                         if o.icon != "": Icon { glyph: o.icon; size: 16px; color: o.disabled ? Theme.c.text-disabled : Theme.c.text-primary; }
+                        if o.has-dot: Rectangle { width: 10px; height: 10px; border-radius: 3px; background: o.dot-color; }
                         Text {
+                            horizontal-stretch: 1;
                             text: o.label;
                             color: o.disabled ? Theme.c.text-disabled : ita.pressed ? Theme.c.text-secondary : Theme.c.text-primary;
                             vertical-alignment: center;
                         }
+                        if o.detail != "": Text { text: o.detail; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
                     }
                 }
                 ita := TouchArea {

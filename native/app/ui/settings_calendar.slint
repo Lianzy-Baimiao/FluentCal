@@ -3,7 +3,7 @@
 import { Theme } from "theme.slint";
 import { Glyph } from "icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "controls.slint";
-import { Toggle } from "forms.slint";
+import { Toggle, Checkbox } from "forms.slint";
 import { Select, NumberBox, TextBox, Fluent } from "inputs.slint";
 import { ColorSwatches } from "menu.slint";
 import { SettingsGroup, SettingsCard } from "cards.slint";
@@ -84,6 +84,12 @@ export component CalendarPage inherits VerticalLayout {
                 options: [{ value: "inline", label: @tr("占用日历左侧") }, { value: "left", label: @tr("向左扩展窗口") }, { value: "float", label: @tr("浮在日历上") }];
                 selected(v) => { SetState.set-str("calendar.sidebarMode", v); }
             }
+        }
+        SettingsCard {
+            icon: Glyph.group;
+            title: @tr("列表显示分组标签");
+            description: @tr("任务名前显示分组名称和颜色；未分组不显示标签");
+            Toggle { checked: SetState.calendar.list-group-labels; toggled(v) => { SetState.set-bool("calendar.listGroupLabels", v); } }
         }
         if SetState.calendar.sidebar-mode == "float": SettingsCard {
             icon: Glyph.list;
@@ -199,6 +205,21 @@ export component CalendarPage inherits VerticalLayout {
             ColorSwatches { colors: SetState.task-swatches; value: SetState.calendar.default-color; allow-none: true; size: 22px; picked(v) => { SetState.set-str("tasks.defaultColor", v); } }
         }
     }
+    SettingsGroup {
+        first: false;
+        title: @tr("倒计时显示内容");
+        SettingsCard {
+            icon: Glyph.flag;
+            title: @tr("手工标记的倒数日");
+            description: @tr("与勾选分组的任务合并显示，同一任务只出现一次");
+            Toggle { checked: SetState.calendar.countdown-marked; toggled(v) => { SetState.set-bool("calendar.countdownMarked", v); } }
+        }
+        for g in SetState.groups: SettingsCard {
+            title: g.name;
+            description: g.desc;
+            Checkbox { checked: g.countdown; accessible-label: @tr("倒计时分组：{0}", g.name); toggled(v) => { SetState.action-arg("countdown-group", g.id); } }
+        }
+    }
 }
 
 // A group's card: name box (saved on Enter / leaving it), colour, delete.
@@ -208,7 +229,7 @@ component GroupCard inherits SettingsCard {
     in property <string> gcolor;
     property <string> draft: gname;
     title: gname;
-    TextBox {
+    if root.gid != "": TextBox {
         width: 160px;
         text <=> root.draft;
         placeholder: root.gname;
@@ -219,13 +240,14 @@ component GroupCard inherits SettingsCard {
             }
         }
     }
-    ColorSwatches { colors: SetState.task-swatches; value: root.gcolor; size: 18px; picked(v) => { SetState.set-group-color(root.gid, v); } }
-    Button { variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.delete; tip: @tr("删除分组 ") + root.gname; clicked => { SetState.action-arg("delete-group", root.gid); } }
+    if root.gid != "": ColorSwatches { colors: SetState.task-swatches; value: root.gcolor; custom: true; custom-value: Fluent.custom-value(root.gcolor, SetState.task-swatches); custom-color: Fluent.hex-color(root.gcolor); custom-fg: Fluent.text-on(root.gcolor); size: 18px; picked(v) => { SetState.set-group-color(root.gid, v); } }
+    if root.gid != "": Button { variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.delete; tip: @tr("删除分组 ") + root.gname; clicked => { SetState.action-arg("delete-group", root.gid); } }
 }
 
 export component GanttPage inherits VerticalLayout {
+    in property <bool> groups-only;
     property <string> new-name;
-    SettingsGroup {
+    if !root.groups-only: SettingsGroup {
         title: @tr("显示");
         SettingsCard {
             icon: Glyph.zoom-in;
@@ -254,7 +276,7 @@ export component GanttPage inherits VerticalLayout {
         }
     }
     SettingsGroup {
-        first: false;
+        first: root.groups-only;
         title: @tr("分组");
         for g in SetState.groups: GroupCard { gid: g.id; gname: g.name; gcolor: g.color; description: g.desc; }
         SettingsCard {

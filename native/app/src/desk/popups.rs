@@ -41,6 +41,7 @@ pub struct Popups {
     pub day_list: Option<String>,
     /// 按分组筛选's list is open (filter.rs).
     pub filter_open: bool,
+    pub countdown_filter: bool,
     pub search_open: bool,
     pub changes_open: bool,
     /// The warning bar (data folder missing, data file repaired).
@@ -176,6 +177,7 @@ impl App {
         w.invoke_close_ym();
         w.invoke_close_done_day();
         w.invoke_close_filter();
+        w.invoke_close_countdown_list();
     }
 
     // ------------------------------------------------------------- 修改完成日期 (GitHub #15)

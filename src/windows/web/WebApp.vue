@@ -7,7 +7,7 @@ import { doc, initStore, patchSettings, storeState } from '@/stores/doc';
 import { deskVars, startThemeSync } from '@/composables/theme';
 import { startClock } from '@/composables/now';
 import type { WebStatus } from '@/webApi';
-import { goToday, notify, page, ui, viewTitle } from '../desk/state';
+import { clearReveal, goToday, notify, page, ui, viewTitle } from '../desk/state';
 import MonthView from '../desk/MonthView.vue';
 import SearchPanel from '../desk/SearchPanel.vue';
 import CountdownBar from '../desk/CountdownBar.vue';
@@ -39,6 +39,10 @@ const mq = matchMedia('(max-width: 640px)');
 const onMq = () => (narrow.value = mq.matches);
 const chosen = ref(localStorage.getItem(VIEW_KEY) ?? '');
 const view = computed(() => chosen.value || (narrow.value ? 'list' : doc.settings.calendar.view));
+watchEffect(() => { ui.activeView = view.value; });
+watch(() => ui.locateRevision, () => {
+  if (ui.locateView) { chosen.value = ui.locateView; localStorage.setItem(VIEW_KEY, ui.locateView); ui.locateView = ''; }
+});
 const views = computed(() => [
   { value: 'list', label: tr("列表") },
   { value: 'month', label: tr("月") },
@@ -54,6 +58,7 @@ const languages = computed(() => [
 const viewModel = computed({
   get: () => view.value,
   set: (v: string) => {
+    clearReveal();
     chosen.value = v;
     localStorage.setItem(VIEW_KEY, v);
     if (v !== 'list') patchSettings({ calendar: { view: v as 'month' | 'weeks' | 'gantt' } });
@@ -69,6 +74,7 @@ const ranges = computed(() => [
   { value: 'all' as const, label: tr("所有"), title: tr("全部任务，包括以前的（每个重复任务列一次）") },
 ]);
 function setRange(v: 'upcoming' | 'all') {
+  clearReveal();
   chosenRange.value = v;
   localStorage.setItem(RANGE_KEY, v);
 }
@@ -158,6 +164,7 @@ onBeforeUnmount(() => {
       <FButton variant="subtle" size="icon" icon="search" :title="tr('搜索')" @click="ui.searchOpen = !ui.searchOpen" />
     </header>
     <FInfoBar v-if="notice" class="notice" :severity="notice.sev">{{ notice.text }}</FInfoBar>
+    <FInfoBar v-if="ui.revealTask" class="notice">{{ tr('已临时显示定位任务，切换视图或筛选后恢复') }} <FButton variant="subtle" @click="clearReveal">{{ tr('退出定位') }}</FButton></FInfoBar>
     <main class="body">
       <p v-if="!storeState.ready" class="loading">{{ status === 'connecting' ? tr("正在连接电脑上的 FluentCal…") : '' }}</p>
       <template v-else>

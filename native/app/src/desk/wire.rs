@@ -23,6 +23,9 @@ pub fn wire(w: &DeskWindow) {
     w.on_quick_add_close(|| run(|a| a.desk_quick_add_close()));
     w.on_quick_add_focus(|| run(|a| a.desk_wants_keyboard()));
     w.on_jump(|d| run(move |a| a.desk_jump(&d)));
+    w.on_locate(|id, d| run(move |a| a.desk_locate(&id, &d)));
+    w.on_countdown_filter(|x, y, bw, bh| run(move |a| a.desk_countdown_filter_open(super::popups::At::Below(x, y, bw, bh))));
+    w.on_countdown_source(|key, value| run(move |a| a.patch_settings(serde_json::json!({ "calendar": { key.as_str(): value } }))));
     w.on_chip_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
     w.on_chip_open(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
     w.on_chip_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
@@ -74,7 +77,7 @@ pub fn wire(w: &DeskWindow) {
     w.on_filter_manage(|| run(|a| a.desk_filter_manage()));
     w.on_filter_closed(|| run(|a| a.desk_filter_closed()));
     w.on_search_changed(|| run(|a| a.desk_search_refresh()));
-    w.on_search_go(|h| run(move |a| a.desk_search_go(&h.date)));
+    w.on_search_go(|h| run(move |a| { a.desk_search_close(); a.desk_locate(&h.task_id, &h.date); }));
     w.on_search_open_task(|h| run(move |a| a.open_editor_task(&h.task_id, Some(h.date.to_string()))));
     w.on_search_close(|| run(|a| a.desk_search_close()));
     w.on_wants_keyboard(|| run(|a| a.desk_wants_keyboard()));

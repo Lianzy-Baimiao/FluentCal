@@ -9,17 +9,20 @@ use fluentcal_core::date::{add_days, now_ms, start_of_month, start_of_week};
 use fluentcal_core::model::Task;
 use fluentcal_core::tasks;
 use serde_json::json;
-use slint::Model;
+use slint::{ComponentHandle, Model};
 use std::time::Duration;
 
 impl App {
     pub fn desk_page(&mut self, delta: i32) {
+        self.desk_clear_reveal();
         vm::page(&self.doc, &mut self.desk.ui, delta);
         self.desk_refresh_view();
     }
 
     pub fn desk_go_today(&mut self) {
+        self.desk_clear_reveal();
         if self.doc.settings.calendar.view == "list" {
+            self.desk_refresh_data();
             return self.desk_list_scroll_today();
         }
         let today = self.today();
@@ -31,32 +34,66 @@ impl App {
         self.desk_refresh_view();
     }
 
-    /// Shows `date` (switching from the Gantt or list view to the month) and highlights it.
+    /// A date-only link (a holiday, for example).
     pub fn desk_jump(&mut self, date: &str) {
+        self.desk_locate("", date);
+    }
+
+    pub fn desk_clear_reveal(&mut self) {
+        self.desk.ui.reveal_task.clear();
+        self.desk.ui.reveal_all = false;
+    }
+
+    /// Locate the task/occurrence, keeping list view and all saved visibility preferences.
+    pub fn desk_locate(&mut self, task_id: &str, date: &str) {
+        if !fluentcal_core::date::is_iso_date(date) { return; }
+        self.desk_clear_reveal();
+        let task = self.doc.tasks.get(task_id).cloned();
+        let hidden = task.as_ref().is_some_and(|t| !vm::shown(&self.doc, &self.desk.ui, t) || (!self.doc.settings.tasks.show_completed && t.done));
+        let (start, end) = task.as_ref().and_then(|t| fluentcal_core::recur::occurrence_on(t, date).or_else(|| fluentcal_core::recur::occurrences(t, date, date, 400).into_iter().next())).map_or_else(|| (date.to_owned(), date.to_owned()), |o| (o.start, o.end));
+        let list = self.doc.settings.calendar.view == "list" && task.is_some();
         if matches!(self.doc.settings.calendar.view.as_str(), "gantt" | "list") {
-            self.patch_settings(json!({ "calendar": { "view": "month" } }));
+            if !list { self.patch_settings(json!({ "calendar": { "view": "month" } })); }
         }
+        let today = self.today();
+        let outside = list && (task.as_ref().is_some_and(|t| t.flex.is_some()) || end < today || start > add_days(&today, self.desk.ui.list_span - 1));
         let c = &self.doc.settings.calendar;
         let ui = &mut self.desk.ui;
         ui.cursor = start_of_month(date);
         ui.weeks_start = add_days(&start_of_week(date, c.week_start), -7 * c.weeks_past as i32);
         ui.selected = date.to_owned();
-        self.desk_flash(date);
+        ui.reveal_task = task.as_ref().map_or_else(String::new, |t| t.id.clone());
+        ui.reveal_all = outside;
+        self.desk_flash_range(&start, &end, task_id);
         self.desk_refresh_view();
+        if list {
+            let rows = self.desk.window.get_list_rows();
+            if let Some(index) = rows.iter().position(|r| r.kind == "item" && r.chip.task_id == task_id) {
+                let w = self.desk.window.as_weak();
+                slint::Timer::single_shot(Duration::ZERO, move || { if let Some(w) = w.upgrade() { w.invoke_list_scroll_to(index as i32); } });
+            }
+        }
+        if hidden || outside { self.notify(tr("已临时显示定位任务，切换视图或筛选后恢复"), false); }
     }
 
     pub fn desk_set_view(&mut self, view: &str) {
+        let revealed = !self.desk.ui.reveal_task.is_empty();
+        self.desk_clear_reveal();
         self.history.boundary();
         // The view that goes takes its focused item with it (a task, the to-do column's add
         // box): the keys go back to the calendar first.
         self.desk.window.invoke_focus_root();
         self.patch_settings(json!({ "calendar": { "view": view } }));
+        if revealed { self.desk_refresh_view(); }
     }
 
     /// The list view's 近期 / 所有 (it opens on today: shell::apply_settings).
     pub fn desk_set_list_range(&mut self, range: &str) {
+        let revealed = !self.desk.ui.reveal_task.is_empty();
+        self.desk_clear_reveal();
         self.history.boundary();
         self.patch_settings(json!({ "calendar": { "listRange": range } }));
+        if revealed { self.desk_refresh_data(); }
     }
 
     /// 显示更多日期: 30 more days, up to 180.
@@ -73,12 +110,26 @@ impl App {
     }
 
     pub fn desk_flash(&mut self, date: &str) {
+        self.desk_flash_range(date, date, "");
+    }
+
+    fn desk_flash_range(&mut self, date: &str, end: &str, task_id: &str) {
         self.desk.ui.flash = date.to_owned();
+        self.desk.ui.flash_end = end.to_owned();
+        self.desk.ui.flash_task = task_id.to_owned();
         self.desk.window.set_flash_date(date.into());
-        self.desk.flash_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(1600), || {
+        self.desk.window.set_flash_end(end.into());
+        self.desk.window.set_flash_task(task_id.into());
+        self.desk.window.global::<crate::ChipKeys>().set_located_task(task_id.into());
+        self.desk.flash_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(3000), || {
             crate::app::run(|app| {
                 app.desk.ui.flash.clear();
+                app.desk.ui.flash_end.clear();
+                app.desk.ui.flash_task.clear();
                 app.desk.window.set_flash_date("".into());
+                app.desk.window.set_flash_end("".into());
+                app.desk.window.set_flash_task("".into());
+                app.desk.window.global::<crate::ChipKeys>().set_located_task("".into());
             })
         });
     }

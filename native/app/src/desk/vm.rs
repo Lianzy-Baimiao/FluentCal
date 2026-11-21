@@ -6,7 +6,7 @@ use fluentcal_core::i18n::{tr, trf};
 use crate::theme::color;
 use crate::{CellData, ChipData, CountdownData, ListRowData, WeekData, WeekdayHead};
 use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub};
-use fluentcal_core::countdown::countdowns;
+use fluentcal_core::countdown::selected_countdowns;
 use fluentcal_core::date::{add_days, add_months, diff_days, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
 use fluentcal_core::lunar::{almanac, display_info as day_info, Kind};
 use fluentcal_core::model::Task;
@@ -27,6 +27,11 @@ pub struct DeskUi {
     pub selected: String,
     /// Day highlighted briefly after a jump.
     pub flash: String,
+    pub flash_end: String,
+    pub flash_task: String,
+    /// A located task can be temporarily revealed without changing saved filters.
+    pub reveal_task: String,
+    pub reveal_all: bool,
     /// Arrow keys move the selected day (a day was clicked; 0.2: a focused cell).
     pub grid_focus: bool,
     /// Day with the inline quick-add box.
@@ -60,7 +65,7 @@ pub const LIST_SPAN_MAX: i32 = 180;
 /// Whether the calendar shows `t` under the group filter. A task whose group is gone counts
 /// as 未分组 (as in the Gantt chart).
 pub fn shown(doc: &Doc, ui: &DeskUi, t: &Task) -> bool {
-    if ui.group_filter.is_empty() {
+    if ui.group_filter.is_empty() || (!ui.reveal_task.is_empty() && ui.reveal_task == t.id) {
         return true;
     }
     let g = t.group_id.as_deref().filter(|g| doc.groups.contains_key(*g)).unwrap_or("");
@@ -173,12 +178,16 @@ pub fn weekday_heads(doc: &Doc) -> ModelRc<WeekdayHead> {
 }
 
 pub fn countdown_items(doc: &Doc, today: &str) -> ModelRc<CountdownData> {
-    let tasks: Vec<Task> = doc.tasks.values().cloned().collect();
+    let tasks: Vec<Task> = doc.tasks.values().cloned().map(|mut t| {
+        if t.group_id.as_ref().is_some_and(|g| !doc.groups.contains_key(g)) { t.group_id = None; }
+        t
+    }).collect();
+    let settings = &doc.settings.calendar;
     model(
-        countdowns(&tasks, today, doc.settings.calendar.holiday_countdown)
+        selected_countdowns(&tasks, today, settings.holiday_countdown, settings.countdown_marked, &settings.countdown_groups)
             .into_iter()
-            .take(6)
             .map(|c| CountdownData {
+                task_id: c.task_id.clone().unwrap_or_default().into(),
                 key: c.key.into(),
                 label: if c.task_id.is_none() { tr(&c.label).into() } else { c.label.into() },
                 tip: format_friendly(&c.date, today).into(),
@@ -222,7 +231,7 @@ pub fn weeks(doc: &Doc, ui: &DeskUi, today: &str, room: Option<Room>, t: &Tokens
         .values()
         .filter(|task| shown(doc, ui, task))
         .flat_map(|task| occurrences(task, &first, &last, 400))
-        .filter(|o| show_done || !o.done)
+        .filter(|o| show_done || !o.done || o.task.id == ui.reveal_task)
         .collect();
     let last = doc.settings.tasks.completed_last;
     // 行高随任务多少调整 (GitHub #6): each row as high as its tasks need, as far as the room goes.
@@ -321,8 +330,8 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
 /// every task once, on its start date.
 pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRowData>, i32, String) {
     let c = &doc.settings.calendar;
-    let show_done = doc.settings.tasks.show_completed;
-    let all = c.list_range == "all";
+    let show_done = doc.settings.tasks.show_completed || !ui.reveal_task.is_empty();
+    let all = c.list_range == "all" || ui.reveal_all;
     let tasks = doc.tasks.values().filter(|task| shown(doc, ui, task));
     let days = if all { all_tasks(tasks, today, show_done) } else { agenda(tasks, today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, show_done) };
     let mut rows = Vec::new();
@@ -335,7 +344,12 @@ pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRo
         if d.items.is_empty() {
             rows.push(ListRowData { kind: "empty".into(), ..Default::default() });
         }
-        rows.extend(d.items.iter().map(|o| list_item(doc, o, all, today, t)));
+        rows.extend(d.items.iter().filter(|o| doc.settings.tasks.show_completed || !o.done || o.task.id == ui.reveal_task).map(|o| list_item(doc, o, all, today, t)));
+    }
+    // A no-date to-do is normally in its own column; a search must still expose a row.
+    if let Some(task) = doc.tasks.get(&ui.reveal_task).filter(|task| task.flex.is_some()) {
+        let occ = Occurrence { task, date: task.start.clone(), start: task.start.clone(), end: task.end.clone(), done: task.done };
+        rows.insert(0, list_item(doc, &occ, true, today, t));
     }
     let footer = if all {
         String::new()
@@ -361,9 +375,12 @@ fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> L
         meta.push(describe_rule(task.repeat.as_ref(), &task.start));
     }
     if let Some(g) = task.group_id.as_deref().and_then(|id| doc.groups.get(id)) {
-        meta.push(g.name.clone());
+        if !doc.settings.calendar.list_group_labels { meta.push(g.name.clone()); }
     }
     ListRowData {
+        group_name: if doc.settings.calendar.list_group_labels { task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map_or_else(String::new, |g| g.name.clone()).into() } else { "".into() },
+        group_color: color(task_color(task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map(|g| g.color.as_str()), t).bar),
+        group_text: color(task_color(task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map(|g| g.color.as_str()), t).on_bar),
         kind: "item".into(),
         chip: chip_data(doc, &ch, today, t),
         when: task.time.clone().unwrap_or_else(|| tr("全天").into()).into(),

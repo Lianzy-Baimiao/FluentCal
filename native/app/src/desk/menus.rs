@@ -19,6 +19,8 @@ pub struct Entry {
     pub disabled: bool,
     pub danger: bool,
     pub separator: bool,
+    pub color: Option<String>,
+    pub detail: String,
     /// Colour swatches: (key, colour hex or "", title, selected); activating runs `id` + key.
     pub swatches: Vec<(String, String, String, bool)>,
     pub children: Vec<Entry>,

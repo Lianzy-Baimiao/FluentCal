@@ -13,6 +13,16 @@ use crate::app::App;
 impl App {
     /// The button (or 更多 › 按分组筛选…): the list of groups under it.
     pub fn desk_filter_open(&mut self, at: At) {
+        self.desk.popups.countdown_filter = false;
+        self.open_filter_panel(at);
+    }
+
+    pub fn desk_countdown_filter_open(&mut self, at: At) {
+        self.desk.popups.countdown_filter = true;
+        self.open_filter_panel(at);
+    }
+
+    fn open_filter_panel(&mut self, at: At) {
         self.desk.popups.filter_open = true;
         self.desk_filter_refresh();
         let w = &self.desk.window;
@@ -27,8 +37,14 @@ impl App {
         if !self.desk.popups.filter_open {
             return;
         }
-        let (rows, all, hint) = overlays::filter_rows(&self.doc, &self.desk.ui, &self.tokens);
+        let countdown = self.desk.popups.countdown_filter;
+        let mut ui = self.desk.ui.clone();
+        if countdown { ui.group_filter = self.doc.settings.calendar.countdown_groups.clone(); }
+        let (rows, all, hint) = overlays::filter_rows(&self.doc, &ui, &self.tokens);
         let w = &self.desk.window;
+        w.set_countdown_filter_mode(countdown);
+        w.set_countdown_marked(self.doc.settings.calendar.countdown_marked);
+        w.set_countdown_holiday(self.doc.settings.calendar.holiday_countdown);
         super::sync::rows(&w.get_filter_rows(), rows, |m| w.set_filter_rows(m));
         w.set_filter_all_count(all.into());
         w.set_filter_hint(hint.into());
@@ -40,6 +56,14 @@ impl App {
 
     /// A group (or 未分组, "") ticked or unticked.
     pub fn desk_filter_toggle(&mut self, id: &str, on: bool) {
+        if self.desk.popups.countdown_filter {
+            let mut groups = self.doc.settings.calendar.countdown_groups.clone();
+            groups.retain(|g| g != id);
+            if on { groups.push(id.to_owned()); }
+            self.patch_settings(serde_json::json!({ "calendar": { "countdownGroups": groups } }));
+            return;
+        }
+        self.desk_clear_reveal();
         let f = &mut self.desk.ui.group_filter;
         f.retain(|g| g != id);
         if on {
@@ -51,6 +75,7 @@ impl App {
 
     /// 全部.
     pub fn desk_filter_clear(&mut self) {
+        self.desk_clear_reveal();
         self.desk.ui.group_filter.clear();
         self.desk_refresh_data();
     }
@@ -58,7 +83,7 @@ impl App {
     /// 管理分组…: where groups are added, renamed, coloured and deleted.
     pub fn desk_filter_manage(&mut self) {
         self.desk.window.invoke_close_filter();
-        self.open_settings(Some("gantt"));
+        self.open_settings(Some("groups"));
     }
 
     /// The group a task made on the calendar now belongs to: the one group the calendar shows

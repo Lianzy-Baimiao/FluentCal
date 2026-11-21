@@ -99,7 +99,7 @@ function onCellDblClick(date: ISODate) {
           :tabindex="ui.selected === c.date ? 0 : -1"
           :aria-selected="ui.selected === c.date"
           :aria-describedby="`desc-${c.date}`"
-          :class="{ rest: c.rest, today: c.today, dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash === c.date }"
+          :class="{ rest: c.rest, today: c.today, dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash && c.date >= ui.flash && c.date <= ui.flashEnd }"
           :style="c.mark ? { '--mark': c.mark } : undefined"
           @click="ui.selected = c.date"
           @dblclick="onCellDblClick(c.date)"
@@ -208,7 +208,8 @@ function onCellDblClick(date: ISODate) {
   box-shadow: inset 0 0 0 2px var(--accent-fill);
 }
 .cell.flash {
-  animation: flash 1.5s var(--ease);
+  box-shadow: inset 0 0 0 2px var(--accent-fill);
+  background: color-mix(in srgb, var(--accent-fill) 16%, var(--cell-bg));
 }
 @keyframes flash {
   0%,

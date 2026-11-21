@@ -6,6 +6,7 @@ import { call } from '@/api';
 import { shown, tidyFilter } from '@/lib/filter';
 import { doc, patchSettings, storeState, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
+import { occurrenceOn, occurrences } from '@/lib/recur';
 
 /** UI state shared by the desk window's components (and the web view, which reuses them). */
 export const ui = reactive({
@@ -16,6 +17,12 @@ export const ui = reactive({
   selected: now.value as ISODate,
   /** Day highlighted briefly after a search jump. */
   flash: '' as ISODate,
+  flashEnd: '' as ISODate,
+  flashTask: '',
+  revealTask: '',
+  activeView: '',
+  locateRevision: 0,
+  locateView: '',
   quickAdd: null as null | { date: ISODate },
   searchOpen: false,
   /** Task the Gantt view should scroll to and select. */
@@ -33,8 +40,10 @@ export const groupFilter = computed(() => tidyFilter(doc.groups, ui.groupFilter)
  * Gantt chart take all of them. */
 export const shownTasks = computed(() => {
   const f = groupFilter.value;
-  return f.length ? taskList.value.filter((t) => shown(doc.groups, f, t)) : taskList.value;
+  return f.length ? taskList.value.filter((t) => t.id === ui.revealTask || shown(doc.groups, f, t)) : taskList.value;
 });
+
+export function clearReveal(): void { ui.revealTask = ''; }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 export function notify(text: string, undo = false): void {
@@ -95,6 +104,7 @@ export function defaultWeeksStart(day: ISODate = now.value): ISODate {
 }
 
 export function goToday(): void {
+  clearReveal();
   ui.cursor = startOfMonth(now.value);
   ui.weeksStart = defaultWeeksStart();
   ui.selected = now.value;
@@ -102,6 +112,7 @@ export function goToday(): void {
 }
 
 export function page(delta: number): void {
+  clearReveal();
   if (doc.settings.calendar.view === 'weeks') {
     ui.weeksStart = addDays(ui.weeksStart || defaultWeeksStart(), delta * 7);
   } else {
@@ -110,17 +121,28 @@ export function page(delta: number): void {
 }
 
 /** Shows `date` in the calendar (switching away from Gantt if needed) and highlights it. */
-export function jumpTo(date: ISODate): void {
-  if (doc.settings.calendar.view === 'gantt') patchSettings({ calendar: { view: 'month' } });
+export function jumpTo(date: ISODate, taskId = ''): void {
+  clearReveal();
+  const view = ui.activeView || doc.settings.calendar.view;
+  if (view === 'gantt' || view === 'list' && !taskId) {
+    ui.locateView = 'month';
+    patchSettings({ calendar: { view: 'month' } });
+  }
   ui.cursor = startOfMonth(date);
   ui.weeksStart = addDays(startOfWeek(date, doc.settings.calendar.weekStart), -7 * doc.settings.calendar.weeksPast);
   ui.selected = date;
-  flash(date);
+  const task = doc.tasks[taskId];
+  const occurrence = task && (occurrenceOn(task, date) ?? occurrences(task, date, date)[0]);
+  ui.revealTask = task ? taskId : '';
+  ui.flashTask = task ? taskId : '';
+  flash(occurrence?.start ?? date, occurrence?.end ?? date);
+  ui.locateRevision++;
 }
 
 let flashTimer: ReturnType<typeof setTimeout> | undefined;
-export function flash(date: ISODate): void {
+export function flash(date: ISODate, end = date): void {
   ui.flash = date;
+  ui.flashEnd = end;
   clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => (ui.flash = ''), 1600);
+  flashTimer = setTimeout(() => { ui.flash = ''; ui.flashEnd = ''; ui.flashTask = ''; }, 3000);
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { t as tr } from '@/i18n';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { FIcon, vTip } from '@/fluent';
 import { countdowns } from '@/lib/countdown';
 import { formatFriendly } from '@/lib/date';
@@ -8,13 +8,15 @@ import { doc, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
 import { jumpTo } from './state';
 
-const items = computed(() => countdowns(taskList.value, now.value, doc.settings.calendar.holidayCountdown).slice(0, 6)
+const expanded = ref(false);
+const items = computed(() => countdowns(taskList.value.map(t => t.groupId && !doc.groups[t.groupId] ? { ...t, groupId: undefined } : t), now.value, doc.settings.calendar.holidayCountdown, doc.settings.calendar.countdownMarked, doc.settings.calendar.countdownGroups)
   .map(c => ({ ...c, label: c.taskId ? c.label : tr(c.label) })));
 </script>
 
 <template>
-  <div v-if="items.length" class="countdown" role="group" :aria-label="tr('倒数日')">
-    <button v-for="c in items" :key="c.key" type="button" class="cd" v-tip="formatFriendly(c.date)" @click="jumpTo(c.date)">
+  <div v-if="items.length" class="countdown" :class="{ expanded }" role="group" :aria-label="tr('倒数日')">
+    <button v-if="items.length > 6" class="cd" @click="expanded = !expanded">{{ expanded ? tr('收起') : tr('展开倒计时') }}</button>
+    <button v-for="c in expanded ? items : items.slice(0, 6)" :key="c.key" type="button" class="cd" v-tip="formatFriendly(c.date)" @click="jumpTo(c.date, c.taskId)">
       <FIcon :name="c.taskId ? 'flag' : 'calendarDay'" :size="11" />
       <span>{{ c.days === 0 ? tr('{0} 就是今天', c.label) : tr('距{0}还有 {1} 天', c.label, c.days) }}</span>
     </button>
@@ -45,6 +47,7 @@ const items = computed(() => countdowns(taskList.value, now.value, doc.settings.
   text-shadow: var(--text-glow);
   cursor: pointer;
 }
+.countdown.expanded { flex-wrap: wrap; height: auto; max-height: 180px; overflow-y: auto; }
 .cd:hover {
   background: var(--subtle-fill-hover);
   color: var(--text-primary);

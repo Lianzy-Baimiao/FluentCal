@@ -11,6 +11,10 @@ use serde_json::json;
 impl App {
     /// Runs entry `id` of the menu opened on `target`.
     pub fn menu_act(&mut self, target: &Target, id: &str) {
+        if id == "manage-groups" {
+            self.open_settings(Some("groups"));
+            return;
+        }
         self.history.boundary();
         match target {
             Target::Task(tid, date) => self.task_act(tid, date, id),

@@ -137,6 +137,7 @@ export interface Settings {
     view: CalendarView;
     /** The list view: 近期 (today on) or 所有 (every task once). */
     listRange: 'upcoming' | 'all';
+    listGroupLabels: boolean;
     weekStart: 0 | 1;
     monthRows: 'auto' | 'six';
     /** Busy weeks get taller rows (the PC calendar; the web view keeps equal rows). */
@@ -159,6 +160,8 @@ export interface Settings {
     showAlmanac: boolean;
     /** Countdown to the next statutory holiday in the countdown bar. */
     holidayCountdown: boolean;
+    countdownMarked: boolean;
+    countdownGroups: string[];
     /** 0 = Sunday … 6 = Saturday */
     restDays: number[];
   };

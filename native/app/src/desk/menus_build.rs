@@ -35,12 +35,14 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
     v.push(Entry { icon: "flag".into(), ..check("countdown", tr("倒数日"), t.countdown == Some(true)) });
     // 分组 (GitHub #14): 未分组, the groups, and the presets that aren't there yet (one is made
     // when it is first chosen)
-    let mut groups: Vec<_> = app.doc.groups.values().collect();
-    groups.sort_by(|a, b| a.order.total_cmp(&b.order));
     let own = t.group_id.as_deref().filter(|g| app.doc.groups.contains_key(*g));
-    let mut choices = vec![radio("group:", tr("未分组"), own.is_none())];
-    choices.extend(groups.iter().map(|g| radio(&format!("group:{}", g.id), &g.name, own == Some(g.id.as_str()))));
+    let mut choices: Vec<_> = fluentcal_core::groups::summaries(&app.doc).into_iter().map(|g| Entry {
+        color: g.color, detail: g.count.to_string(),
+        ..radio(&format!("group:{}", g.id), &g.name, own.unwrap_or("") == g.id)
+    }).collect();
     choices.extend(fluentcal_core::tasks::open_presets(&app.doc).into_iter().map(|(key, name)| radio(&format!("group:{}{key}", fluentcal_core::tasks::PRESET_PREFIX), name, false)));
+    choices.push(sep());
+    choices.push(item("manage-groups", tr("管理分组…"), "settings"));
     v.push(sub(tr("分组"), "group", choices));
     let o = RowOptions { hide_done: s.gantt.hide_done, hide_single_day: s.gantt.hide_single_day, group_filter: s.gantt.group_filter.clone() };
     if s.calendar.view != "gantt" && in_gantt(t, &o) {

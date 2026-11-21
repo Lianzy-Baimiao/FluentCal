@@ -10,6 +10,7 @@ import { Tip, Overlay, FocusRing } from "overlay.slint";
 import { ChipData, ChipKeys } from "chip.slint";
 
 export struct ListRowData {
+    group-name: string, group-color: color, group-text: color,
     // "day" (a day's heading) | "item" (a task) | "empty" (今天 without tasks)
     kind: string,
     heading: string,
@@ -30,6 +31,10 @@ export struct ListRowData {
 // One task: check box, time, colour, title, details. Double click opens it, right click its
 // menu; keys as on a chip (Enter, Space, Delete, the menu key).
 component ListItem inherits Rectangle {
+    in property <string> group-name;
+    in property <color> group-color;
+    in property <color> group-text;
+    in property <bool> highlighted;
     in property <ChipData> chip;
     in property <string> when;
     in property <string> meta;
@@ -44,7 +49,9 @@ component ListItem inherits Rectangle {
     property <float> fs: Theme.desk.fs;
     property <int> tip-token: -1;
     border-radius: 4px;
-    background: Theme.desk.cell-bg;
+    background: highlighted ? Theme.c.accent-fill.transparentize(0.78) : Theme.desk.cell-bg;
+    border-width: highlighted ? 2px : 0;
+    border-color: Theme.c.accent-fill;
     accessible-role: list-item;
     accessible-label: chip.title + (chip.done ? @tr("，已完成") : "");
     accessible-description: (meta != "" ? when + " · " + meta : when) + (due != "" ? " · " + due : "");
@@ -147,6 +154,19 @@ component ListItem inherits Rectangle {
             border-radius: 2px;
             background: chip.bar;
         }
+        if root.group-name != "" && root.width > 300px * fs: Rectangle {
+            width: min(group-text.preferred-width + 12px, 100px * fs, root.width * 0.2);
+            height: 21px * fs;
+            border-radius: 4px;
+            background: root.group-color;
+            accessible-role: text;
+            accessible-label: root.group-name;
+            group-text := Text {
+                x: 6px; width: parent.width - 12px;
+                text: root.group-name; color: root.group-text;
+                font-size: 11px * fs; overflow: elide; vertical-alignment: center;
+            }
+        }
         title-box := Rectangle {
             height: root.height;
             min-width: 0;
@@ -232,6 +252,7 @@ component ListHeading inherits Rectangle {
 }
 
 export component AgendaList inherits Rectangle {
+    in property <string> flash-task;
     in property <[ListRowData]> rows;
     in property <bool> read-only;
     // Under the rows: "more" (显示更多日期), a note, or nothing.
@@ -280,6 +301,10 @@ export component AgendaList inherits Rectangle {
                 today: r.today;
             }
             if near && r.kind == "item": ListItem {
+                group-name: r.group-name;
+                group-color: r.group-color;
+                group-text: r.group-text;
+                highlighted: root.flash-task != "" && root.flash-task == r.chip.task-id;
                 y: 1px;
                 height: rh - 2px;
                 chip: r.chip;

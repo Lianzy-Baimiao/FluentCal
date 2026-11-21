@@ -27,6 +27,7 @@ export struct SAppearance {
 }
 
 export struct SCalendar {
+    list-group-labels: bool, countdown-marked: bool,
     view: string, week-start: string, month-rows: string, fit-rows: bool, bar-days: bool, bar-progress: bool, bar-done: bool, sidebar-mode: string, sidebar-close: string, weeks-rows: float, weeks-past: float,
     show-lunar: bool, show-holidays: bool, show-week-numbers: bool, show-almanac: bool, holiday-countdown: bool,
     rest-days: [bool],
@@ -58,7 +59,7 @@ export struct SMcp {
 
 export struct SAbout { version: string, build: string, update-checking: bool, update-message: string }
 
-export struct SGroup { id: string, name: string, color: string, desc: string }
+export struct SGroup { id: string, name: string, color: string, desc: string, countdown: bool }
 export struct SBackup { name: string, desc: string }
 export struct SUpcoming { key: string, title: string, desc: string }
 export struct SAddress { ip: string, text: string, note: string, url: string }

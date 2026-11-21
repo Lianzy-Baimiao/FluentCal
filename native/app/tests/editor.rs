@@ -14,6 +14,26 @@ struct T {
     dir: PathBuf,
 }
 
+#[test]
+fn color_spectrum_is_draft_until_confirm_and_save() {
+    let today=fluentcal_core::date::today();
+    let t=start("color-picker",&[json!({"id":"a","title":"颜色测试","start":today,"color":"#FF0000"})]);
+    let w=t.open(|a|a.open_editor_task("a",None));
+    let plus=t.find(&w,"自定义颜色"); t.click(&w,&plus);
+    let spectrum=t.find(&w,"色盘（饱和度与明度）");
+    t.click(&w,&spectrum);
+    assert_eq!(w.get_data().color,"#FF0000","picker does not commit while browsing");
+    let cancel=ElementHandle::find_by_accessible_label(&w,"取消").last().unwrap(); t.click(&w,&cancel);
+    assert_eq!(w.get_data().color,"#FF0000");
+    let plus=t.find(&w,"自定义颜色"); t.click(&w,&plus);
+    let spectrum=t.find(&w,"色盘（饱和度与明度）"); t.click(&w,&spectrum);
+    let confirm=t.find(&w,"确定"); t.click(&w,&confirm);
+    assert_ne!(w.get_data().color,"#FF0000");
+    assert_eq!(with(|a|a.doc.tasks["a"].color.clone()).unwrap().as_deref(),Some("#FF0000"),"editor draft not yet saved");
+    let save=t.find(&w,"保存"); t.click(&w,&save);
+    assert_ne!(with(|a|a.doc.tasks["a"].color.clone()).unwrap().as_deref(),Some("#FF0000"));
+}
+
 fn start(name: &str, tasks: &[Value]) -> T {
     slint::platform::set_platform(Box::new(TestingBackend::new(TestingBackendOptions { mock_time: false, threading: false, ..Default::default() }))).expect("platform");
     let dir = std::env::temp_dir().join(format!("fluentcal-editor-{name}-{}", std::process::id()));
@@ -451,7 +471,7 @@ fn preset_group_from_the_editor() {
     assert!(groups().is_empty());
     use slint::Model;
     let choices: Vec<String> = w.get_groups().iter().map(|o| o.label.to_string()).collect();
-    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…"]);
+    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…", "管理分组…"]);
     // chosen from the list (the box shows the group now chosen: 未分组)
     t.click(&w, &t.find(&w, "未分组"));
     let option = ElementHandle::find_by_accessible_label(&w, "生日").find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::ListItem)).expect("the choice");
@@ -460,7 +480,14 @@ fn preset_group_from_the_editor() {
     assert_eq!(made.iter().map(|(n, c, _)| (n.as_str(), c.as_str())).collect::<Vec<_>>(), [("生日", "pink")]);
     assert_eq!(w.get_data().group, made[0].2.as_str(), "the task is in it");
     let choices: Vec<String> = w.get_groups().iter().map(|o| o.label.to_string()).collect();
-    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…"], "生日 is a group now, once");
+    assert_eq!(choices, ["未分组", "生日", "工作", "还款", "纪念日", "新建分组…", "管理分组…"], "生日 is a group now, once");
+    w.set_title_text("生日草稿".into());
+    w.invoke_edit("title".into(),"生日草稿".into());
+    w.invoke_edit("group".into(),"__manage__".into());
+    settle();
+    assert_eq!(with(|a|a.settings_win.as_ref().map(|s|s.local.page.clone())).unwrap().as_deref(),Some("groups"));
+    assert_eq!(w.get_title_text(),"生日草稿","management leaves the editor draft intact");
     t.ctrl(&w, "s");
     assert_eq!(t.task("a").unwrap()["groupId"], json!(made[0].2));
+    assert_eq!(t.task("a").unwrap()["title"],json!("生日草稿"));
 }

@@ -14,9 +14,9 @@ const box = ref<InstanceType<typeof FTextBox>>();
 const results = computed(() => (o.q.trim() || o.color || o.status !== 'all' ? searchTasks(taskList.value, doc.groups, o, now.value).slice(0, 100) : []));
 const colors = computed(() => TASK_COLORS.map((c) => ({ key: c.key, color: c.bar, label: tr(c.label) })));
 
-function go(date: string) {
+function go(date: string, taskId: string) {
   ui.searchOpen = false;
-  jumpTo(date);
+  jumpTo(date, taskId);
 }
 
 onMounted(() => void nextTick(() => box.value?.focus()));
@@ -25,7 +25,7 @@ onMounted(() => void nextTick(() => box.value?.focus()));
 <template>
   <div class="search" role="dialog" :aria-label="tr('搜索任务')" style="--text-glow: none" @keydown.esc.stop="ui.searchOpen = false">
     <div class="bar">
-      <FTextBox ref="box" v-model="o.q" icon="search" :placeholder="tr('搜索任务、备注或分组')" clearable @escape="ui.searchOpen = false" @enter="results[0] && go(results[0].date)" />
+      <FTextBox ref="box" v-model="o.q" icon="search" :placeholder="tr('搜索任务、备注或分组')" clearable @escape="ui.searchOpen = false" @enter="results[0] && go(results[0].date, results[0].task.id)" />
       <FButton variant="subtle" size="icon" icon="close" :title="tr('关闭 (Esc)')" @click="ui.searchOpen = false" />
     </div>
     <div class="filters">
@@ -51,7 +51,7 @@ onMounted(() => void nextTick(() => box.value?.focus()));
       <FColorSwatches v-model="o.color" :colors="colors" allow-none :size="18" />
     </div>
     <ul v-if="results.length" class="results" role="listbox" :aria-label="tr('搜索结果')">
-      <li v-for="h in results" :key="h.task.id" role="option" tabindex="0" @click="go(h.date)" @keydown.enter="go(h.date)" @dblclick="openEditor({ mode: 'edit', taskId: h.task.id, date: h.date })">
+      <li v-for="h in results" :key="h.task.id" role="option" tabindex="0" @click="go(h.date, h.task.id)" @keydown.enter="go(h.date, h.task.id)" @dblclick="openEditor({ mode: 'edit', taskId: h.task.id, date: h.date })">
         <span class="dot" :style="{ background: taskColor(h.task.color, isDark).bar }" />
         <span class="t" :class="{ done: h.task.done }">{{ h.task.title }}</span>
         <span class="d">{{ h.task.repeat ? tr("{0}（重复）", formatFriendly(h.date)) : formatRange(h.task.start, h.task.end) }}</span>

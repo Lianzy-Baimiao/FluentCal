@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendar: {
     view: 'month',
     listRange: 'upcoming',
+    listGroupLabels: false,
     weekStart: 1,
     monthRows: 'auto',
     fitRows: false,
@@ -41,6 +42,8 @@ export const DEFAULT_SETTINGS: Settings = {
     showWeekNumbers: false,
     showAlmanac: false,
     holidayCountdown: true,
+    countdownMarked: true,
+    countdownGroups: [],
     restDays: [0, 6],
   },
   tasks: { showCompleted: true, completedLast: true, autoPostpone: false, defaultColor: '' },

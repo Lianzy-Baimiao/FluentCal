@@ -146,7 +146,16 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
         .collect();
     sync::rows(&w.get_deps(), deps, |m| w.set_deps(m));
     sync::rows(&w.get_reminder_options(), options(&v.reminder_options), |m| w.set_reminder_options(m));
-    sync::rows(&w.get_groups(), options(&v.groups), |m| w.set_groups(m));
+    let summaries = fluentcal_core::groups::summaries(doc);
+    let mut groups = options(&v.groups);
+    for row in &mut groups {
+        if let Some(g) = summaries.iter().find(|g| g.id == row.value.as_str()) {
+            row.detail = g.count.to_string().into();
+            row.has_dot = g.color.is_some();
+            row.dot_color = color(task_color(g.color.as_deref(), t).bar);
+        }
+    }
+    sync::rows(&w.get_groups(), groups, |m| w.set_groups(m));
     sync::rows(&w.get_dep_options(), options(&v.dep_options), |m| w.set_dep_options(m));
     let modes: Vec<RadioOption> = v.month_modes.iter().map(|o| RadioOption { value: o.value.clone().into(), label: o.label.clone().into(), disabled: false }).collect();
     sync::rows(&w.get_month_modes(), modes, |m| w.set_month_modes(m));
@@ -157,6 +166,7 @@ pub fn handle(w: &EditorWindow, ed: &mut Editor, doc: &Doc, m: Msg, today: &str,
     // (the window may have stayed open over midnight: a tick is dated the day it is made)
     ed.set_today(today);
     match m {
+        Msg::Edit(k, v) if k == "group" && v == "__manage__" => Effect::default(),
         // a preset group (生日、工作…) that isn't there yet: made now, like 新建分组's 创建
         Msg::Edit(k, v) if k == "group" && v.starts_with(fluentcal_core::tasks::PRESET_PREFIX) => {
             let key = &v[fluentcal_core::tasks::PRESET_PREFIX.len()..];

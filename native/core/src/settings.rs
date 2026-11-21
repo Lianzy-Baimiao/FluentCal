@@ -69,6 +69,8 @@ section!(Calendar {
     view: String = "month".into(),
     /// The list view: "upcoming" (近期) | "all" (所有)
     list_range: String = "upcoming".into(),
+    /// Optional group-name badges in the list; preserve the existing compact layout.
+    list_group_labels: bool = false,
     /// 0 = Sunday, 1 = Monday
     week_start: u32 = 1,
     /// "auto" | "six"
@@ -99,6 +101,9 @@ section!(Calendar {
     show_almanac: bool = false,
     /// Countdown to the next statutory holiday in the countdown bar.
     holiday_countdown: bool = true,
+    /// Empty groups means no group source (not all groups).
+    countdown_marked: bool = true,
+    countdown_groups: Vec<String> = Vec::new(),
     /// 0 = Sunday … 6 = Saturday
     rest_days: Vec<u32> = vec![0, 6],
 });

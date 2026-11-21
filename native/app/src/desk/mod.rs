@@ -33,6 +33,9 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Optio
     w.set_show_week_no(c.show_week_numbers);
     w.set_selected(ui.selected.clone().into());
     w.set_flash_date(ui.flash.clone().into());
+    w.set_flash_end(ui.flash_end.clone().into());
+    w.set_flash_task(ui.flash_task.clone().into());
+    w.global::<crate::ChipKeys>().set_located_task(ui.flash_task.clone().into());
     push_weeks(w, doc, ui, today, room, t);
 }
 
@@ -54,13 +57,14 @@ pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Opt
     w.set_side_add_someday_row(add_row("someday"));
     sync::rows(&w.get_side_rows(), rows, |m| w.set_side_rows(m));
     let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
-    sync::rows(&w.get_countdowns(), cds, |m| w.set_countdowns(m));
+    sync::rows(&w.get_countdowns(), cds.iter().take(6).cloned().collect(), |m| w.set_countdowns(m));
+    sync::rows(&w.get_all_countdowns(), cds, |m| w.set_all_countdowns(m));
 }
 
 /// The list view's rows; none while another view shows (nothing kept for it).
 pub fn push_list(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) {
     let c = &doc.settings.calendar;
-    w.set_list_range(c.list_range.clone().into());
+    w.set_list_range(if ui.reveal_all { "all".into() } else { c.list_range.clone().into() });
     let (rows, today_row, footer) = if c.view == "list" { vm::list_rows(doc, ui, today, t) } else { (Vec::new(), 0, String::new()) };
     sync::rows(&w.get_list_rows(), rows, |m| w.set_list_rows(m));
     w.set_list_today_row(today_row);
@@ -131,6 +135,11 @@ impl Desk {
         }
         let w = &self.window;
         match s("open").as_str() {
+            "locate" => {
+                w.set_flash_date(s("date").into());
+                w.set_flash_end(s("end").into());
+                w.set_flash_task(s("task").into());
+            }
             "dayList" => {
                 let (title, lunar, chips) = overlays::day_list(&self.doc, &self.ui, &s("date"), &self.today, &self.tokens);
                 // `drag`: the task in row `row` is on its way to the day `over`, the pointer at

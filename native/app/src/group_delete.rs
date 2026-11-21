@@ -1,7 +1,7 @@
 //! 删除分组 (ui/group_delete.slint): one dialog deletes one or several groups. It lists every
 //! group with a check box; the group it was opened from (the Gantt group menu, the delete
-//! button in 设置 › 甘特图) is ticked. The groups' tasks are deleted with them unless
-//! 同时删除分组里的任务 is unticked; then they move to 未分组. The desk and the settings window
+//! button in 设置 › 分组) is ticked. The groups' tasks are deleted with them only when
+//! 同时删除分组里的任务 is explicitly ticked; otherwise they move to 未分组. The desk and the settings window
 //! each have one; the ticks are kept here, in the window's state. Every deletion is one step
 //! of the desk's undo history, wherever it was made.
 
@@ -28,9 +28,9 @@ pub struct Picks {
 }
 
 impl Picks {
-    /// The dialog opened from group `id`: it is ticked, and its tasks are deleted with it.
+    /// The dialog opened from group `id`: select the group, keep its tasks by default.
     pub fn new(id: &str) -> Self {
-        Picks { checked: vec![id.to_owned()], with_tasks: true }
+        Picks { checked: vec![id.to_owned()], with_tasks: false }
     }
 }
 

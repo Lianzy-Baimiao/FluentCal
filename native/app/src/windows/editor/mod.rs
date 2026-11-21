@@ -77,6 +77,10 @@ impl App {
     }
 
     pub fn editor_msg(&mut self, m: Msg) {
+        if matches!(&m, Msg::Edit(k, v) if k == "group" && v == "__manage__") {
+            self.open_settings(Some("groups"));
+            return;
+        }
         let today = self.today();
         let Some(ed) = self.editor.as_mut() else { return };
         let fx = host::handle(&ed.window, &mut ed.editor, &self.doc, m, &today, now_ms());

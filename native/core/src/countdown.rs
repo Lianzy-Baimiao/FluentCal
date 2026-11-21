@@ -47,6 +47,11 @@ pub fn next_holiday(now: &str) -> Option<(String, String)> {
 
 /// Tasks flagged as countdown (next occurrence) plus, optionally, the next holiday.
 pub fn countdowns(tasks: &[Task], now: &str, with_holiday: bool) -> Vec<CountdownItem> {
+    selected_countdowns(tasks, now, with_holiday, true, &[])
+}
+
+/// Union of marked tasks and selected groups; each task contributes at most one occurrence.
+pub fn selected_countdowns(tasks: &[Task], now: &str, with_holiday: bool, marked: bool, groups: &[String]) -> Vec<CountdownItem> {
     let mut out = Vec::new();
     if with_holiday {
         if let Some((name, date)) = next_holiday(now) {
@@ -54,7 +59,8 @@ pub fn countdowns(tasks: &[Task], now: &str, with_holiday: bool) -> Vec<Countdow
         }
     }
     for t in tasks {
-        if t.countdown != Some(true) || (t.done && t.repeat.is_none()) {
+        let selected = (marked && t.countdown == Some(true)) || groups.iter().any(|g| g == t.group_id.as_deref().unwrap_or(""));
+        if !selected || (t.done && t.repeat.is_none()) {
             continue;
         }
         // The running or next occurrence; one that already started counts as "today".

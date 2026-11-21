@@ -1,0 +1,60 @@
+// An on-demand native HSV/RGB picker. Only confirmation writes the chosen colour.
+import { Theme } from "theme.slint";
+import { Fluent, NumberBox, TextBox } from "inputs.slint";
+import { Slider } from "forms.slint";
+
+export component ColorPicker inherits VerticalLayout {
+    in-out property <string> draft;
+    in property <string> original;
+    property <float> hue: Fluent.hsv(root.original).h;
+    property <float> sat: Fluent.hsv(root.draft).s;
+    property <float> val: Fluent.hsv(root.draft).v;
+    spacing: 8px;
+    function set-hsv(h: float, s: float, v: float) {
+        root.hue = h;
+        root.draft = Fluent.hsv-hex(h, s, v);
+    }
+    spectrum := Rectangle {
+        height: 150px;
+        background: @linear-gradient(90deg, #ffffff, Fluent.hex-color(Fluent.hsv-hex(root.hue, 100, 100)));
+        accessible-role: groupbox;
+        accessible-label: @tr("色盘（饱和度与明度）");
+        Rectangle { background: @linear-gradient(0deg, #000000, transparent); }
+        Rectangle {
+            x: clamp(root.sat / 100 * parent.width - 5px, 0px, parent.width - 10px);
+            y: clamp((1 - root.val / 100) * parent.height - 5px, 0px, parent.height - 10px);
+            width: 10px; height: 10px; border-radius: 5px; border-width: 2px; border-color: white; background: transparent;
+        }
+        TouchArea {
+            function choose() { root.set-hsv(root.hue, clamp(self.mouse-x / self.width * 100, 0, 100), clamp(100 - self.mouse-y / self.height * 100, 0, 100)); }
+            pointer-event(e) => { if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { self.choose(); } }
+            moved => { if self.pressed { self.choose(); } }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text { text: @tr("色相"); color: Theme.c.text-primary; vertical-alignment: center; }
+        Slider { value: round(root.hue); maximum: 359; track-width: 180px; accessible-label: @tr("色相"); moved(v) => { root.set-hsv(v, root.sat, root.val); } }
+        NumberBox { show-buttons: false; width: 70px; value: round(root.hue); maximum: 359; changed-value(v) => { root.set-hsv(v, root.sat, root.val); } }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text { text: @tr("饱和度"); color: Theme.c.text-primary; vertical-alignment: center; }
+        NumberBox { show-buttons: false; width: 82px; value: round(root.sat); minimum: 0; maximum: 100; suffix: "%"; changed-value(v) => { root.set-hsv(root.hue, v, root.val); } }
+        Text { text: @tr("明度"); color: Theme.c.text-primary; vertical-alignment: center; }
+        NumberBox { show-buttons: false; width: 82px; value: round(root.val); minimum: 0; maximum: 100; suffix: "%"; changed-value(v) => { root.set-hsv(root.hue, root.sat, v); } }
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        Text { text: "RGB"; color: Theme.c.text-primary; vertical-alignment: center; }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).r; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(v, Fluent.hsv(root.draft).g, Fluent.hsv(root.draft).b); root.hue = Fluent.hsv(root.draft).h; } }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).g; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(Fluent.hsv(root.draft).r, v, Fluent.hsv(root.draft).b); root.hue = Fluent.hsv(root.draft).h; } }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).b; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(Fluent.hsv(root.draft).r, Fluent.hsv(root.draft).g, v); root.hue = Fluent.hsv(root.draft).h; } }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Rectangle { width: 36px; height: 30px; background: Fluent.hex-color(root.original); border-width: 1px; border-color: Theme.c.control-stroke; }
+        Rectangle { width: 36px; height: 30px; background: Fluent.hex-color(root.draft); border-width: 1px; border-color: Theme.c.control-stroke; }
+        TextBox { horizontal-stretch: 1; text <=> root.draft; accessible-label: @tr("颜色值"); edited(v) => { root.hue = Fluent.hsv(v).h; } }
+    }
+}

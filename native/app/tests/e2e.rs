@@ -15,6 +15,59 @@ struct T {
     dir: PathBuf,
 }
 
+#[test]
+fn locate_search_target_keeps_list_and_reveals_only_that_task() {
+    let mut doc = doc_with(&[
+        json!({"id":"target","title":"跨月目标","start":"2024-10-30","end":"2024-11-03","done":true,"groupId":"a"}),
+        json!({"id":"other","title":"其他隐藏任务","start":"2024-10-31","done":true,"groupId":"a"}),
+    ], json!({"calendar":{"view":"list","listRange":"upcoming","listGroupLabels":true},"tasks":{"showCompleted":false},"theme":{"reduceMotion":true}}));
+    doc["groups"] = json!({"a":{"id":"a","name":"工作","color":"red","order":1},"b":{"id":"b","name":"生日","color":"blue","order":2}});
+    let t = start("locate-list",Some(doc));
+    with(|a| a.desk_filter_toggle("b",true)).unwrap();
+    t.ctrl("f"); t.type_text("跨月目标");
+    t.click("跨月目标");
+    assert_eq!(t.w.get_view(),"list");
+    assert_eq!(t.w.get_flash_date(),"2024-10-30");
+    assert_eq!(t.w.get_flash_end(),"2024-11-03");
+    assert_eq!(t.w.get_flash_task(),"target");
+    let rows:Vec<_>=t.w.get_list_rows().iter().filter(|r|r.kind=="item").collect();
+    assert_eq!(rows.len(),1);
+    assert_eq!(rows[0].group_name,"工作");
+    assert_eq!(with(|a|(a.doc.settings.calendar.list_range.clone(),a.doc.settings.tasks.show_completed,a.desk.ui.group_filter.clone())).unwrap(),("upcoming".into(),false,vec!["b".to_owned()]));
+    wait(3100);
+    assert_eq!(t.w.get_flash_task(),"");
+    assert_eq!(t.w.get_list_rows().iter().filter(|r|r.kind=="item").count(),1,"target remains until explicit navigation");
+    with(|a| a.desk_filter_clear()).unwrap(); settle();
+    assert_eq!(t.w.get_list_rows().iter().filter(|r|r.kind=="item").count(),0,"normal visibility restored");
+}
+
+#[test]
+fn countdown_popup_sources_persist_and_empty_bar_keeps_its_control() {
+    let today=fluentcal_core::date::today();
+    let mut doc=doc_with(&[
+        json!({"id":"a","title":"甲生日","start":today,"groupId":"g","countdown":true}),
+        json!({"id":"b","title":"乙生日","start":today,"groupId":"g"}),
+    ],json!({"calendar":{"holidayCountdown":false}}));
+    doc["groups"]=json!({"g":{"id":"g","name":"生日","color":"red","order":1}});
+    let t=start("countdown-sources",Some(doc));
+    assert_eq!(t.w.get_all_countdowns().row_count(),1);
+    t.click("倒计时显示内容");
+    let tick=|label:&str| {
+        let e=ElementHandle::find_by_accessible_label(&t.w,label).find(|e|e.accessible_role()==Some(i_slint_backend_testing::AccessibleRole::Checkbox)).unwrap();
+        t.click_at(t.at(&e,9.0,e.size().height/2.0));
+    };
+    tick("生日");
+    assert_eq!(t.w.get_all_countdowns().row_count(),2,"union has no duplicate marked birthday");
+    tick("手工标记的倒数日");
+    assert_eq!(t.w.get_all_countdowns().row_count(),2);
+    tick("生日");
+    assert_eq!(t.w.get_all_countdowns().row_count(),0);
+    t.key(&slint::SharedString::from(Key::Escape));
+    t.click("倒计时显示内容");
+    assert!(t.w.get_any_popup(),"empty selection can be changed again");
+    assert!(!with(|a|a.doc.settings.calendar.countdown_marked).unwrap());
+}
+
 /// A fresh data folder (with `doc` as data.json) and the app on it.
 fn start(name: &str, doc: Option<Value>) -> T {
     // Real time (the published crate has no mock-time helper outside its own tests): events,
@@ -502,8 +555,7 @@ fn grid_by_keyboard() {
     assert!(focused());
 }
 
-/// 0.2's animations: the jump flash holds its 2px ring for 60% of 1.5 s and then shrinks away;
-/// the toast keeps its text while it fades out.
+/// Locate feedback remains readable for three seconds; toast text survives its fade.
 #[test]
 fn flash_and_toast_animations() {
     let t = start("anims", Some(doc_with(&[], json!({}))));
@@ -513,7 +565,9 @@ fn flash_and_toast_animations() {
     let w1 = with(|a| a.desk.window.get_flash_date().to_string()).unwrap();
     assert_eq!(w1, today, "still flashing at 0.5 s");
     wait(1200);
-    assert_eq!(with(|a| a.desk.window.get_flash_date().to_string()).unwrap(), "", "over after 1.6 s");
+    assert_eq!(with(|a| a.desk.window.get_flash_date().to_string()).unwrap(), today, "still visible after 1.6 s");
+    wait(1500);
+    assert_eq!(with(|a| a.desk.window.get_flash_date().to_string()).unwrap(), "", "over after 3 s");
     // The toast: text set, then cleared; the visible text stays until it has faded.
     with(|a| a.notify("测试提示", false)).unwrap();
     settle();
@@ -728,11 +782,9 @@ fn delete_several_groups_at_once() {
     assert_eq!(labels, ["项目一", "项目二", "项目三"], "all groups, in the chart's order");
     assert_eq!(ticked(), ["项目一"]);
     assert_eq!(boxes()[0].accessible_description().as_deref(), Some("1 个任务"));
-    // The tasks go too by default; unticking says where they go instead.
+    // Tasks stay by default; deleting them requires an explicit opt-in.
     let wb = with_tasks_box().expect("同时删除 box");
-    assert_eq!((wb.accessible_label().as_deref(), wb.accessible_checked()), (Some("同时删除分组里的任务（1 个）"), Some(true)));
-    assert!(!t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
-    tick_with_tasks();
+    assert_eq!((wb.accessible_label().as_deref(), wb.accessible_checked()), (Some("同时删除分组里的任务（1 个）"), Some(false)));
     assert!(!gd().get_with_tasks());
     assert!(t.has("所选分组里的任务会移到“未分组”，不会被删除。"));
     tick_with_tasks();
@@ -760,7 +812,8 @@ fn delete_several_groups_at_once() {
     with(|a| a.menu_act(&Target::Group("g1".into()), "deleteGroup")).unwrap();
     settle();
     assert_eq!(ticked(), ["项目一"], "a new dialog starts with the clicked group only");
-    assert!(gd().get_with_tasks(), "and with 同时删除 ticked again");
+    assert!(!gd().get_with_tasks(), "every new dialog keeps tasks by default");
+    tick_with_tasks();
     tick("项目二");
     t.click("删除");
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
@@ -786,10 +839,9 @@ fn delete_several_groups_at_once() {
     t.key(&slint::SharedString::from(Key::Escape));
     assert!(boxes().is_empty(), "Esc closes");
     assert_eq!(with(|a| a.doc.groups.len()).unwrap(), 3);
-    // Keeping the tasks: untick 同时删除, Enter deletes the group only.
+    // With no opt-in, Enter deletes only the group and retains its tasks.
     with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();
     settle();
-    tick_with_tasks();
     t.key("\n");
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
     assert_eq!(groups, ["g1", "g2"], "Enter deletes the ticked group");
@@ -1815,7 +1867,7 @@ fn group_filter_shows_the_ticked_groups() {
     // 管理分组…: where groups are made, renamed and deleted
     t.click("管理分组…");
     assert!(!t.w.get_any_popup());
-    assert_eq!(with(|a| a.settings_win.as_ref().map(|s| s.local.page.clone())).unwrap().as_deref(), Some("gantt"));
+    assert_eq!(with(|a| a.settings_win.as_ref().map(|s| s.local.page.clone())).unwrap().as_deref(), Some("groups"));
 }
 
 /// The button is there while there is room after the view switch, and always while it filters

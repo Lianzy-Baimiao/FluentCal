@@ -8,10 +8,11 @@ import { Overlay, Tip, FocusRing, Flyout, Placement, PlacedRect, TipLayer } from
 import { Button, ButtonVariant } from "controls.slint";
 import { TextBox, Fluent } from "inputs.slint";
 import { Cell } from "dialog.slint";
+import { ColorPicker } from "color_picker.slint";
 
 
 // A submenu entry.
-export struct MenuLeaf { key: string, label: string, checked: bool, checkable: bool, radio: bool, disabled: bool, danger: bool }
+export struct MenuLeaf { key: string, label: string, checked: bool, checkable: bool, radio: bool, disabled: bool, danger: bool, separator: bool, icon: string, has-dot: bool, dot-color: color, detail: string }
 
 // A menu entry. kind: "item" | "separator" | "swatches".
 export struct MenuEntry {
@@ -91,6 +92,10 @@ component MenuRow inherits Rectangle {
     in property <string> label;
     in property <string> icon;
     in property <string> shortcut;
+    in property <string> detail;
+    in property <bool> has-dot;
+    in property <color> dot-color;
+    in property <bool> separator;
     in property <bool> checkable;
     in property <bool> checked;
     in property <bool> radio;
@@ -108,13 +113,15 @@ component MenuRow inherits Rectangle {
     // vertical margins: 2px each, collapsing with the neighbours' (block layout)
     in property <length> gap-top: 2px;
     in property <length> gap-bottom: 0;
-    height: gap-top + 32px + gap-bottom;
+    height: separator ? 8px : gap-top + 32px + gap-bottom;
     preferred-width: row.preferred-width + 8px;
     accessible-role: list-item;
     accessible-label: label;
     accessible-enabled: !disabled;
     accessible-checked: checked;
+    if separator: Rectangle { y: 4px; x: 8px; width: parent.width - 16px; height: 1px; background: Theme.c.divider; }
     Rectangle {
+        visible: !root.separator;
         x: 4px;
         y: root.gap-top;
         width: parent.width - 8px;
@@ -135,6 +142,7 @@ component MenuRow inherits Rectangle {
                 }
             }
             if root.col-icon: Icon { glyph: root.icon; size: 16px; color: root.fg; }
+            if root.has-dot: Rectangle { width: 10px; height: 10px; border-radius: 3px; background: root.dot-color; }
             Text {
                 horizontal-stretch: 1;
                 text: root.label;
@@ -142,6 +150,7 @@ component MenuRow inherits Rectangle {
                 vertical-alignment: center;
                 overflow: elide;
             }
+            if root.detail != "": Text { text: root.detail; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; }
             if root.shortcut != "": HorizontalLayout {
                 padding-left: 24px;
                 Text {
@@ -159,6 +168,7 @@ component MenuRow inherits Rectangle {
     }
     ta := TouchArea {
         y: root.gap-top;
+        enabled: !root.disabled && !root.separator;
         height: 32px;
         changed has-hover => {
             if self.has-hover {
@@ -536,6 +546,12 @@ export component Menu {
                         gap-top: 2px;
                         gap-bottom: j == subpanel.kids.length - 1 ? 2px : 0;
                         label: leaf.label;
+                        detail: leaf.detail;
+                        has-dot: leaf.has-dot;
+                        dot-color: leaf.dot-color;
+                        separator: leaf.separator;
+                        icon: leaf.icon;
+                        col-icon: leaf.icon != "";
                         checkable: leaf.checkable;
                         checked: leaf.checked;
                         radio: leaf.radio;
@@ -651,6 +667,7 @@ export component ColorSwatches {
     in property <color> custom-color;
     in property <color> custom-fg;
     property <string> draft: "#0078D4";
+    property <string> original: "#0078D4";
     property <int> cursor: -1;
     // One line wide, as CSS measures a wrapping flex row (Slint's FlexboxLayout would say
     // about a square); it still wraps when it gets less.
@@ -690,7 +707,8 @@ export component ColorSwatches {
             add: true;
             label: @tr("自定义颜色");
             picked => {
-                root.draft = root.custom-value != "" ? root.custom-value : "#0078D4";
+                root.original = Fluent.selected-hex(root.value, root.colors);
+                root.draft = root.original;
                 fly.open-at(self.absolute-position.x, self.absolute-position.y, self.width, self.height);
             }
         }
@@ -712,31 +730,9 @@ export component ColorSwatches {
         }
     }
     fly := Flyout {
-        panel-width: 232px;
+        panel-width: 340px;
         label: @tr("自定义颜色");
-        HorizontalLayout {
-            spacing: 12px;
-            alignment: start;
-            cross-axis-alignment: center;
-            Rectangle {
-                width: 48px;
-                height: 32px;
-                border-radius: Theme.radius-control;
-                border-width: 1px;
-                border-color: Theme.c.control-stroke;
-                background: Fluent.hex-color(root.draft);
-            }
-            TextBox {
-                width: 120px;
-                text <=> root.draft;
-                accepted => {
-                    if Fluent.normalize-hex(root.draft) != "" {
-                        root.picked(Fluent.normalize-hex(root.draft));
-                        fly.close();
-                    }
-                }
-            }
-        }
+        if fly.is-open: ColorPicker { draft <=> root.draft; original: root.original; }
         HorizontalLayout {
             padding-top: 16px;
             spacing: 8px;

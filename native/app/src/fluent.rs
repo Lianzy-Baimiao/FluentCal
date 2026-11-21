@@ -19,6 +19,18 @@ where
     Fluent<'a>: Global<'a, C>,
 {
     let g = window.global::<Fluent>();
+    g.on_hsv(|hex| {
+        let (h,s,v) = fluentcal_core::color::hex_to_hsv(&hex);
+        let (r,g,b) = fluentcal_core::color::hex_to_rgb(&hex);
+        crate::HsvData { h:h as f32, s:s as f32, v:v as f32, r:r as f32, g:g as f32, b:b as f32 }
+    });
+    g.on_hsv_hex(|h,s,v| fluentcal_core::color::hsv_to_hex(h as f64,s as f64,v as f64).into());
+    g.on_rgb_hex(|r,g,b| fluentcal_core::color::rgb_to_hex(r as f64,g as f64,b as f64).into());
+    g.on_selected_hex(|value, colors| {
+        colors.iter().find(|c| c.key == value).map(|c| fluentcal_core::color::rgb_to_hex(c.color.red() as f64,c.color.green() as f64,c.color.blue() as f64))
+            .or_else(|| normalize_hex(&value)).unwrap_or_else(|| "#0078D4".into()).into()
+    });
+    g.on_days_between(|a, b| if fluentcal_core::date::is_iso_date(&a) && fluentcal_core::date::is_iso_date(&b) { fluentcal_core::date::diff_days(&a, &b) } else { -1 });
     let today = if today.is_empty() { fluentcal_core::date::today() } else { today.to_owned() };
     g.set_today(today.clone().into());
     let (_, minutes, _) = fluentcal_core::date::local_now();

@@ -1,6 +1,6 @@
 // 删除分组: one dialog for deleting one or several groups at once. Every group is listed with a
 // check box; the group the dialog was opened from (Gantt group menu, 设置 › 甘特图) is ticked.
-// Their tasks are deleted too unless 同时删除分组里的任务 is unticked (then they move to 未分组).
+// Their tasks stay unless 同时删除分组里的任务 is explicitly ticked.
 // Both the desk and the settings window have one; Rust keeps the ticks (src/group_delete.rs).
 
 import { Theme } from "theme.slint";
@@ -14,7 +14,7 @@ export global GroupDelete {
     in property <[GroupPick]> items;
     in property <string> title;
     in property <bool> can-delete;
-    // 同时删除分组里的任务 (on by default); its label has the count, empty when there are none.
+    // 同时删除分组里的任务 (off by default); its label has the count, empty when there are none.
     in property <bool> with-tasks;
     in property <string> with-tasks-label;
     // Under it when the tasks stay (they move to 未分组); empty otherwise.

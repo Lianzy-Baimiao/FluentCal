@@ -61,6 +61,7 @@ export component SettingsWindow inherits Window {
                 { key: "appearance", label: @tr("外观"), icon: Glyph.palette },
                 { key: "calendar", label: @tr("日历"), icon: Glyph.calendar },
                 { key: "gantt", label: @tr("甘特图"), icon: "svg:gantt" },
+                { key: "groups", label: @tr("分组"), icon: Glyph.group },
                 { key: "reminders", label: @tr("提醒"), icon: Glyph.alarm },
                 { key: "data", label: @tr("数据"), icon: Glyph.data },
                 { key: "sync", label: @tr("同步"), icon: Glyph.cloud },
@@ -73,6 +74,7 @@ export component SettingsWindow inherits Window {
             if SetState.page == "appearance": AppearancePage { spacing: 4px; }
             if SetState.page == "calendar": CalendarPage { spacing: 4px; }
             if SetState.page == "gantt": GanttPage { spacing: 4px; }
+            if SetState.page == "groups": GanttPage { groups-only: true; spacing: 4px; }
             if SetState.page == "reminders": RemindersPage { spacing: 4px; }
             if SetState.page == "data": DataPage { }
             if SetState.page == "sync": SyncPage { }

@@ -151,7 +151,7 @@ fn groups_reminders_and_sample_data() {
     settle();
     assert_eq!(gd().get_title(), "删除分组“改名”？");
     let items: Vec<_> = gd().get_items().iter().collect();
-    assert_eq!(items.len(), n0 + 1, "every group is listed");
+    assert_eq!(items.len(), n0, "every real group is listed; ungrouped is not deletable");
     assert_eq!(items.iter().filter(|p| p.checked).map(|p| p.id.to_string()).collect::<Vec<_>>(), [id.clone()]);
     gd().invoke_answer("close".into());
     settle();
@@ -159,7 +159,8 @@ fn groups_reminders_and_sample_data() {
     // tick a sample group that has tasks too: both go at once, with its tasks
     t.g().invoke_action_arg("delete-group".into(), id.as_str().into());
     settle();
-    assert!(gd().get_with_tasks(), "同时删除 is ticked by default");
+    assert!(!gd().get_with_tasks(), "tasks are retained by default");
+    gd().invoke_with_tasks_toggled(true);
     let other = gd().get_items().iter().find(|p| p.id != id.as_str() && p.desc != "0 个任务").expect("a sample group with tasks").id.to_string();
     let theirs = |v: &Value| v["tasks"].as_object().unwrap().values().filter(|x| x["groupId"] == other.as_str()).count();
     let n = theirs(&t.saved());

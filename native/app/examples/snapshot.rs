@@ -228,6 +228,7 @@ fn main() {
         _gallery = Some(g);
     } else {
         let window = DeskWindow::new().unwrap();
+        fluentcal_app::fluent::install(&window, &today, None);
         fluentcal_app::i18n::select(&locale);
         apply(&window, &look);
         let mut d = Desk::new(window.clone_strong(), doc, today.clone(), t.clone());
