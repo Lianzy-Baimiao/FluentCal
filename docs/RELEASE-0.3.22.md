@@ -15,7 +15,7 @@ FluentCal 0.3.22 completes the full-alpha colour workflow and GitHub Issues #17â
 
 Install `FluentCal_0.3.22_x64-setup.exe` to upgrade while retaining existing calendar data, or use the standalone `FluentCal-Desktop-0.3.22.exe`. Both include SHA-256 checksum files.
 
-Microsoft Store package version is 0.3.22.0. Store availability follows Microsoft's certification and publication process.
+Microsoft Store package version is 0.3.22.0. Submission 17 (1152921505702471899) was submitted on 2026-11-22 and is in preprocessing; it is set to publish immediately after certification.
 
 ## Verification
 

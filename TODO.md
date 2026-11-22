@@ -17,7 +17,8 @@
 - [x] 回归：workspace Rust 测试通过（含 50 个桌面 E2E、编辑器 15 项、设置 11 项）；前端 231 项；TypeScript 生产构建、1175 条三语言文案、Android 浏览器 E2E、网页 Issue E2E 通过。
 - [x] 重建 Windows 安装器、独立 EXE、Microsoft Store MSIX 与 Android 0.3.7 APK/迁移 APK；覆盖更新本机到 0.3.22，核对窗口响应、93 个任务、11 个分组及数据 SHA-256 不变。
 - [x] 用户验收本机 0.3.22 后，准备发布与商店说明。
-- [~] GitHub 提交、推送、桌面与 Android Release、Issues #17–#21 回复已授权并继续进行；Microsoft Store 包已准备，正式提交前按提交确认要求等待用户确认。
+- [x] GitHub 提交 `c26ec44`、后续商店清单修正 `aa6ff20` 均已推送；Windows 0.3.22 Latest 和 Android 0.3.7 / `android-latest` 已发布，Issues #17–#21 已逐条回复。
+- [x] Microsoft Store MSIX 修正 PublisherDisplayName 为「白描ice」后通过包验证；三语 Store 一览更新说明完成。Submission 17 / 1152921505702471899 于 2026-11-22 已提交认证，当前预处理，认证后立即发布。
 
 调研和边界：`docs/ISSUES-17-21-RESEARCH-2026-11-21.md`。工作日志与验证产物：`C:\Users\30694\tools\issues\round6\`。
 
