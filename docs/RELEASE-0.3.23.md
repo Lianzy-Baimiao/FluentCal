@@ -13,7 +13,7 @@ This update fixes the crowded countdown strip and aligns new-install countdown d
 
 Install `FluentCal_0.3.23_x64-setup.exe` to upgrade while retaining existing calendar data, or use the standalone `FluentCal-Desktop-0.3.23.exe`. Both include SHA-256 checksum files.
 
-The Microsoft Store package version is 0.3.23.0. Certification and publication status will be recorded after submission.
+The Microsoft Store package version is 0.3.23.0. Submission 18 (1152921505702472573) was submitted on 2026-11-22 and is in preprocessing; it is set to publish immediately after certification.
 
 ## Verification
 

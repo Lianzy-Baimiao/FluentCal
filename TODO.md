@@ -27,7 +27,8 @@
 - [x] workspace Rust、前端 233 项、翻译、Web Issue、Android 浏览器回归通过；Windows 0.3.23/MSIX 已构建并验证。
 - [x] 覆盖安装验证通过：应用响应，93 个任务和 11 个分组保留，数据 SHA-256 不变。
 - [x] 新年连续假期修复：开启法定假期与节日时，同名连续休假日只计首日；Rust 与 TypeScript 三日元旦夹具回归通过。
-- [ ] 推送 0.3.23、创建 GitHub Release、按微软商店状态更新或重提，并回复、关闭 #18。
+- [x] 提交 `7cf2bd6` 已推送；GitHub [v0.3.23](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/v0.3.23) 已设为 Latest；Issue #18 已回复并关闭。
+- [x] Submission 17 已发布/不再认证，未取消；新建 Microsoft Store Submission 18 / 1152921505702472573，0.3.23.0 MSIX 和三语 Store 更新说明已提交，当前预处理，认证通过后立即发布。
 
 调研和边界：`docs/ISSUES-17-21-RESEARCH-2026-11-21.md`。工作日志与验证产物：`C:\Users\30694\tools\issues\round6\`。
 
