@@ -9,7 +9,8 @@
 - [x] 定向回归：相关原生列表与点击路径、核心 agenda/设置迁移、前端 agenda/flex/defaults 测试通过。
 - [x] 构建正式 EXE、安装器和 0.3.24.0 MSIX；本机覆盖安装验证 0.3.24，保留旧 EXE 与安装前数据备份。
 - [x] 定向原生、核心 Rust、前端与 Web 回归通过；Android 保持 0.3.7。
-- [ ] 提交 `main`、推送并发布 GitHub v0.3.24；创建微软商店 Submission 19，待认证。
+- [x] 提交 `main`、推送并发布 GitHub v0.3.24；Issues #22、#23 已回复并关闭。
+- [~] Microsoft Store Submission 19 / 1152921505702475396：0.3.24.0 MSIX 已验证，三语更新说明已保存，认证后立即发布已选；当前仍是草稿，尚待送审。
 
 ## 0.3.22 / Android 0.3.7：全面 Alpha、Issue 补完与反馈修复（2026-11-22）
 

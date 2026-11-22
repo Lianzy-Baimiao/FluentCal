@@ -1,5 +1,11 @@
 # FluentCal 商店提交记录
 
+### 0.3.24.0（Submission 19 / 1152921505702475396）
+
+- 2026-11-23：Partner Center 中创建的 Submission 19 已保存 `FluentCal_0.3.24.0_x64.msix`，状态为 Validated / 已更新；包 SHA-256：`80ec3422f04be6db771d001691e7555149ad2994e75fdf001b9a2176270a9c53`。
+- 简体中文、繁体中文和英文的“此版本的新增功能”均已保存，内容分别对应 `release/store-0.3.24/whats-new-zh-CN.txt`、`release/store-0.3.24/whats-new-zh-TW.txt` 和 `release/store-0.3.24/whats-new-en-US.txt`。发布暂缓选项保持默认值：通过认证后立即发布。
+- Partner Center 当前仍显示“正在草拟”；尚未提交认证。提交认证前需要用户即时确认。
+
 隐私政策：https://raw.githubusercontent.com/Lianzy-Baimiao/FluentCal/main/docs/PRIVACY.md
 支持地址：https://github.com/Lianzy-Baimiao/FluentCal/issues
 网站：https://github.com/Lianzy-Baimiao/FluentCal

@@ -11,7 +11,7 @@
 
 `release/store-0.3.24/whats-new-zh-CN.txt`, `release/store-0.3.24/whats-new-zh-TW.txt` and `release/store-0.3.24/whats-new-en-US.txt` contain the submitted descriptions.
 
-Windows package version: `0.3.24.0`. Submission status will be recorded after Partner Center accepts the package.
+Windows package version: `0.3.24.0`. Submission 19 (`1152921505702475396`) contains the validated package and saved release notes in all three supported languages. It is configured to publish immediately after certification; Partner Center still shows it as a draft pending submission for certification.
 
 ## GitHub
 
