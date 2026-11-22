@@ -17,6 +17,8 @@ describe('settings defaults', () => {
     expect(s.theme.accent).toBe('system');
     expect(s.desk.bounds).toEqual({ x: 1, y: 2, w: 3, h: 4 });
     expect(s.desk.bgOpacity).toBe(DEFAULT_SETTINGS.desk.bgOpacity);
+    expect(s.desk.todayStyle).toBe('outline');
+    expect(s.desk.todayOpacity).toBe(35);
     expect(s.calendar.restDays).toEqual([0]);
     expect(mergeDefaults(DEFAULT_SETTINGS, undefined)).toEqual(DEFAULT_SETTINGS);
   });

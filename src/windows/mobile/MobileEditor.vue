@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { TASK_COLORS, taskColor } from "@/fluent";
+import { colorOpacity, normalizeRgba, opaqueColor, setColorOpacity } from "@/lib/rgba";
 import type { ISODate, Task } from "@/types";
 import { diffDays, isISODate, today } from "@/lib/date";
 import {
@@ -32,6 +33,20 @@ const end = ref(today());
 const time = ref("");
 const notes = ref("");
 const color = ref("");
+const colorEdited = ref(false);
+const resolvedColor = computed(() => TASK_COLORS.find(c => c.key === color.value)?.bar ?? normalizeRgba(color.value) ?? '#0078D4');
+const colorRGB = computed({
+  get: () => opaqueColor(resolvedColor.value),
+  set: (value: string) => { colorEdited.value = true; color.value = setColorOpacity(value, colorOpacity(resolvedColor.value)); },
+});
+const colorAlpha = computed({
+  get: () => Math.round(colorOpacity(resolvedColor.value) * 100),
+  set: (value: number) => { colorEdited.value = true; color.value = setColorOpacity(resolvedColor.value, Number(value) / 100); },
+});
+const colorHex = computed({
+  get: () => TASK_COLORS.some(c => c.key === color.value) || !color.value ? resolvedColor.value : color.value,
+  set: (value: string) => { colorEdited.value = true; color.value = value; },
+});
 const groupId = ref("");
 const progress = ref(0);
 const done = ref(false);
@@ -81,6 +96,7 @@ function load() {
   time.value = t?.time ?? "";
   notes.value = t?.notes ?? "";
   color.value = t?.color ?? "";
+  colorEdited.value = false;
   groupId.value = t?.groupId ?? props.groupId ?? "";
   progress.value = t?.progress ?? 0;
   done.value =
@@ -186,6 +202,11 @@ async function addGroup() {
 
 async function save() {
   if (busy.value) return;
+  if (colorEdited.value && color.value && !TASK_COLORS.some(c => c.key === color.value)) {
+    const normalized = normalizeRgba(color.value);
+    if (!normalized) { error.value = "请输入有效的颜色值，如 #0078D4 或 #0078D480"; return; }
+    color.value = normalized;
+  }
   if (
     !isISODate(start.value) ||
     !isISODate(end.value) ||
@@ -215,7 +236,7 @@ async function save() {
         end: end.value,
         time: time.value || undefined,
         notes: notes.value.trim() || undefined,
-        color: color.value || undefined,
+        color: colorEdited.value ? color.value || undefined : base?.color,
         groupId: groupId.value || undefined,
         progress: done.value ? 100 : progress.value,
         done: done.value || progress.value >= 100,
@@ -228,7 +249,7 @@ async function save() {
         end: end.value,
         time: time.value || undefined,
         notes: notes.value.trim() || undefined,
-        color: color.value || undefined,
+        ...(colorEdited.value ? { color: color.value || undefined } : {}),
         groupId: groupId.value || undefined,
         progress: done.value ? 100 : progress.value,
         done: done.value || progress.value >= 100,
@@ -301,7 +322,7 @@ async function remove(all = false) {
         tabindex="-1"
         role="dialog"
         aria-modal="true"
-        :aria-label="isNew ? '新建任务' : '编辑任务'"
+    :aria-label="isNew ? '新建任务' : '编辑任务'"
         @keydown="onKey"
       >
         <header class="sheet-head">
@@ -434,13 +455,24 @@ async function remove(all = false) {
                   :key="c.key"
                   type="button"
                   class="swatch"
-                  :class="{ selected: color === c.key }"
+                  :class="{ selected: !!color && colorRGB === c.bar }"
                   :style="{ background: taskColor(c.key, false).bar }"
                   :aria-label="c.label"
-                  @click="color = color === c.key ? '' : c.key"
+                  @click="colorEdited = true; color = color === c.key ? '' : colorAlpha < 100 ? setColorOpacity(c.bar, colorAlpha / 100) : c.key"
                 />
               </div>
             </div>
+            <div class="field custom-color-row">
+              <span>自定义颜色</span>
+              <span class="alpha-preview"><i :style="{ background: resolvedColor }" /></span>
+              <input v-model="colorRGB" type="color" aria-label="自定义颜色" />
+              <input v-model="colorHex" class="hex-input" aria-label="颜色值" maxlength="9" spellcheck="false" />
+            </div>
+            <label class="field opacity-row">
+              <span>不透明度</span>
+              <input v-model.number="colorAlpha" type="range" min="0" max="100" step="1" aria-label="不透明度" />
+              <output>{{ colorAlpha }}%</output>
+            </label>
             <label class="field"
               ><span>分组</span
               ><select v-model="groupId" aria-label="分组">
@@ -733,6 +765,13 @@ async function remove(all = false) {
   border-color: var(--text-primary);
   box-shadow: 0 0 0 2px var(--solid-base);
 }
+.custom-color-row { gap: 8px; }
+.custom-color-row input[type="color"] { flex: 0 0 36px; width: 36px; min-width: 36px; height: 36px; padding: 0; border: 0; }
+.custom-color-row .hex-input { min-width: 0; width: 104px; flex: 1; font-variant-numeric: tabular-nums; }
+.alpha-preview { flex: 0 0 28px; width: 28px; height: 28px; border: 1px solid var(--control-stroke-secondary); border-radius: 5px; overflow: hidden; background: repeating-conic-gradient(#fff 0% 25%, #bbb 0% 50%) 0 0 / 12px 12px; }
+.alpha-preview i { display: block; width: 100%; height: 100%; }
+.opacity-row input[type="range"] { min-width: 0; flex: 1; accent-color: var(--accent-text); }
+.opacity-row output { width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
 .new-group {
   padding: 8px 14px;
   border-top: 1px solid var(--divider);

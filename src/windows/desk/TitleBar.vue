@@ -56,20 +56,21 @@ const pickerOpen = ref(false);
       </button>
       <span v-else class="title static">{{ title }}</span>
       <template v-if="view !== 'gantt'">
-        <FButton variant="subtle" size="icon" icon="chevronLeft" :title="view === 'weeks' ? '上一周' : '上个月'" @click="page(-1)" />
-        <FButton variant="subtle" size="icon" icon="chevronRight" :title="view === 'weeks' ? '下一周' : '下个月'" @click="page(1)" />
-        <FButton class="today-btn" variant="subtle" size="small" v-tip="todayTip" @click="goToday">今天</FButton>
+        <FButton variant="subtle" size="icon" icon="chevronLeft" foreground="var(--calendar-text)" :title="view === 'weeks' ? '上一周' : '上个月'" @click="page(-1)" />
+        <FButton variant="subtle" size="icon" icon="chevronRight" foreground="var(--calendar-text)" :title="view === 'weeks' ? '下一周' : '下个月'" @click="page(1)" />
+        <FButton class="today-btn" variant="subtle" size="small" foreground="var(--calendar-text)" v-tip="todayTip" @click="goToday">今天</FButton>
       </template>
     </div>
     <div class="right">
-      <FSegmented v-model="viewModel" class="f-seg" :options="views" size="small" />
-      <FButton variant="subtle" size="icon" icon="search" title="搜索 (Ctrl+F)" @click="ui.searchOpen = !ui.searchOpen" />
+      <FSegmented v-model="viewModel" class="f-seg" foreground="var(--calendar-text)" :options="views" size="small" />
+      <FButton variant="subtle" size="icon" icon="search" foreground="var(--calendar-text)" title="搜索 (Ctrl+F)" @click="ui.searchOpen = !ui.searchOpen" />
       <FButton
         v-if="syncStatus.enabled"
         class="sync-btn"
         :class="{ spinning: syncStatus.syncing, failed: !!syncStatus.error }"
         variant="subtle"
         size="icon"
+        :foreground="syncStatus.error ? 'var(--caution)' : 'var(--calendar-text)'"
         :icon="syncStatus.error ? 'warning' : 'sync'"
         :title="`${statusLine(syncStatus)}（点击立即同步）`"
         @click="syncNow"
@@ -77,13 +78,14 @@ const pickerOpen = ref(false);
       <FButton
         variant="subtle"
         size="icon"
+        :foreground="locked ? 'var(--calendar-text)' : 'var(--accent-text)'"
         :icon="locked ? 'lock' : 'unlock'"
         :class="{ unlocked: !locked }"
         :title="locked ? '解锁以调整位置和大小' : '完成调整并锁定'"
         @click="patchSettings({ desk: { locked: !locked } })"
       />
-      <FButton class="settings-btn" variant="subtle" size="icon" icon="settings" title="设置" @click="openSettings()" />
-      <FButton variant="subtle" size="icon" icon="more" title="更多" @click="(e: MouseEvent) => moreMenu(e.currentTarget as HTMLElement)" />
+      <FButton class="settings-btn" variant="subtle" size="icon" icon="settings" foreground="var(--calendar-text)" title="设置" @click="openSettings()" />
+      <FButton variant="subtle" size="icon" icon="more" foreground="var(--calendar-text)" title="更多" @click="(e: MouseEvent) => moreMenu(e.currentTarget as HTMLElement)" />
     </div>
     <YearMonthPicker v-model:open="pickerOpen" :anchor="titleBtn ?? null" />
   </header>
@@ -99,7 +101,7 @@ const pickerOpen = ref(false);
   height: 36px;
   flex: none;
   padding: 0 2px 0 4px;
-  text-shadow: var(--text-glow);
+  text-shadow: var(--calendar-outline);
 }
 .titlebar.movable {
   cursor: move;
@@ -121,9 +123,9 @@ const pickerOpen = ref(false);
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--calendar-text);
   font: inherit;
-  font-family: var(--font-display);
+  font-family: var(--calendar-font-family);
   font-size: calc(18px * var(--fs));
   font-weight: 600;
   white-space: nowrap;

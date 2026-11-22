@@ -14,11 +14,15 @@ impl App {
     /// The button (or 更多 › 按分组筛选…): the list of groups under it.
     pub fn desk_filter_open(&mut self, at: At) {
         self.desk.popups.countdown_filter = false;
+        self.desk.ui.countdown_mode = false;
+        self.desk.window.set_countdown_filter_mode(false);
         self.open_filter_panel(at);
     }
 
     pub fn desk_countdown_filter_open(&mut self, at: At) {
         self.desk.popups.countdown_filter = true;
+        self.desk.ui.countdown_mode = true;
+        self.desk.window.set_countdown_filter_mode(true);
         self.open_filter_panel(at);
     }
 
@@ -39,12 +43,10 @@ impl App {
         }
         let countdown = self.desk.popups.countdown_filter;
         let mut ui = self.desk.ui.clone();
-        if countdown { ui.group_filter = self.doc.settings.calendar.countdown_groups.clone(); }
+        ui.countdown_mode = countdown;
         let (rows, all, hint) = overlays::filter_rows(&self.doc, &ui, &self.tokens);
         let w = &self.desk.window;
         w.set_countdown_filter_mode(countdown);
-        w.set_countdown_marked(self.doc.settings.calendar.countdown_marked);
-        w.set_countdown_holiday(self.doc.settings.calendar.holiday_countdown);
         super::sync::rows(&w.get_filter_rows(), rows, |m| w.set_filter_rows(m));
         w.set_filter_all_count(all.into());
         w.set_filter_hint(hint.into());
@@ -52,6 +54,8 @@ impl App {
 
     pub fn desk_filter_closed(&mut self) {
         self.desk.popups.filter_open = false;
+        self.desk.ui.countdown_mode = false;
+        self.desk.window.set_countdown_filter_mode(false);
     }
 
     /// A group (or 未分组, "") ticked or unticked.
@@ -63,6 +67,7 @@ impl App {
             self.patch_settings(serde_json::json!({ "calendar": { "countdownGroups": groups } }));
             return;
         }
+        if self.desk.ui.countdown_mode { return; }
         self.desk_clear_reveal();
         let f = &mut self.desk.ui.group_filter;
         f.retain(|g| g != id);
@@ -75,6 +80,7 @@ impl App {
 
     /// 全部.
     pub fn desk_filter_clear(&mut self) {
+        if self.desk.ui.countdown_mode { return; }
         self.desk_clear_reveal();
         self.desk.ui.group_filter.clear();
         self.desk_refresh_data();

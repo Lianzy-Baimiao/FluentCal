@@ -592,6 +592,8 @@ fn changes_a_task() {
     }
     call(&*h, "update_task", json!({ "id": "a", "time": "18:05:00", "group": "g1", "color": "grey" })).unwrap();
     assert_eq!((stored(&h, "a")["time"].as_str(), stored(&h, "a")["groupId"].as_str(), stored(&h, "a")["color"].as_str()), (Some("18:05"), Some("g1"), Some("gray")));
+    call(&*h, "update_task", json!({ "id": "a", "color": "#12345680" })).unwrap();
+    assert_eq!(stored(&h, "a")["color"], "#12345680");
 
     call(&*h, "update_task", json!({ "id": "a", "progress": 60 })).unwrap();
     assert_eq!((stored(&h, "a")["progress"].as_i64(), stored(&h, "a")["done"].as_bool()), (Some(60), Some(false)));

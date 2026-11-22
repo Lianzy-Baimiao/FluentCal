@@ -688,7 +688,7 @@ onBeforeUnmount(() => {
             >
               <span
                 class="task-accent"
-                :style="{ background: taskColor(o.task.color, isDark).bar }"
+                :style="{ background: taskColor(o.task.color || (o.task.groupId ? doc.groups[o.task.groupId]?.color : undefined), isDark).bar }"
               /><button
                 type="button"
                 class="check"
@@ -718,7 +718,7 @@ onBeforeUnmount(() => {
                   ><i
                     :style="{
                       width: `${percent(o.task)}%`,
-                      background: taskColor(o.task.color, isDark).bar,
+                      background: taskColor(o.task.color || (o.task.groupId ? doc.groups[o.task.groupId]?.color : undefined), isDark).bar,
                     }"
                 /></span></button
               ><FIcon name="chevronRight" :size="16" class="chevron" />
@@ -816,7 +816,7 @@ onBeforeUnmount(() => {
             >
               <span
                 class="task-accent"
-                :style="{ background: taskColor(o.task.color, isDark).bar }"
+                :style="{ background: taskColor(o.task.color || (o.task.groupId ? doc.groups[o.task.groupId]?.color : undefined), isDark).bar }"
               /><span :class="{ struck: o.done }">{{ o.task.title }}</span
               ><small
                 >{{ displayTime(o.task)

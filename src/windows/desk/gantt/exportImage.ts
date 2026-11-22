@@ -70,7 +70,12 @@ export function ganttSVG(): { svg: string; w: number; h: number } {
       continue;
     }
     o.push(`<g${op}><rect x="${b.x + 1}" y="${y + 6}" width="${Math.max(4, b.w - 2)}" height="20" rx="4" fill="${b.bar}"/>`);
-    if (b.progress > 0) o.push(`<rect x="${b.x + 1}" y="${y + 6}" width="${Math.max(0, ((b.w - 2) * b.progress) / 100)}" height="20" rx="4" fill="#000" opacity="0.22"/>`);
+    if (b.progress > 0) {
+      const channels = b.bar.match(/[\da-f]{2}/gi) ?? [];
+      const rgb = channels.slice(0, 3).map(c => parseInt(c, 16));
+      const alpha = channels[3] ? parseInt(channels[3], 16) / 255 : 1;
+      o.push(`<rect x="${b.x + 1}" y="${y + 6}" width="${Math.max(0, ((b.w - 2) * b.progress) / 100)}" height="20" rx="4" fill="rgba(${rgb.join(',')},${alpha})"/>`);
+    }
     const inside = charW(b.task.title) + 14 <= b.w;
     o.push(`<text x="${inside ? b.x + 8 : b.x + b.w + 6}" y="${y + 20}" fill="${inside ? b.onBar : b.text}">${esc(b.task.title)}</text></g>`);
   }

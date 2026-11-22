@@ -1,9 +1,8 @@
-/** #RGB / #RRGGBB → [r, g, b]; invalid input gives mid gray. */
+import { normalizeRgba, parseRgba } from './rgba';
+/** RGB channels of any supported hex; invalid input gives mid gray. */
 export function hexToRgb(hex: string): [number, number, number] {
-  let h = hex.trim().replace(/^#/, '');
-  if (h.length === 3) h = h.replace(/./g, (c) => c + c);
-  if (!/^[0-9a-f]{6}$/i.test(h)) return [128, 128, 128];
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  const c = parseRgba(hex);
+  return c ? [c[0], c[1], c[2]] : [128, 128, 128];
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {
@@ -13,7 +12,7 @@ export function rgbToHex(r: number, g: number, b: number): string {
 
 export function alpha(hex: string, a: number): string {
   const [r, g, b] = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a * (parseRgba(hex)?.[3] ?? 1))).toFixed(3)})`;
 }
 
 /** Linear mix: t = 0 → a, t = 1 → b. */
@@ -24,5 +23,5 @@ export function mixHex(a: string, b: string, t: number): string {
 }
 
 export function isHex(s: string | undefined): s is string {
-  return !!s && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(s);
+  return !!s && s.startsWith('#') && normalizeRgba(s) !== null;
 }

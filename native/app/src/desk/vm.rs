@@ -44,6 +44,7 @@ pub struct DeskUi {
     /// 按分组筛选 (GitHub #14): the groups whose tasks the calendar shows ("" = 未分组); empty =
     /// all of them. For a look, not a setting: it is gone when the app is closed.
     pub group_filter: Vec<String>,
+    pub countdown_mode: bool,
 }
 
 impl DeskUi {
@@ -184,7 +185,7 @@ pub fn countdown_items(doc: &Doc, today: &str) -> ModelRc<CountdownData> {
     }).collect();
     let settings = &doc.settings.calendar;
     model(
-        selected_countdowns(&tasks, today, settings.holiday_countdown, settings.countdown_marked, &settings.countdown_groups)
+    selected_countdowns(&tasks, today, settings.holiday_countdown, settings.countdown_festival, settings.countdown_term, settings.countdown_marked, &countdown_groups(doc))
             .into_iter()
             .map(|c| CountdownData {
                 task_id: c.task_id.clone().unwrap_or_default().into(),
@@ -197,6 +198,10 @@ pub fn countdown_items(doc: &Doc, today: &str) -> ModelRc<CountdownData> {
             })
             .collect(),
     )
+}
+
+fn countdown_groups(doc: &Doc) -> Vec<String> {
+    doc.settings.calendar.countdown_groups.clone()
 }
 
 /// What the window's layout gives the week rows (measured in Slint).
@@ -374,13 +379,19 @@ fn list_item(doc: &Doc, o: &Occurrence, all: bool, today: &str, t: &Tokens) -> L
     if all && task.repeat.is_some() {
         meta.push(describe_rule(task.repeat.as_ref(), &task.start));
     }
-    if let Some(g) = task.group_id.as_deref().and_then(|id| doc.groups.get(id)) {
-        if !doc.settings.calendar.list_group_labels { meta.push(g.name.clone()); }
-    }
+    let group = task.group_id.as_deref().and_then(|id| doc.groups.get(id));
+    if let Some(g) = group.filter(|_| !doc.settings.calendar.list_group_labels) { meta.push(g.name.clone()); }
+    let (group_name, group_color_key) = match group {
+        Some(g) => (if doc.settings.calendar.list_group_labels { g.name.as_str() } else { "" }, Some(g.color.as_str())),
+        None => {
+            let color = doc.settings.calendar.ungrouped_color.as_str();
+            (if doc.settings.calendar.list_group_labels && !color.is_empty() { tr("未分组") } else { "" }, if color.is_empty() { None } else { Some(color) })
+        }
+    };
     ListRowData {
-        group_name: if doc.settings.calendar.list_group_labels { task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map_or_else(String::new, |g| g.name.clone()).into() } else { "".into() },
-        group_color: color(task_color(task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map(|g| g.color.as_str()), t).bar),
-        group_text: color(task_color(task.group_id.as_ref().and_then(|id| doc.groups.get(id)).map(|g| g.color.as_str()), t).on_bar),
+        group_name: group_name.into(),
+        group_color: color(task_color(group_color_key, t).bar),
+        group_text: color(task_color(group_color_key, t).on_bar),
         kind: "item".into(),
         chip: chip_data(doc, &ch, today, t),
         when: task.time.clone().unwrap_or_else(|| tr("全天").into()).into(),
@@ -535,10 +546,10 @@ pub fn chip_data(doc: &Doc, ch: &Chip, today: &str, t: &Tokens) -> ChipData {
         milestone: task.is_milestone(),
         repeat: task.repeat.is_some(),
         bar: color(col.bar),
-        text: color(col.text),
+        text: color(if doc.settings.desk.task_text_mode != "task" { fluentcal_core::theme::calendar_text_color(&doc.settings.desk, t) } else { col.text }),
         on_bar: color(col.on_bar),
-        bar_hover: color(col.bar.mix(0.88, t.text_primary)),
-        check_ring: color(col.bar.mix(0.7, t.text_secondary)),
+        bar_hover: color(col.bar.with_alpha(1.0).mix(0.88, t.text_primary).with_alpha(col.bar.a)),
+        check_ring: color(col.bar.with_alpha(1.0).mix(0.7, t.text_secondary).with_alpha(col.bar.a)),
         tip: SharedString::from(tip.join("\n")),
         linked: ch.linked,
         join_left: ch.join_left,

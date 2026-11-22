@@ -20,6 +20,8 @@ const autoColor = (path: string, auto: string) => {
 };
 const bgColor = autoColor('desk.bgColor', 'auto');
 const todayColor = autoColor('desk.todayColor', 'accent');
+const todayStyle = useSetting<'fill' | 'outline'>('desk.todayStyle');
+const todayOpacity = useSetting<number>('desk.todayOpacity');
 const restColor = autoColor('desk.restBgColor', 'auto');
 const holidayColor = autoColor('desk.holidayTextColor', 'auto');
 const termColor = autoColor('desk.termTextColor', 'auto');
@@ -32,11 +34,29 @@ const acrylic = useSetting<boolean>('desk.acrylic');
 const radius = useSetting<number>('desk.radius');
 const shadow = useSetting<boolean>('desk.shadow');
 const textShadow = useSetting<string>('desk.textShadow');
+const fontFamily = useSetting<SettingsFontFamily>('desk.fontFamily');
+const textColor = useSetting<string>('desk.textColor');
+const taskTextMode = useSetting<'calendar' | 'task'>('desk.taskTextMode');
+const textOutlineWidth = useSetting<number>('desk.textOutlineWidth');
 const fontScale = useSetting<number>('desk.fontScale');
 const cellGap = useSetting<number>('desk.cellGap');
 const lineSpacing = useSetting<number>('desk.lineSpacing');
 const reduceMotion = useSetting<boolean>('theme.reduceMotion');
 const pct = (v: number) => `${v}%`;
+type SettingsFontFamily = 'auto' | 'segoe-variable' | 'segoe' | 'yahei-ui' | 'yahei' | 'arial';
+const fontOptions = [
+  { value: 'auto', label: '系统默认' },
+  { value: 'segoe-variable', label: 'Segoe UI Variable' },
+  { value: 'segoe', label: 'Segoe UI' },
+  { value: 'yahei-ui', label: 'Microsoft YaHei UI' },
+  { value: 'yahei', label: 'Microsoft YaHei' },
+  { value: 'arial', label: 'Arial' },
+];
+const textSwatches = ['#000000', '#FFFFFF', '#202020', '#303030', '#B00020', '#006400', '#003E92'].map((color) => ({ key: color, color }));
+const textColorMode = computed({
+  get: () => textColor.value === 'auto' ? 'auto' : 'custom',
+  set: (value: string) => { textColor.value = value === 'auto' ? 'auto' : '#202020'; },
+});
 </script>
 
 <template>
@@ -75,9 +95,20 @@ const pct = (v: number) => `${v}%`;
         <template #items>
           <FSettingsRow title="圆角"><FSlider v-model="radius" :min="0" :max="16" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
           <FSettingsRow title="窗口阴影"><FToggle v-model="shadow" /></FSettingsRow>
-          <FSettingsRow title="文字阴影" description="背景较透明时为文字加阴影，保证在壁纸上清晰可读">
+          <FSettingsRow title="阴影轮廓" description="自动模式会在透明背景上启用；开关可手动覆盖">
             <FSelect v-model="textShadow" :width="120" :options="[{ value: 'auto', label: '自动' }, { value: 'on', label: '开启' }, { value: 'off', label: '关闭' }]" />
           </FSettingsRow>
+          <FSettingsRow title="日历字体"><FSelect v-model="fontFamily" :width="180" :options="fontOptions" /></FSettingsRow>
+          <FSettingsRow title="文字颜色" description="自适应根据日期格背景选择黑色或白色">
+            <div class="text-color-controls">
+              <FSegmented v-model="textColorMode" :options="[{ value: 'auto', label: '自适应' }, { value: 'custom', label: '自选颜色' }]" size="small" />
+              <FColorSwatches v-if="textColorMode === 'custom'" v-model="textColor" :colors="textSwatches" custom :size="22" />
+            </div>
+          </FSettingsRow>
+          <FSettingsRow title="任务标题文字颜色" description="跟随日历文字提高可读性；任务/分组颜色仍显示在完成标记上">
+            <FSegmented v-model="taskTextMode" :options="[{ value: 'calendar', label: '日历文字' }, { value: 'task', label: '任务颜色' }]" size="small" />
+          </FSettingsRow>
+          <FSettingsRow title="文字轮廓像素"><FSlider v-model="textOutlineWidth" :min="0" :max="4" :step="0.5" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
           <FSettingsRow title="字号"><FSlider v-model="fontScale" :min="80" :max="140" :step="5" :width="180" show-value :format="pct" /></FSettingsRow>
           <FSettingsRow title="日期格间隙"><FSlider v-model="cellGap" :min="0" :max="10" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
           <FSettingsRow title="任务行距"><FSlider v-model="lineSpacing" :min="0" :max="8" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
@@ -86,6 +117,8 @@ const pct = (v: number) => `${v}%`;
       <FSettingsExpander icon="color" title="细节颜色" description="今日、休息日、节假日和节气的颜色；留空为自动">
         <template #items>
           <FSettingsRow title="今日高亮"><FColorSwatches v-model="todayColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
+          <FSettingsRow title="今日标记样式"><FSegmented v-model="todayStyle" :options="[{ value: 'outline', label: '边框' }, { value: 'fill', label: '填充' }]" size="small" /></FSettingsRow>
+          <FSettingsRow title="今日高亮不透明度"><FSlider v-model="todayOpacity" :min="0" :max="100" :step="1" :width="180" show-value :format="pct" /></FSettingsRow>
           <FSettingsRow title="休息日背景"><FColorSwatches v-model="restColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
           <FSettingsRow title="节假日文字"><FColorSwatches v-model="holidayColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
           <FSettingsRow title="节日与节气文字"><FColorSwatches v-model="termColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
@@ -105,4 +138,5 @@ const pct = (v: number) => `${v}%`;
   max-width: 420px;
   flex-wrap: wrap;
 }
+.text-color-controls { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
 </style>

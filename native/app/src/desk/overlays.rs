@@ -151,8 +151,8 @@ pub fn day_list(doc: &Doc, ui: &super::vm::DeskUi, date: &str, today: &str, t: &
 pub fn filter_rows(doc: &Doc, ui: &super::vm::DeskUi, t: &Tokens) -> (Vec<FilterRowData>, String, String) {
     let rows = fluentcal_core::groups::summaries(doc).into_iter().map(|g| FilterRowData {
         id: g.id.as_str().into(), name: g.name.into(),
-        color: color(task_color(g.color.as_deref(), t).bar), dot: g.color.is_some(),
-        checked: ui.group_filter.contains(&g.id), count: g.count.to_string().into(),
+        color: color(task_color(g.color.as_deref().or_else(|| (!doc.settings.calendar.ungrouped_color.is_empty()).then_some(doc.settings.calendar.ungrouped_color.as_str())), t).bar), dot: g.color.is_some() || (g.id.is_empty() && !doc.settings.calendar.ungrouped_color.is_empty()),
+        checked: if ui.countdown_mode { doc.settings.calendar.countdown_groups.contains(&g.id) } else { ui.group_filter.contains(&g.id) }, count: g.count.to_string().into(),
     }).collect();
     let hint = if doc.groups.is_empty() { fluentcal_core::i18n::tr("还没有分组。右键任务 › 分组，可以把它放进“生日”“工作”等分组。") } else { "" };
     (rows, doc.tasks.len().to_string(), hint.into())

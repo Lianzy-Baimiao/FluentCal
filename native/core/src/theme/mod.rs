@@ -6,7 +6,7 @@
 mod desk;
 mod tokens;
 
-pub use desk::{desk_style, mark_color, task_color, DeskStyle, Resolved, TaskColor, TASK_COLORS};
+pub use desk::{calendar_text_color, desk_style, mark_color, task_color, DeskStyle, Resolved, TaskColor, TASK_COLORS};
 pub use tokens::{tokens, Shadow, Tokens};
 
 /// sRGB colour with straight (not premultiplied) alpha. Channels 0–255, alpha 0–1.
@@ -27,14 +27,15 @@ impl Rgba {
         Rgba { r, g, b, a }
     }
 
-    /// `#RGB`, `#RRGGBB` or `#RRGGBBAA` (the `#` is optional).
+    /// CSS `#RGB`, `#RGBA`, `#RRGGBB` or `#RRGGBBAA` (the `#` is optional).
     pub fn parse(s: &str) -> Option<Rgba> {
-        let h = s.trim().trim_start_matches('#');
+        let h = s.trim();
+        let h = h.strip_prefix('#').unwrap_or(h);
         if !h.chars().all(|c| c.is_ascii_hexdigit()) {
             return None;
         }
         let h: String = match h.len() {
-            3 => h.chars().flat_map(|c| [c, c]).collect(),
+            3 | 4 => h.chars().flat_map(|c| [c, c]).collect(),
             6 | 8 => h.to_owned(),
             _ => return None,
         };
@@ -62,6 +63,11 @@ impl Rgba {
     pub fn to_hex(self) -> String {
         let c = self.rounded();
         format!("#{:02X}{:02X}{:02X}", c.r as u8, c.g as u8, c.b as u8)
+    }
+
+    pub fn to_hex_alpha(self) -> String {
+        let rgb = self.to_hex();
+        if self.a >= 1.0 { rgb } else { format!("{rgb}{:02X}", (self.a.clamp(0.0, 1.0) * 255.0).round() as u8) }
     }
 
     /// Linear blend of the colour channels, `t` = 0 → self, 1 → `other` (fluent/theme.ts `mix`,
@@ -109,11 +115,20 @@ pub fn contrast(a: Rgba, b: Rgba) -> f64 {
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
-/// White unless it fails AA (4.5:1) and black reads better — matches Windows, which keeps
-/// white text on mid-tone accents such as #0078D4.
+/// Pick the higher-contrast monochrome foreground for a fill colour.
 pub fn best_text_on(fill: Rgba) -> Rgba {
     let white = contrast(fill, WHITE);
     if white >= 4.5 || white >= contrast(fill, BLACK) { WHITE } else { BLACK }
+}
+
+/// Text is opaque; judge a translucent fill after it has been painted on its surface.
+pub fn best_text_on_over(fill: Rgba, surface: Rgba) -> Rgba {
+    best_text_on(fill.over(surface))
+}
+
+pub fn best_monochrome_text(fill: Rgba) -> Rgba {
+    let surface = fill.over(WHITE);
+    if contrast(surface, BLACK) >= contrast(surface, WHITE) { BLACK } else { WHITE }
 }
 
 fn rgb_to_hsl(c: Rgba) -> (f64, f64, f64) {

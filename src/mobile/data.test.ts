@@ -55,4 +55,14 @@ describe("Android desktop backup compatibility", () => {
     expect(plan.tasks).toEqual({});
     expect(plan.kept).toBe(1);
   });
+  it("keeps RGBA task colors when importing and re-exporting without changes", () => {
+    const imported = readDocument(JSON.stringify({ tasks: { t: { id: "t", title: "透明任务", start: "2026-11-21", end: "2026-11-21", color: "#12345680" } } }));
+    expect(imported.tasks.t.color).toBe("#12345680");
+    expect(readDocument(JSON.stringify(imported)).tasks.t.color).toBe("#12345680");
+  });
+  it("keeps desktop RGBA color when the mobile editor changes a different field", () => {
+    const imported = readDocument(JSON.stringify({ tasks: { t: { id: "t", title: "透明任务", start: "2026-11-21", end: "2026-11-21", color: "#12345680" } } }));
+    imported.tasks.t.notes = "手机改备注";
+    expect(readDocument(JSON.stringify(imported)).tasks.t).toMatchObject({ color: "#12345680", notes: "手机改备注" });
+  });
 });

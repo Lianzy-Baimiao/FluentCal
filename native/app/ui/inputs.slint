@@ -38,8 +38,10 @@ export global Fluent {
     pure callback hsv(string) -> HsvData;
     pure callback hsv-hex(float, float, float) -> string;
     pure callback rgb-hex(float, float, float) -> string;
+    pure callback alpha(string) -> float;
+    pure callback with-alpha(string, float) -> string;
     // White or black, whichever reads on the colour (theme.ts bestTextOn).
-    pure callback text-on(string) -> color;
+    pure callback text-on(string, color) -> color;
     // The selected value as a custom hex when it isn't one of the swatches' keys, else "".
     pure callback custom-value(string, [Swatch]) -> string;
     pure callback selected-hex(string, [Swatch]) -> string;
@@ -407,6 +409,15 @@ export component NumberBox {
 
 export struct SelectOption { value: string, label: string, icon: string, disabled: bool, has-dot: bool, dot-color: color, detail: string }
 
+export component OptionDot inherits Rectangle {
+    in property <SelectOption> option;
+    width: option.has-dot ? 10px : 0px;
+    height: 10px;
+    border-radius: 3px;
+    background: option.dot-color;
+    accessible-role: none;
+}
+
 // 0.2's FSelect: a button showing the choice, with the list in a flyout at least as wide.
 export component Select {
     in property <[SelectOption]> options;
@@ -503,6 +514,7 @@ export component Select {
             size: 16px;
             color: root.enabled ? Theme.c.text-primary : Theme.c.text-disabled;
         }
+        if root.sel >= 0 && root.options[root.sel].has-dot: Rectangle { width: 10px; height: 10px; border-radius: 3px; background: root.options[root.sel].dot-color; }
         Text {
             horizontal-stretch: 1;
             text: root.sel >= 0 ? root.options[root.sel].label : root.placeholder;

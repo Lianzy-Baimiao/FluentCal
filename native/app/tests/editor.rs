@@ -34,6 +34,42 @@ fn color_spectrum_is_draft_until_confirm_and_save() {
     assert_ne!(with(|a|a.doc.tasks["a"].color.clone()).unwrap().as_deref(),Some("#FF0000"));
 }
 
+#[test]
+fn multiline_notes_keep_all_text_and_show_a_vertical_scrollbar() {
+    let notes = (0..80).map(|n| format!("第{n}行长备注内容")).collect::<Vec<_>>().join("\n");
+    let t = start("long-notes-scroll", &[json!({"id":"a","title":"长备注","start":"2026-11-21","notes":notes})]);
+    let w = t.open(|a| a.open_editor_task("a", None));
+    w.window().set_size(slint::LogicalSize::new(1100.0, 1800.0));
+    settle();
+    let wheel = |position, delta_y| {
+        w.window().dispatch_event(WindowEvent::PointerMoved { position });
+        w.window().dispatch_event(WindowEvent::PointerScrolled { position, delta_x: 0.0, delta_y });
+        settle();
+    };
+    wheel(LogicalPosition::new(100.0, 180.0), -4000.0);
+    let input = t.find(&w, "备注");
+    assert!(input.size().height > 160.0, "notes field should show more than the old four rows");
+    assert_eq!(input.accessible_value().as_deref(), Some(notes.as_str()));
+    let (origin, size) = (input.absolute_position(), input.size());
+    let scrollbar = ElementHandle::find_by_element_type_name(&w, "ScrollBar").find(|e| {
+        let p = e.absolute_position();
+        p.x > origin.x + size.width / 2.0 && p.y >= origin.y && p.y < origin.y + size.height && e.size().height > e.size().width
+    }).expect("visible vertical scrollbar in the notes field");
+    let (scroll_origin, scroll_size) = (scrollbar.absolute_position(), scrollbar.size());
+    let x = scroll_origin.x + scroll_size.width / 2.0;
+    let button = PointerEventButton::Left;
+    w.window().dispatch_event(WindowEvent::PointerPressed { position: LogicalPosition::new(x, scroll_origin.y + 20.0), button });
+    let position = LogicalPosition::new(x, scroll_origin.y + scroll_size.height - 10.0);
+    w.window().dispatch_event(WindowEvent::PointerMoved { position });
+    w.window().dispatch_event(WindowEvent::PointerReleased { position, button });
+    settle();
+    t.click(&w, &input);
+    t.ctrl(&w, &slint::SharedString::from(Key::End));
+    t.key(&w, "!");
+    t.ctrl(&w, "s");
+    assert_eq!(t.task("a").unwrap()["notes"], format!("{notes}!"));
+}
+
 fn start(name: &str, tasks: &[Value]) -> T {
     slint::platform::set_platform(Box::new(TestingBackend::new(TestingBackendOptions { mock_time: false, threading: false, ..Default::default() }))).expect("platform");
     let dir = std::env::temp_dir().join(format!("fluentcal-editor-{name}-{}", std::process::id()));

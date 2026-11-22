@@ -8,6 +8,7 @@ import { Select, NumberBox, TextBox, Fluent } from "inputs.slint";
 import { ColorSwatches } from "menu.slint";
 import { SettingsGroup, SettingsCard } from "cards.slint";
 import { SetState } from "settings_state.slint";
+import { Fluent } from "inputs.slint";
 
 // One of the 休息日 chips (0.2's .settings .chips button).
 component DayChip inherits Rectangle {
@@ -85,12 +86,6 @@ export component CalendarPage inherits VerticalLayout {
                 selected(v) => { SetState.set-str("calendar.sidebarMode", v); }
             }
         }
-        SettingsCard {
-            icon: Glyph.group;
-            title: @tr("列表显示分组标签");
-            description: @tr("任务名前显示分组名称和颜色；未分组不显示标签");
-            Toggle { checked: SetState.calendar.list-group-labels; toggled(v) => { SetState.set-bool("calendar.listGroupLabels", v); } }
-        }
         if SetState.calendar.sidebar-mode == "float": SettingsCard {
             icon: Glyph.list;
             title: @tr("浮动待办栏的收起方式");
@@ -101,6 +96,12 @@ export component CalendarPage inherits VerticalLayout {
                 options: [{ value: "button", label: @tr("再点一次按钮") }, { value: "outside", label: @tr("点击栏外也收起") }];
                 selected(v) => { SetState.set-str("calendar.sidebarClose", v); }
             }
+        }
+        SettingsCard {
+            icon: Glyph.group;
+            title: @tr("列表显示分组标签");
+            description: @tr("任务名前显示分组名称和颜色；未分组不显示标签");
+            Toggle { checked: SetState.calendar.list-group-labels; toggled(v) => { SetState.set-bool("calendar.listGroupLabels", v); } }
         }
         SettingsCard {
             icon: Glyph.calendar-day;
@@ -158,12 +159,6 @@ export component CalendarPage inherits VerticalLayout {
             Toggle { checked: SetState.calendar.show-almanac; toggled(v) => { SetState.set-bool("calendar.showAlmanac", v); } }
         }
         SettingsCard {
-            icon: Glyph.flag;
-            title: @tr("节假日倒计时");
-            description: @tr("在日历底部显示距离下一个法定假日的天数；任务可在右键菜单或编辑窗口中设为倒数日");
-            Toggle { checked: SetState.calendar.holiday-countdown; toggled(v) => { SetState.set-bool("calendar.holidayCountdown", v); } }
-        }
-        SettingsCard {
             icon: Glyph.home;
             title: @tr("休息日");
             description: @tr("没有法定节假日时，这几天按休息日显示");
@@ -202,7 +197,7 @@ export component CalendarPage inherits VerticalLayout {
         SettingsCard {
             icon: Glyph.color;
             title: @tr("新任务默认颜色");
-            ColorSwatches { colors: SetState.task-swatches; value: SetState.calendar.default-color; allow-none: true; size: 22px; picked(v) => { SetState.set-str("tasks.defaultColor", v); } }
+            ColorSwatches { colors: SetState.task-swatches; value: SetState.calendar.default-color; allow-none: true; custom: true; custom-value: Fluent.custom-value(self.value, self.colors); custom-color: Fluent.hex-color(self.custom-value); custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base); size: 22px; picked(v) => { SetState.set-str("tasks.defaultColor", v); } }
         }
     }
     SettingsGroup {
@@ -214,20 +209,25 @@ export component CalendarPage inherits VerticalLayout {
             description: @tr("与勾选分组的任务合并显示，同一任务只出现一次");
             Toggle { checked: SetState.calendar.countdown-marked; toggled(v) => { SetState.set-bool("calendar.countdownMarked", v); } }
         }
+        SettingsCard { icon: Glyph.calendar; title: @tr("法定假期"); description: ""; Toggle { checked: SetState.calendar.holiday-countdown; toggled(v) => { SetState.set-bool("calendar.holidayCountdown", v); } } }
+        SettingsCard { icon: Glyph.flag; title: @tr("普通节日"); description: ""; Toggle { checked: SetState.calendar.countdown-festival; toggled(v) => { SetState.set-bool("calendar.countdownFestival", v); } } }
+        SettingsCard { icon: Glyph.calendar-day; title: @tr("节气"); description: ""; Toggle { checked: SetState.calendar.countdown-term; toggled(v) => { SetState.set-bool("calendar.countdownTerm", v); } } }
         for g in SetState.groups: SettingsCard {
             title: g.name;
             description: g.desc;
-            Checkbox { checked: g.countdown; accessible-label: @tr("倒计时分组：{0}", g.name); toggled(v) => { SetState.action-arg("countdown-group", g.id); } }
+            Checkbox { text: g.id == "" ? @tr("未分组") : g.name; checked: g.countdown; accessible-label: @tr("倒计时分组：{0}", g.name); toggled(v) => { SetState.action-arg("countdown-group", g.id); } }
         }
     }
 }
 
 // A group's card: name box (saved on Enter / leaving it), colour, delete.
 component GroupCard inherits SettingsCard {
+    in property <bool> show-card: true;
     in property <string> gid;
     in property <string> gname;
     in property <string> gcolor;
     property <string> draft: gname;
+    visible: root.show-card;
     title: gname;
     if root.gid != "": TextBox {
         width: 160px;
@@ -240,14 +240,12 @@ component GroupCard inherits SettingsCard {
             }
         }
     }
-    if root.gid != "": ColorSwatches { colors: SetState.task-swatches; value: root.gcolor; custom: true; custom-value: Fluent.custom-value(root.gcolor, SetState.task-swatches); custom-color: Fluent.hex-color(root.gcolor); custom-fg: Fluent.text-on(root.gcolor); size: 18px; picked(v) => { SetState.set-group-color(root.gid, v); } }
+    if root.gid != "": ColorSwatches { colors: SetState.task-swatches; value: root.gcolor; custom: true; custom-value: Fluent.custom-value(root.gcolor, SetState.task-swatches); custom-color: Fluent.hex-color(root.gcolor); custom-fg: Fluent.text-on(root.gcolor, Theme.c.solid-base); size: 18px; picked(v) => { SetState.set-group-color(root.gid, v); } }
     if root.gid != "": Button { variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.delete; tip: @tr("删除分组 ") + root.gname; clicked => { SetState.action-arg("delete-group", root.gid); } }
 }
 
 export component GanttPage inherits VerticalLayout {
-    in property <bool> groups-only;
-    property <string> new-name;
-    if !root.groups-only: SettingsGroup {
+    SettingsGroup {
         title: @tr("显示");
         SettingsCard {
             icon: Glyph.zoom-in;
@@ -275,10 +273,13 @@ export component GanttPage inherits VerticalLayout {
             Toggle { checked: SetState.gantt.hide-single-day; toggled(v) => { SetState.set-bool("gantt.hideSingleDay", v); } }
         }
     }
+}
+
+export component GroupsPage inherits VerticalLayout {
+    property <string> new-name;
     SettingsGroup {
-        first: root.groups-only;
-        title: @tr("分组");
-        for g in SetState.groups: GroupCard { gid: g.id; gname: g.name; gcolor: g.color; description: g.desc; }
+        SettingsCard { icon: Glyph.group; title: @tr("未分组"); description: SetState.ungrouped-count; ColorSwatches { colors: SetState.task-swatches; value: SetState.ungrouped-color; allow-none: true; custom: true; custom-value: Fluent.custom-value(self.value, SetState.task-swatches); custom-color: Fluent.hex-color(self.custom-value); custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base); size: 18px; picked(v) => { SetState.set-str("calendar.ungroupedColor", v); } } }
+        for g in SetState.groups: GroupCard { show-card: g.id != ""; gid: g.id; gname: g.name; gcolor: g.color; description: g.desc; }
         SettingsCard {
             icon: Glyph.add;
             title: @tr("新建分组");

@@ -1,7 +1,7 @@
 //! Task colours (fluent/theme.ts) and the desk calendar's appearance variables (the deskVars
 //! of composables/theme.ts).
 
-use super::{best_text_on, contrast, Rgba, Shadow, Tokens, BLACK, WHITE};
+use super::{best_monochrome_text, best_text_on, best_text_on_over, contrast, Rgba, Shadow, Tokens, BLACK, WHITE};
 use crate::settings::Desk;
 
 /// A task palette entry. `bar` carries white (or black for yellow) text; text_light/text_dark
@@ -41,10 +41,6 @@ pub struct Resolved {
     pub on_bar: Rgba,
 }
 
-fn opaque_hex(s: &str) -> Option<Rgba> {
-    matches!(s.trim().trim_start_matches('#').len(), 3 | 6).then(|| Rgba::parse(s)).flatten()
-}
-
 /// Colour key (or custom #hex) for the current theme; `None` or unknown → the theme's default
 /// text and the accent fill for bars.
 pub fn task_color(key: Option<&str>, t: &Tokens) -> Resolved {
@@ -53,17 +49,17 @@ pub fn task_color(key: Option<&str>, t: &Tokens) -> Resolved {
             let bar = Rgba::hex(c.bar);
             return Resolved { bar, text: Rgba::hex(if t.dark { c.text_dark } else { c.text_light }), on_bar: best_text_on(bar) };
         }
-        if let Some(hex) = opaque_hex(k) {
+        if let Some(hex) = Rgba::parse(k) {
             let bg = if t.dark { Rgba::hex("#202020") } else { WHITE };
             let toward = if t.dark { WHITE } else { BLACK };
-            let mut text = hex;
+            let mut text = hex.with_alpha(1.0);
             for i in 1..=10 {
                 if contrast(text, bg) >= 4.5 {
                     break;
                 }
                 text = hex.lerp(toward, f64::from(i) * 0.1);
             }
-            return Resolved { bar: hex, text, on_bar: best_text_on(hex) };
+            return Resolved { bar: hex, text, on_bar: best_text_on_over(hex, bg) };
         }
     }
     Resolved { bar: t.accent_fill, text: t.text_primary, on_bar: t.text_on_accent }
@@ -92,7 +88,16 @@ pub struct DeskStyle {
     pub line_gap: f64,
     /// Font scale, 1 = 100 %.
     pub fs: f64,
+    pub font_family: String,
+    pub text_color: Rgba,
+    pub text_secondary: Rgba,
+    pub text_tertiary: Rgba,
+    pub outline_color: Rgba,
+    pub outline_width: f64,
+    pub outline_on: bool,
     pub today: Rgba,
+    pub today_text: Rgba,
+    pub today_style: String,
     pub rest_tint: Rgba,
     pub holiday_text: Rgba,
     pub term_text: Rgba,
@@ -106,16 +111,26 @@ fn setting_color(s: &str, auto: Rgba) -> Rgba {
     Rgba::parse(s).unwrap_or(auto)
 }
 
+pub fn calendar_text_color(s: &Desk, t: &Tokens) -> Rgba {
+    let dark = t.dark;
+    let base = if s.bg_color == "auto" { Rgba::hex(if dark { "#202020" } else { "#F3F3F3" }) } else { Rgba::parse(&s.bg_color).unwrap_or(Rgba::hex("#808080")) };
+    let cell = base.lerp(WHITE, if dark { 0.07 } else { 0.85 });
+    let surface = base.with_alpha(base.a * s.bg_opacity.clamp(0.0, 100.0) / 100.0).over(t.solid_base);
+    let visible_cell = cell.with_alpha(base.a * s.cell_opacity.clamp(0.0, 100.0) / 100.0).over(surface);
+    if s.text_color == "auto" { best_monochrome_text(visible_cell) } else { setting_color(&s.text_color, best_monochrome_text(visible_cell)).with_alpha(1.0) }
+}
+
 pub fn desk_style(s: &Desk, t: &Tokens) -> DeskStyle {
     let dark = t.dark;
     let auto_base = Rgba::hex(if dark { "#202020" } else { "#F3F3F3" });
     // alpha()/mixHex() take a hex colour; anything else reads as mid gray there.
-    let base = if s.bg_color == "auto" { auto_base } else { Rgba::parse(&s.bg_color).map_or(Rgba::hex("#808080"), |c| c.with_alpha(1.0)) };
+    let base = if s.bg_color == "auto" { auto_base } else { Rgba::parse(&s.bg_color).unwrap_or(Rgba::hex("#808080")) };
     let cell = base.lerp(WHITE, if dark { 0.07 } else { 0.85 });
     let alpha = |c: Rgba, a: f64| c.with_alpha((a.clamp(0.0, 1.0) * 1000.0).round() / 1000.0);
-    let glow_on = s.text_shadow == "on" || (s.text_shadow == "auto" && !s.acrylic && s.bg_opacity < 35.0 && s.cell_opacity < 60.0);
+    let outline_width = s.text_outline_width.clamp(0.0, 4.0);
+    let glow_on = outline_width > 0.0 && s.text_shadow != "off" && (s.text_shadow == "on" || (!s.acrylic && s.bg_opacity * base.a < 35.0 && s.cell_opacity * base.a < 60.0));
     // Border and shadow fade out with the background so a transparent calendar has no frame.
-    let k = (s.bg_opacity / 60.0).min(1.0);
+    let k = (s.bg_opacity * base.a / 60.0).min(1.0);
     let k3 = |v: f64| ((v * k) * 1000.0).round() / 1000.0;
     let shadow = if s.shadow && !s.acrylic && k > 0.05 {
         vec![
@@ -126,25 +141,38 @@ pub fn desk_style(s: &Desk, t: &Tokens) -> DeskStyle {
         Vec::new()
     };
     let rest_auto = if dark { Rgba::new(0.0, 0.0, 0.0, 0.16) } else { Rgba::new(0.0, 0.0, 0.0, 0.035) };
+    let today_base = if s.today_color == "accent" { t.accent_fill } else { setting_color(&s.today_color, t.accent_fill) };
+    let today = today_base.with_alpha(today_base.a * s.today_opacity.clamp(0.0, 100.0) / 100.0);
+    let text_color = calendar_text_color(s, t);
+    let outline_color = best_text_on(text_color);
     DeskStyle {
-        bg: alpha(base, s.bg_opacity / 100.0),
+        bg: alpha(base, base.a * s.bg_opacity / 100.0),
         radius: if s.acrylic { 8.0 } else { s.radius },
         pad: if s.acrylic { 0.0 } else if s.shadow { 10.0 } else { 2.0 },
         stroke: if dark { Rgba::new(255.0, 255.0, 255.0, k3(0.1)) } else { Rgba::new(0.0, 0.0, 0.0, k3(0.08)) },
         shadow,
-        panel_bg: alpha(base, (s.bg_opacity / 100.0).max(0.82)),
-        cell_bg: alpha(cell, s.cell_opacity / 100.0),
+        panel_bg: alpha(base, (base.a * s.bg_opacity / 100.0).max(0.82)),
+        cell_bg: alpha(cell, base.a * s.cell_opacity / 100.0),
         cell_gap: s.cell_gap,
         line_gap: s.line_spacing,
         fs: s.font_scale / 100.0,
-        today: if s.today_color == "accent" { t.accent_fill } else { setting_color(&s.today_color, t.accent_fill) },
+        font_family: s.font_family.clone(),
+        text_color,
+        text_secondary: text_color.with_alpha(0.82),
+        text_tertiary: text_color.with_alpha(0.66),
+        outline_color,
+        outline_width,
+        outline_on: glow_on,
+        today,
+        today_text: if s.today_style == "fill" { best_text_on_over(today, cell) } else { t.text_primary },
+        today_style: if s.today_style == "fill" { "fill" } else { "outline" }.into(),
         rest_tint: if s.rest_bg_color == "auto" {
             rest_auto
         } else {
-            Rgba::parse(&s.rest_bg_color).map_or(Rgba::new(128.0, 128.0, 128.0, 0.22), |c| c.with_alpha(0.22))
+            Rgba::parse(&s.rest_bg_color).map_or(Rgba::new(128.0, 128.0, 128.0, 0.22), |c| c.with_alpha(c.a * 0.22))
         },
         holiday_text: setting_color(&s.holiday_text_color, Rgba::hex(if dark { "#FF99A4" } else { "#C42B1C" })),
         term_text: if s.term_text_color == "auto" { t.accent_text } else { setting_color(&s.term_text_color, t.accent_text) },
-        glow: glow_on.then(|| if dark { Rgba::new(0.0, 0.0, 0.0, 0.85) } else { Rgba::new(255.0, 255.0, 255.0, 0.9) }),
+        glow: glow_on.then(|| outline_color.with_alpha(if outline_color == BLACK { 0.85 } else { 0.9 })),
     }
 }

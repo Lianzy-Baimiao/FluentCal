@@ -3,16 +3,37 @@ import { Theme } from "theme.slint";
 import { Fluent, NumberBox, TextBox } from "inputs.slint";
 import { Slider } from "forms.slint";
 
+export component AlphaPreview inherits Rectangle {
+    in property <color> fill;
+    clip: true;
+    for row in ceil(root.height / 6px): Rectangle {
+        y: row * 6px; height: 6px;
+        for col in ceil(root.width / 6px): Rectangle {
+            x: col * 6px; width: 6px; height: 6px;
+            background: mod(row + col, 2) == 0 ? #ffffff : #c0c0c0;
+        }
+    }
+    Rectangle { background: root.fill; }
+    border-width: 1px; border-color: Theme.c.control-stroke;
+}
+
 export component ColorPicker inherits VerticalLayout {
     in-out property <string> draft;
     in property <string> original;
     property <float> hue: Fluent.hsv(root.original).h;
     property <float> sat: Fluent.hsv(root.draft).s;
     property <float> val: Fluent.hsv(root.draft).v;
+    in-out property <float> opacity-value: round(Fluent.alpha(root.draft));
     spacing: 8px;
     function set-hsv(h: float, s: float, v: float) {
         root.hue = h;
-        root.draft = Fluent.hsv-hex(h, s, v);
+        root.draft = Fluent.with-alpha(Fluent.hsv-hex(h, s, v), root.opacity-value);
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text { text: @tr("不透明度"); color: Theme.c.text-primary; vertical-alignment: center; }
+        Slider { value: root.opacity-value; maximum: 100; track-width: 140px; accessible-label: @tr("不透明度"); moved(v) => { root.opacity-value = v; root.draft = Fluent.with-alpha(root.draft, v); } committed(v) => { root.opacity-value = v; root.draft = Fluent.with-alpha(root.draft, v); } }
+        NumberBox { show-buttons: false; width: 70px; value: round(root.opacity-value); minimum: 0; maximum: 100; suffix: "%"; changed-value(v) => { root.opacity-value = v; root.draft = Fluent.with-alpha(root.draft, v); } }
     }
     spectrum := Rectangle {
         height: 150px;
@@ -47,14 +68,14 @@ export component ColorPicker inherits VerticalLayout {
     HorizontalLayout {
         spacing: 6px;
         Text { text: "RGB"; color: Theme.c.text-primary; vertical-alignment: center; }
-        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).r; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(v, Fluent.hsv(root.draft).g, Fluent.hsv(root.draft).b); root.hue = Fluent.hsv(root.draft).h; } }
-        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).g; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(Fluent.hsv(root.draft).r, v, Fluent.hsv(root.draft).b); root.hue = Fluent.hsv(root.draft).h; } }
-        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).b; maximum: 255; changed-value(v) => { root.draft = Fluent.rgb-hex(Fluent.hsv(root.draft).r, Fluent.hsv(root.draft).g, v); root.hue = Fluent.hsv(root.draft).h; } }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).r; maximum: 255; changed-value(v) => { root.draft = Fluent.with-alpha(Fluent.rgb-hex(v, Fluent.hsv(root.draft).g, Fluent.hsv(root.draft).b), root.opacity-value); root.hue = Fluent.hsv(root.draft).h; } }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).g; maximum: 255; changed-value(v) => { root.draft = Fluent.with-alpha(Fluent.rgb-hex(Fluent.hsv(root.draft).r, v, Fluent.hsv(root.draft).b), root.opacity-value); root.hue = Fluent.hsv(root.draft).h; } }
+        NumberBox { show-buttons: false; width: 80px; value: Fluent.hsv(root.draft).b; maximum: 255; changed-value(v) => { root.draft = Fluent.with-alpha(Fluent.rgb-hex(Fluent.hsv(root.draft).r, Fluent.hsv(root.draft).g, v), root.opacity-value); root.hue = Fluent.hsv(root.draft).h; } }
     }
     HorizontalLayout {
         spacing: 8px;
-        Rectangle { width: 36px; height: 30px; background: Fluent.hex-color(root.original); border-width: 1px; border-color: Theme.c.control-stroke; }
-        Rectangle { width: 36px; height: 30px; background: Fluent.hex-color(root.draft); border-width: 1px; border-color: Theme.c.control-stroke; }
+        AlphaPreview { width: 36px; height: 30px; fill: Fluent.hex-color(root.original); }
+        AlphaPreview { width: 36px; height: 30px; fill: Fluent.hex-color(root.draft); }
         TextBox { horizontal-stretch: 1; text <=> root.draft; accessible-label: @tr("颜色值"); edited(v) => { root.hue = Fluent.hsv(v).h; } }
     }
 }

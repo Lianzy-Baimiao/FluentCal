@@ -130,20 +130,21 @@ pub fn tokens(dark: bool, accent: &str, palette: Option<&[String]>) -> Tokens {
     let given: Option<Vec<Rgba>> = palette
         .filter(|p| p.len() == 7)
         .and_then(|p| p.iter().map(|c| Rgba::parse(c).filter(|_| matches!(c.trim_start_matches('#').len(), 3 | 6))).collect());
+    let opacity = if given.is_none() { Rgba::parse(accent).map_or(1.0, |c|c.a) } else { 1.0 };
     let p: [Rgba; 7] = match given {
         Some(v) => [v[0], v[1], v[2], v[3], v[4], v[5], v[6]],
         None => derive_accent(Rgba::parse(accent).unwrap_or(Rgba::hex("#0078D4"))),
     };
     // Light theme fills with dark1, dark theme with light2 (WinUI AccentFillColorDefault).
-    let (on_light, on_dark) = (best_text_on(p[4]), best_text_on(p[1]));
-    let fill = if dark { p[1] } else { p[4] };
+    let (on_light, on_dark) = (best_text_on(p[4].with_alpha(opacity).over(Rgba::hex("#FFFFFF"))), best_text_on(p[1].with_alpha(opacity).over(Rgba::hex("#202020"))));
+    let fill = (if dark { p[1] } else { p[4] }).with_alpha(opacity);
     let on = if dark { on_dark } else { on_light };
     let d = Derived {
         accent_fill: fill,
         accent_fill_hover: fill.mix(0.9, TRANSPARENT),
         accent_fill_pressed: fill.mix(0.8, TRANSPARENT),
-        accent_text: if dark { p[0] } else { p[5] },
-        accent_text_secondary: if dark { p[0] } else { p[6] },
+        accent_text: (if dark { p[0] } else { p[5] }).with_alpha(1.0),
+        accent_text_secondary: (if dark { p[0] } else { p[6] }).with_alpha(1.0),
         text_on_accent: on,
         text_on_accent_secondary: on.mix(if dark { 0.5 } else { 0.7 }, TRANSPARENT),
         attention: fill,

@@ -8,7 +8,7 @@ fn task(id: &str, group: Option<&str>, marked: bool) -> Task {
 #[test]
 fn countdown_sources_are_a_union_and_empty_means_none() {
     let tasks=vec![task("a",Some("birthday"),true), task("b",Some("birthday"),false), task("c",None,true), task("d",None,false)];
-    let ids=|marked,groups:&[String]| selected_countdowns(&tasks,"2026-11-21",false,marked,groups).into_iter().map(|x|x.key).collect::<Vec<_>>();
+    let ids=|marked,groups:&[String]| selected_countdowns(&tasks,"2026-11-21",false,false,false,marked,groups).into_iter().map(|x|x.key).collect::<Vec<_>>();
     assert_eq!(ids(true,&[]),["a","c"]);
     assert_eq!(ids(false,&["birthday".into()]),["a","b"]);
     assert_eq!(ids(true,&["birthday".into()]),["a","b","c"]);
@@ -27,6 +27,16 @@ fn group_counts_include_done_and_do_not_expand_recurrences() {
     let rows=summaries(&doc);
     assert_eq!(rows.iter().map(|g|(g.id.as_str(),g.count)).collect::<Vec<_>>(),[("",2),("g",2)]);
     assert_eq!(rows[1].color.as_deref(),Some("blue"));
+}
+
+#[test]
+fn countdown_festival_and_term_sources_are_independent_and_skip_today() {
+    use fluentcal_core::countdown::{countdowns, next_observance};
+    assert!(next_observance("2026-11-03", false).is_some_and(|(_, date)| date.as_str() > "2026-11-03"));
+    assert!(next_observance("2026-11-03", true).is_some_and(|(_, date)| date.as_str() > "2026-11-03"));
+    assert_eq!(next_observance("2026-04-04", true), Some(("清明".into(), "2026-04-05".into())));
+    assert!(countdowns(&[], "2026-04-04", false).is_empty());
+    assert_eq!(countdowns(&[], "2026-09-20", true).iter().map(|item| item.date.as_str()).collect::<Vec<_>>(), ["2026-09-25"]);
 }
 
 #[test]

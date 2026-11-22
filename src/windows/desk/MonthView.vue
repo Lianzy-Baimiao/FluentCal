@@ -311,15 +311,15 @@ watch(
   display: flex;
   gap: var(--cell-gap);
   font-size: calc(12px * var(--fs));
-  color: var(--text-secondary);
-  text-shadow: var(--text-glow);
+  color: var(--calendar-text-secondary);
+  text-shadow: var(--calendar-outline);
 }
 .wn {
   width: 18px;
   flex: none;
   text-align: center;
   font-size: calc(10px * var(--fs));
-  color: var(--text-tertiary);
+  color: var(--calendar-text-tertiary);
 }
 .wd-grid {
   flex: 1;

@@ -83,11 +83,18 @@ try {
     await page
       .getByRole("button", { name: "取消完成 安卓离线任务", exact: true })
       .waitFor();
-    assert(
-      Object.values((await stored()).tasks).find(
-        (t) => t.title === "安卓离线任务",
-      ).done,
-    );
+    await page.waitForFunction(key => Object.values(JSON.parse(localStorage.getItem(key)).tasks).find(t => t.title === '安卓离线任务')?.done === true, key);
+    assert(Object.values((await stored()).tasks).find((t) => t.title === "安卓离线任务").done);
+    await page.locator(".task-main", { hasText: "安卓离线任务" }).click();
+    await dialog().getByLabel("自定义颜色", { exact: true }).fill("#123456");
+    await dialog().getByLabel("不透明度").fill("50");
+    await save();
+    const rgbaTask = Object.values((await stored()).tasks).find((t) => t.title === "安卓离线任务");
+    assert.equal(rgbaTask.color, "#12345680");
+    await page.locator(".task-main", { hasText: "安卓离线任务" }).click();
+    await dialog().getByLabel("备注", { exact: true }).fill("只改备注，保留 RGBA");
+    await save();
+    assert.equal(Object.values((await stored()).tasks).find((t) => t.title === "安卓离线任务").color, "#12345680");
   });
   await check("discarding an edit does not save progress or text", async () => {
     await page.locator(".task-main", { hasText: "安卓离线任务" }).click();

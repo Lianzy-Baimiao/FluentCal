@@ -31,7 +31,7 @@ export component GanttView inherits Rectangle {
                 padding-left: 4px;
                 min-width: 84px;
                 horizontal-stretch: 0;
-                Text { text: GanttData.label; font-size: 12px; font-weight: 600; color: Theme.c.text-primary; vertical-alignment: center; }
+                Text { text: GanttData.label; font-size: 12px; font-weight: 600; color: Theme.desk.text-color; font-family: Theme.desk.font-family; vertical-alignment: center; }
             }
             Segmented {
                 horizontal-stretch: 0;
@@ -168,7 +168,7 @@ export component GanttView inherits Rectangle {
                         text: c.label;
                         font-size: 12px;
                         font-weight: 600;
-                        color: Theme.c.text-primary;
+                        color: Theme.desk.text-color;
                         vertical-alignment: center;
                     }
                 }
@@ -194,7 +194,7 @@ export component GanttView inherits Rectangle {
                         font-weight: c.today ? 600 : 400;
                         horizontal-alignment: center;
                         vertical-alignment: center;
-                        color: c.today ? Theme.c.text-on-accent : c.rest ? Theme.desk.holiday-text : Theme.c.text-secondary;
+                        color: c.today ? Theme.desk.today-text : c.rest ? Theme.desk.holiday-text : Theme.desk.text-secondary;
                     }
                 }
                 Rectangle { y: head - 1px; height: 1px; background: Theme.c.divider; }

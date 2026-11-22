@@ -1,13 +1,10 @@
 // Theme helpers: accent palette derivation, WCAG contrast, task colour palette.
+import { colorOpacity, compositeColor, normalizeRgba, opaqueColor, setColorOpacity } from '@/lib/rgba';
 
 type RGB = [number, number, number];
 
 export function normalizeHex(hex: string): string | null {
-  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return null;
-  let h = m[1];
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-  return `#${h.toUpperCase()}`;
+  return normalizeRgba(hex);
 }
 
 function toRgb(hex: string): RGB {
@@ -46,7 +43,7 @@ export function deriveAccent(hex: string): string[] {
   const down = [0.094, 0.311, 0.509];
   const lighter = up.map((t) => hslToRgb(h, s, l + (1 - l) * t)).map(toHex);
   const darker = down.map((t) => hslToRgb(h, s, l * (1 - t))).map(toHex);
-  return [...lighter, normalizeHex(hex) ?? '#0078D4', ...darker];
+  return [...lighter, opaqueColor(normalizeHex(hex) ?? '#0078D4'), ...darker];
 }
 
 function luminance(hex: string): number {
@@ -71,15 +68,30 @@ export function mix(a: string, b: string, t: number): string {
 
 /** `#RRGGBB` + alpha (0..1) → `#RRGGBBAA`. */
 export function withAlpha(hex: string, alpha: number): string {
-  const h = normalizeHex(hex) ?? '#000000';
+  const h = opaqueColor(normalizeHex(hex) ?? '#000000');
   return h + Math.round(Math.min(1, Math.max(0, alpha)) * 255).toString(16).padStart(2, '0').toUpperCase();
 }
 
-/** White unless it fails AA (4.5:1) and black reads better — matches Windows, which keeps
- *  white text on mid-tone accents such as #0078D4. */
-export function bestTextOn(fill: string): string {
+/** Fluent accent foreground: prefer AA white on mid-tone accents, otherwise use the better contrast. */
+export function bestTextOn(fill: string, background = '#FFFFFF'): string {
+  fill = compositeColor(fill, background);
   const white = contrast(fill, '#FFFFFF');
   return white >= 4.5 || white >= contrast(fill, '#000000') ? '#FFFFFF' : '#000000';
+}
+
+export function bestMonochromeText(fill: string): string {
+  const color = compositeColor(fill, '#FFFFFF');
+  return contrast(color, '#000000') >= contrast(color, '#FFFFFF') ? '#000000' : '#FFFFFF';
+}
+
+export function accentTextOn(text: string, background: string): string {
+  const base = opaqueColor(text);
+  const target = contrast(base, '#FFFFFF') >= contrast(base, '#000000') ? '#FFFFFF' : '#000000';
+  for (let step = 1; step <= 10; step++) {
+    const adjusted = mix(base, target, step / 10);
+    if (contrast(adjusted, background) >= 4.5) return adjusted;
+  }
+  return target;
 }
 
 export interface ThemeInput {
@@ -98,9 +110,21 @@ export function applyTheme(root: HTMLElement, t: ThemeInput): void {
   root.dataset.theme = t.dark ? 'dark' : 'light';
   root.style.colorScheme = t.dark ? 'dark' : 'light';
   ACCENT_VARS.forEach((name, i) => root.style.setProperty(`--accent-${name}`, palette[i]));
+  const opacity = t.palette?.length === 7 ? 1 : colorOpacity(t.accent);
+  const fill = palette[t.dark ? 1 : 4];
+  root.style.setProperty('--accent-fill', setColorOpacity(fill, opacity));
+  root.style.setProperty('--accent-fill-hover', setColorOpacity(fill, opacity * 0.9));
+  root.style.setProperty('--accent-fill-pressed', setColorOpacity(fill, opacity * 0.8));
+  root.style.setProperty('--attention', setColorOpacity(fill, opacity));
+  root.style.setProperty('--accent-alpha', String(opacity));
   // Light theme fills with dark1, dark theme with light2 (WinUI AccentFillColorDefault).
-  root.style.setProperty('--text-on-accent-light', bestTextOn(palette[4]));
-  root.style.setProperty('--text-on-accent-dark', bestTextOn(palette[1]));
+  root.style.setProperty('--text-on-accent-light', bestTextOn(setColorOpacity(palette[4], opacity), '#FFFFFF'));
+  root.style.setProperty('--text-on-accent-dark', bestTextOn(setColorOpacity(palette[1], opacity), '#202020'));
+  const accentText = accentTextOn(palette[t.dark ? 0 : 5], t.dark ? '#202020' : '#FFFFFF');
+  root.style.setProperty('--accent-text', accentText);
+  root.style.setProperty('--accent-text-secondary', accentTextOn(palette[t.dark ? 0 : 6], t.dark ? '#202020' : '#FFFFFF'));
+  root.style.setProperty('--accent-text-light', accentTextOn(palette[5], '#FFFFFF'));
+  root.style.setProperty('--accent-text-dark', accentTextOn(palette[0], '#202020'));
 }
 
 export interface TaskColor { key: string; label: string; bar: string; textLight: string; textDark: string }
@@ -129,9 +153,9 @@ export function taskColor(key: string | undefined, dark: boolean): { bar: string
     const hex = normalizeHex(key);
     if (hex) {
       const bg = dark ? '#202020' : '#FFFFFF';
-      let text = hex;
+      let text = opaqueColor(hex);
       for (let i = 1; i <= 10 && contrast(text, bg) < 4.5; i++) text = mix(hex, dark ? '#FFFFFF' : '#000000', i * 0.1);
-      return { bar: hex, text, onBar: bestTextOn(hex) };
+      return { bar: hex, text, onBar: bestTextOn(hex, bg) };
     }
   }
   return {
@@ -139,6 +163,14 @@ export function taskColor(key: string | undefined, dark: boolean): { bar: string
     text: 'var(--text-primary)',
     onBar: 'var(--text-on-accent)',
   };
+}
+
+export function progressShade(hex: string): string {
+  const match = normalizeHex(hex);
+  if (!match) return hex;
+  const channels = match.slice(1).match(/.{2}/g) ?? [];
+  const rgb = channels.slice(0, 3).map(c => Math.round(parseInt(c, 16) * 0.78).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return `#${rgb}${channels.length === 4 ? channels[3] : ''}`;
 }
 
 /** The 48 Windows 11 accent colours, in Settings order. */

@@ -9,7 +9,7 @@ import { now } from '@/composables/now';
 import { jumpTo } from './state';
 
 const expanded = ref(false);
-const items = computed(() => countdowns(taskList.value.map(t => t.groupId && !doc.groups[t.groupId] ? { ...t, groupId: undefined } : t), now.value, doc.settings.calendar.holidayCountdown, doc.settings.calendar.countdownMarked, doc.settings.calendar.countdownGroups)
+const items = computed(() => countdowns(taskList.value.map(t => t.groupId && !doc.groups[t.groupId] ? { ...t, groupId: undefined } : t), now.value, doc.settings.calendar.holidayCountdown, doc.settings.calendar.countdownMarked, doc.settings.calendar.countdownGroups, doc.settings.calendar.countdownFestival, doc.settings.calendar.countdownTerm)
   .map(c => ({ ...c, label: c.taskId ? c.label : tr(c.label) })));
 </script>
 
@@ -40,27 +40,27 @@ const items = computed(() => countdowns(taskList.value.map(t => t.groupId && !do
   border: 0;
   border-radius: 11px;
   background: var(--cell-bg);
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   font: inherit;
   font-size: calc(12px * var(--fs));
   white-space: nowrap;
-  text-shadow: var(--text-glow);
+  text-shadow: var(--calendar-outline);
   cursor: pointer;
 }
 .countdown.expanded { flex-wrap: wrap; height: auto; max-height: 180px; overflow-y: auto; }
 .cd:hover {
   background: var(--subtle-fill-hover);
-  color: var(--text-primary);
+  color: var(--calendar-text);
 }
 .cd b {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--calendar-text);
   margin: 0 2px;
 }
 .cd em {
   font-style: normal;
   font-weight: 700;
-  color: var(--accent-text);
+  color: var(--calendar-text);
   font-variant-numeric: tabular-nums;
 }
 </style>

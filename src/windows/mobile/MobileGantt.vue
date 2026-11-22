@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { taskColor } from "@/fluent/theme";
+import { accentTextOn, taskColor } from "@/fluent/theme";
 import { addDays, diffDays, parts } from "@/lib/date";
 import { buildRows } from "@/lib/gantt";
 import { flexKind, openMonth } from "@/lib/flex";
@@ -197,7 +197,10 @@ const links = computed(() => {
                   :class="{ milestone: r.task.milestone }"
                   :style="{
                     ...bar(span(r.task).start, span(r.task).end),
-                    '--bar': taskColor(r.task.color, isDark).bar,
+                    '--bar': taskColor(r.task.color || (r.task.groupId ? doc.groups[r.task.groupId]?.color : undefined), isDark).bar,
+                    '--p': `${r.task.done ? 100 : r.task.progress}%`,
+                    '--on-bar': taskColor(r.task.color || (r.task.groupId ? doc.groups[r.task.groupId]?.color : undefined), isDark).onBar,
+                    '--today-fg': accentTextOn('var(--accent-fill)', 'var(--solid-base)'),
                   }"
                   :aria-label="`编辑 ${r.task.title}`"
                   @click="emit('edit', r.task)"
@@ -206,6 +209,7 @@ const links = computed(() => {
                     class="fill"
                     :style="{
                       width: `${r.task.done ? 100 : r.task.progress}%`,
+                      background: 'color-mix(in srgb, var(--bar) 78%, black)',
                     }"
                   /><span class="bar-title">{{
                     r.task.milestone ? "◆" : r.task.title
@@ -379,13 +383,12 @@ const links = computed(() => {
   white-space: nowrap;
   padding: 0 6px;
   font-size: 11px;
-  color: #fff;
-  text-shadow: 0 1px 2px #000;
+  color: var(--on-bar);
 }
 .fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #0003;
+  background: transparent;
 }
 .bar.milestone {
   background: transparent;

@@ -31,6 +31,7 @@ pub struct Popups {
     pub menu_target: Option<Target>,
     /// … and where: what an entry opens next (修改完成日期's calendar) opens there too.
     pub menu_at: Option<At>,
+    pub color_target: Option<Target>,
     /// 修改完成日期 is open on this task and occurrence.
     pub done_day: Option<(String, String)>,
     /// Runs on the confirmation's primary button.
@@ -49,6 +50,33 @@ pub struct Popups {
 }
 
 impl App {
+    pub fn desk_color_open(&mut self, target: Target) {
+        let value = match &target {
+            Target::Task(id, _) => self.doc.tasks.get(id).and_then(|t|t.color.clone()),
+            Target::Day(date) => self.doc.day_marks.get(date).cloned(),
+            Target::Group(id) => self.doc.groups.get(id).map(|g|g.color.clone()),
+            _ => return,
+        };
+        let using_default_accent = value.as_deref().is_none_or(str::is_empty);
+        let value = value.as_deref().unwrap_or("");
+        let hex = fluentcal_core::theme::TASK_COLORS.iter().find(|c|c.key==value).map(|c|c.bar.to_owned())
+            .or_else(||fluentcal_core::color::normalize_hex(value)).unwrap_or_else(||self.tokens.accent_fill.to_hex_alpha());
+        self.desk.popups.color_target = Some(target);
+        self.desk.window.set_custom_color_default_accent(using_default_accent);
+        self.desk.window.set_custom_color_original(hex.clone().into());
+        self.desk.window.set_custom_color_draft(hex.into());
+        self.desk_wants_keyboard();
+        self.desk.window.invoke_open_custom_color();
+    }
+
+    pub fn desk_color_commit(&mut self, default_accent: bool, value: &str) {
+        let Some(color)=fluentcal_core::color::normalize_hex(value) else{return};
+        let Some(target)=self.desk.popups.color_target.take() else{return};
+        let prefix=match &target {Target::Task(..)=>"color:",Target::Day(..)=>"mark:",Target::Group(..)=>"groupColor:",_=>return};
+        let committed = if color.len() == 9 && color.ends_with("FF") && default_accent { color[..7].to_owned() } else { color };
+        self.menu_act(&target,&format!("{prefix}{committed}"));
+    }
+
     /// Shows the menu for `target` and runs the chosen entry (0.2's showMenu).
     pub fn show_menu(&mut self, target: Target, at: At) {
         if self.desk.window.get_read_only() {

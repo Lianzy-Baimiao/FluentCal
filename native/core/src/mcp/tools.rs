@@ -112,7 +112,7 @@ fn task_fields(update: bool) -> Map<String, Value> {
         "time": { "type": "string", "description": format!("Time of day, HH:MM (24-hour). Leave out for a task that lasts all day.{}", clear("makes it all day")) },
         "notes": { "type": "string", "description": format!("Free text.{}", clear("removes the notes")) },
         "color": { "type": "string", "description": format!(
-            "One of {}, or #RRGGBB. Default: the user's default colour.{}",
+            "One of {}, or #RGB[A] / #RRGGBB[AA]. Default: the user's default colour.{}",
             TASK_COLORS.iter().map(|c| c.key).collect::<Vec<_>>().join(", "),
             clear("removes the colour")
         ) },
@@ -259,7 +259,7 @@ pub fn list() -> Value {
             "Adds a group (a project) tasks can be put in. When a group of that name exists already, the answer is that group.",
             object(json!({
                 "name": { "type": "string", "description": "The group's name." },
-                "color": { "type": "string", "description": format!("One of {}, or #RRGGBB. Default: the next colour of the palette.", TASK_COLORS.iter().map(|c| c.key).collect::<Vec<_>>().join(", ")) }
+                "color": { "type": "string", "description": format!("One of {}, or #RGB[A] / #RRGGBB[AA]. Default: the next colour of the palette.", TASK_COLORS.iter().map(|c| c.key).collect::<Vec<_>>().join(", ")) }
             }), &["name"]),
             changes(false, true)
         )
@@ -367,7 +367,7 @@ fn title_of(v: &Value) -> Result<String, String> {
     Ok(s)
 }
 
-/// A palette key or #RRGGBB; "" is none.
+/// A palette key or #RRGGBB[AA]; "" is none.
 fn color_of(v: &Value) -> Result<Option<String>, String> {
     let s = v.as_str().map(str::trim).ok_or_else(|| format!("\"color\" must be a string, got {v}"))?;
     if s.is_empty() {
@@ -379,8 +379,8 @@ fn color_of(v: &Value) -> Result<Option<String>, String> {
         return Ok(Some(c.key.to_owned()));
     }
     match s.strip_prefix('#') {
-        Some(hex) if hex.len() == 6 && hex.bytes().all(|b| b.is_ascii_hexdigit()) => Ok(Some(format!("#{}", hex.to_ascii_uppercase()))),
-        _ => Err(format!("\"color\" must be one of {}, or #RRGGBB; got \"{s}\"", TASK_COLORS.iter().map(|c| c.key).collect::<Vec<_>>().join(", "))),
+        Some(_) if crate::color::is_hex(s) => Ok(crate::color::normalize_hex(s)),
+        _ => Err(format!("\"color\" must be one of {}, or #RGB[A] / #RRGGBB[AA]; got \"{s}\"", TASK_COLORS.iter().map(|c| c.key).collect::<Vec<_>>().join(", "))),
     }
 }
 

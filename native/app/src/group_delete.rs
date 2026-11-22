@@ -6,7 +6,7 @@
 //! of the desk's undo history, wherever it was made.
 
 use crate::app::{run, App};
-use crate::{GroupDelete, GroupPick, Severity};
+use crate::{GroupDelete, GroupPick, Severity, UngroupedPick};
 use fluentcal_core::i18n::{tr, trf};
 use fluentcal_core::tasks::{self, Doc};
 use fluentcal_core::theme::{task_color, Tokens};
@@ -37,6 +37,7 @@ impl Picks {
 /// What the dialog shows.
 pub struct View {
     pub rows: Vec<GroupPick>,
+    pub ungrouped: UngroupedPick,
     pub title: String,
     pub can_delete: bool,
     pub with_tasks_label: String,
@@ -62,6 +63,12 @@ pub fn view(doc: &Doc, picks: &mut Picks, t: &Tokens) -> View {
             }
         })
         .collect();
+    let ungrouped_count = doc.tasks.values().filter(|t| t.group_id.as_deref().is_none_or(|id| !doc.groups.contains_key(id))).count();
+    let ungrouped = UngroupedPick {
+        name: tr("未分组").into(),
+        color: crate::theme::color(fluentcal_core::theme::Rgba::hex("#767676")),
+        desc: trf("{0} 个任务", &[ungrouped_count.to_string()]).into(),
+    };
     let title = match picks.checked.as_slice() {
         [] => tr("删除分组").to_owned(),
         [one] => trf("删除分组“{0}”？", &[doc.groups[one].name.clone()]),
@@ -70,7 +77,7 @@ pub fn view(doc: &Doc, picks: &mut Picks, t: &Tokens) -> View {
     let n = tasks::tasks_in_groups(doc, &picks.checked);
     let with_tasks_label = if n > 0 { trf("同时删除分组里的任务（{0} 个）", &[n.to_string()]) } else { String::new() };
     let note = if n > 0 && !picks.with_tasks { tr("所选分组里的任务会移到“未分组”，不会被删除。").to_owned() } else { String::new() };
-    View { rows, title, can_delete: !picks.checked.is_empty(), with_tasks_label, note }
+    View { rows, ungrouped, title, can_delete: !picks.checked.is_empty(), with_tasks_label, note }
 }
 
 /// Shows `view` in the window's GroupDelete global; rows are rewritten in place, so a ticked
@@ -84,6 +91,7 @@ where
     let g = window.global::<GroupDelete>();
     g.set_title(v.title.into());
     g.set_can_delete(v.can_delete);
+    g.set_ungrouped(v.ungrouped.into());
     g.set_with_tasks(picks.with_tasks);
     g.set_with_tasks_label(v.with_tasks_label.into());
     g.set_note(v.note.into());

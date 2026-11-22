@@ -106,6 +106,12 @@ fn settings_reach_data_json_and_the_pages() {
     t.g().invoke_set_bool("desk.locked".into(), false);
     t.g().invoke_set_str("theme.mode".into(), "dark".into());
     t.g().invoke_set_num("desk.bgOpacity".into(), 40.0);
+    t.g().invoke_set_str("desk.todayStyle".into(), "fill".into());
+    t.g().invoke_set_num("desk.todayOpacity".into(), 22.0);
+    t.g().invoke_set_str("desk.fontFamily".into(), "yahei-ui".into());
+    t.g().invoke_set_str("desk.textColor".into(), "#CC0066".into());
+    t.g().invoke_set_str("desk.taskTextMode".into(), "task".into());
+    t.g().invoke_set_num("desk.textOutlineWidth".into(), 2.5);
     t.g().invoke_set_num("calendar.weekStart".into(), 0.0);
     t.g().invoke_set_rest_day(5, true);
     t.g().invoke_action_arg("preset".into(), "glass".into());
@@ -115,10 +121,22 @@ fn settings_reach_data_json_and_the_pages() {
     assert_eq!(s["calendar"]["weekStart"], json!(0));
     assert_eq!(s["calendar"]["restDays"], json!([0, 5, 6]));
     assert_eq!(s["desk"]["bgOpacity"], json!(18), "the preset comes last");
+    assert_eq!(s["desk"]["todayStyle"], "fill");
+    assert_eq!(s["desk"]["todayOpacity"], 22);
+    assert_eq!(s["desk"]["fontFamily"], "yahei-ui");
+    assert_eq!(s["desk"]["textColor"], "#CC0066");
+    assert_eq!(s["desk"]["taskTextMode"], "task");
+    assert_eq!(s["desk"]["textOutlineWidth"], 2.5);
     // the pages show the new state
     assert!(!t.g().get_general().locked);
     assert_eq!(t.g().get_appearance().preset, "glass");
     assert_eq!(t.g().get_appearance().mode, "dark");
+    assert_eq!(t.g().get_appearance().today_style, "fill");
+    assert_eq!(t.g().get_appearance().today_opacity, 22.0);
+    assert_eq!(t.g().get_appearance().font_family, "yahei-ui");
+    assert_eq!(t.g().get_appearance().text_color, "#CC0066");
+    assert_eq!(t.g().get_appearance().task_text_mode, "task");
+    assert_eq!(t.g().get_appearance().text_outline_width, 2.5);
     // follow the Windows accent off: a fixed colour
     t.g().invoke_set_bool("follow-accent".into(), false);
     assert!(t.saved()["settings"]["theme"]["accent"].as_str().unwrap().starts_with('#'));
@@ -131,8 +149,20 @@ fn settings_reach_data_json_and_the_pages() {
 }
 
 #[test]
+fn group_management_has_one_settings_entry() {
+    let t = start("group-page-entry", Some(doc_with(json!({}))), "gantt");
+    use i_slint_backend_testing::{AccessibleRole, ElementHandle};
+    let groups_page = || ElementHandle::find_by_accessible_label(&t.w, "新建分组").filter(|e| e.accessible_role() == Some(AccessibleRole::Groupbox)).count();
+    assert!(ElementHandle::find_by_accessible_label(&t.w, "默认时间刻度").next().is_some());
+    assert_eq!(groups_page(), 0, "Gantt options page does not duplicate group management");
+    ElementHandle::find_by_accessible_label(&t.w, "分组").find(|e| e.accessible_role() == Some(AccessibleRole::Tab)).unwrap().invoke_accessible_default_action();
+    settle();
+    assert_eq!(groups_page(), 1, "the dedicated Groups page is the single management entry");
+}
+
+#[test]
 fn groups_reminders_and_sample_data() {
-    let t = start("groups", None, "gantt");
+    let t = start("groups", None, "groups");
     // first start: sample tasks and groups
     assert!(t.g().get_data().samples > 0);
     let n0 = t.g().get_groups().row_count();

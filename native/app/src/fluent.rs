@@ -22,12 +22,14 @@ where
     g.on_hsv(|hex| {
         let (h,s,v) = fluentcal_core::color::hex_to_hsv(&hex);
         let (r,g,b) = fluentcal_core::color::hex_to_rgb(&hex);
-        crate::HsvData { h:h as f32, s:s as f32, v:v as f32, r:r as f32, g:g as f32, b:b as f32 }
+        crate::HsvData { h: h as f32, s: s as f32, v: v as f32, r: r as f32, g: g as f32, b: b as f32 }
     });
     g.on_hsv_hex(|h,s,v| fluentcal_core::color::hsv_to_hex(h as f64,s as f64,v as f64).into());
     g.on_rgb_hex(|r,g,b| fluentcal_core::color::rgb_to_hex(r as f64,g as f64,b as f64).into());
+    g.on_alpha(|hex| fluentcal_core::theme::Rgba::parse(&hex).map_or(100.0, |c| (c.a * 100.0) as f32));
+    g.on_with_alpha(|hex, alpha| fluentcal_core::color::with_alpha(&hex, f64::from(alpha) / 100.0).into());
     g.on_selected_hex(|value, colors| {
-        colors.iter().find(|c| c.key == value).map(|c| fluentcal_core::color::rgb_to_hex(c.color.red() as f64,c.color.green() as f64,c.color.blue() as f64))
+        colors.iter().find(|c| c.key == value).map(|c| fluentcal_core::theme::Rgba::new(c.color.red() as f64,c.color.green() as f64,c.color.blue() as f64,c.color.alpha() as f64/255.0).to_hex_alpha())
             .or_else(|| normalize_hex(&value)).unwrap_or_else(|| "#0078D4".into()).into()
     });
     g.on_days_between(|a, b| if fluentcal_core::date::is_iso_date(&a) && fluentcal_core::date::is_iso_date(&b) { fluentcal_core::date::diff_days(&a, &b) } else { -1 });
@@ -48,9 +50,9 @@ where
     g.on_time_minutes(|t| parse_time(&t).map_or(-1, |s| minutes_of(&s)));
     g.on_trim(|t| t.trim().into());
     g.on_normalize_hex(|t| normalize_hex(&t).unwrap_or_default().into());
-    g.on_text_on(|t| {
+    g.on_text_on(|t, surface| {
         let c = normalize_hex(&t).and_then(|h| fluentcal_core::theme::Rgba::parse(&h)).unwrap_or(fluentcal_core::theme::BLACK);
-        crate::theme::color(fluentcal_core::theme::best_text_on(c))
+        crate::theme::color(fluentcal_core::theme::best_text_on_over(c,fluentcal_core::theme::Rgba::new(surface.red() as f64,surface.green() as f64,surface.blue() as f64,1.0)))
     });
     g.on_custom_value(|v, list: ModelRc<Swatch>| {
         if v.is_empty() || list.iter().any(|s| s.key == v) {
@@ -90,12 +92,7 @@ where
 
 /// theme.ts normalizeHex: "#abc" / "0078d4" → "#AABBCC".
 pub fn normalize_hex(s: &str) -> Option<String> {
-    let h = s.trim().trim_start_matches('#');
-    if !(h.len() == 3 || h.len() == 6) || !h.chars().all(|c| c.is_ascii_hexdigit()) {
-        return None;
-    }
-    let full: String = if h.len() == 3 { h.chars().flat_map(|c| [c, c]).collect() } else { h.to_owned() };
-    Some(format!("#{}", full.to_ascii_uppercase()))
+    fluentcal_core::color::normalize_hex(s)
 }
 
 fn strings(v: Vec<String>) -> ModelRc<SharedString> {

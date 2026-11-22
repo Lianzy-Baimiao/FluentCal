@@ -4,6 +4,7 @@ use crate::app::{run, with};
 use crate::DeskWindow;
 
 pub fn wire(w: &DeskWindow) {
+    w.on_custom_color_commit(|default_accent, value|run(move|a|a.desk_color_commit(default_accent, &value)));
     // the calendar of 修改完成日期 (its date helpers, lunar days and 休/班)
     crate::fluent::install(w, "", Some(std::rc::Rc::new(crate::windows::editor::day_labels)));
     super::gantt::keys::wire(w);
@@ -25,7 +26,13 @@ pub fn wire(w: &DeskWindow) {
     w.on_jump(|d| run(move |a| a.desk_jump(&d)));
     w.on_locate(|id, d| run(move |a| a.desk_locate(&id, &d)));
     w.on_countdown_filter(|x, y, bw, bh| run(move |a| a.desk_countdown_filter_open(super::popups::At::Below(x, y, bw, bh))));
-    w.on_countdown_source(|key, value| run(move |a| a.patch_settings(serde_json::json!({ "calendar": { key.as_str(): value } }))));
+    w.on_countdown_source(|key, value| run(move |a| {
+        if key == "countdownMarked" {
+            a.patch_settings(serde_json::json!({ "calendar": { "countdownMarked": !a.doc.settings.calendar.countdown_marked } }));
+        } else {
+            a.patch_settings(serde_json::json!({ "calendar": { key.as_str(): value } }));
+        }
+    }));
     w.on_chip_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
     w.on_chip_open(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
     w.on_chip_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));

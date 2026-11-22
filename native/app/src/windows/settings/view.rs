@@ -271,10 +271,16 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         radius: d.radius as f32,
         shadow: d.shadow,
         text_shadow: s(&d.text_shadow),
+        font_family: s(&d.font_family),
+        text_color: auto(&d.text_color, "auto"),
+        task_text_mode: s(if d.task_text_mode == "task" { "task" } else { "calendar" }),
+        text_outline_width: d.text_outline_width.clamp(0.0, 4.0) as f32,
         font_scale: d.font_scale as f32,
         cell_gap: d.cell_gap as f32,
         line_spacing: d.line_spacing as f32,
         today_color: auto(&d.today_color, "accent"),
+        today_style: s(if d.today_style == "fill" { "fill" } else { "outline" }),
+        today_opacity: d.today_opacity.clamp(0.0, 100.0) as f32,
         rest_color: auto(&d.rest_bg_color, "auto"),
         holiday_color: auto(&d.holiday_text_color, "auto"),
         term_color: auto(&d.term_text_color, "auto"),
@@ -289,6 +295,7 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         fit_rows: c.fit_rows,
         list_group_labels: c.list_group_labels,
         countdown_marked: c.countdown_marked,
+        countdown_groups: model(c.countdown_groups.iter().map(|id| s(id)).collect()),
         bar_days: c.bar_days,
         bar_progress: c.bar_progress,
         bar_done: c.bar_done,
@@ -301,6 +308,8 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
         show_week_numbers: c.show_week_numbers,
         show_almanac: c.show_almanac,
         holiday_countdown: c.holiday_countdown,
+        countdown_festival: c.countdown_festival,
+        countdown_term: c.countdown_term,
         rest_days: model((0..7).map(|i| c.rest_days.contains(&i)).collect()),
         show_completed: st.tasks.show_completed,
         completed_last: st.tasks.completed_last,
@@ -424,10 +433,11 @@ pub fn push(w: &SettingsWindow, doc: &Doc, info: &Info, local: &Local) {
 
     let groups: Vec<SGroup> = fluentcal_core::groups::summaries(doc)
         .into_iter()
-        .map(|gr| SGroup { countdown: c.countdown_groups.contains(&gr.id), id: s(&gr.id), name: s(&gr.name), color: s(gr.color.as_deref().unwrap_or("")), desc: s(&trf("{0} 个任务", &[gr.count.to_string()])) })
+        .map(|gr| SGroup { countdown: c.countdown_groups.contains(&gr.id), id: s(&gr.id), name: s(&gr.name), color: s(gr.color.as_deref().or_else(|| (!c.ungrouped_color.is_empty()).then_some(c.ungrouped_color.as_str())).unwrap_or("")), desc: s(&trf("{0} 个任务", &[gr.count.to_string()])) })
         .collect();
     update(g.get_groups(), groups, |m| g.set_groups(m));
-
+    g.set_ungrouped_color(s(&c.ungrouped_color));
+    g.set_ungrouped_count(s(&trf("{0} 个任务", &[fluentcal_core::groups::summaries(doc)[0].count.to_string()])));
     g.set_msg(match &local.msg {
         Some((sev, title, text)) => SMsg { shown: true, severity: *sev, title: s(title), text: s(text) },
         None => SMsg { shown: false, severity: Severity::Info, title: s(""), text: s("") },

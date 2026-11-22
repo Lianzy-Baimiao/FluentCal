@@ -67,7 +67,7 @@ pub fn wire(w: &EditorWindow, to: Rc<dyn Fn(Msg)>) {
 }
 
 fn options(list: &[Option_]) -> Vec<SelectOption> {
-    list.iter().map(|o| SelectOption { value: o.value.clone().into(), label: o.label.clone().into(), ..Default::default() }).collect()
+    list.iter().map(|o| SelectOption { value: o.value.clone().into(), label: o.label.clone().into(), detail: o.detail.clone().unwrap_or_default().into(), has_dot: o.color.is_some(), ..Default::default() }).collect()
 }
 
 /// What doesn't change while the window is open: the repeat choices and the colour palette.
@@ -151,8 +151,14 @@ pub fn push(w: &EditorWindow, ed: &Editor, doc: &Doc, today: &str, t: &Tokens, t
     for row in &mut groups {
         if let Some(g) = summaries.iter().find(|g| g.id == row.value.as_str()) {
             row.detail = g.count.to_string().into();
-            row.has_dot = g.color.is_some();
-            row.dot_color = color(task_color(g.color.as_deref(), t).bar);
+            let group_color = g.color.as_deref().or_else(|| (!doc.settings.calendar.ungrouped_color.is_empty()).then_some(doc.settings.calendar.ungrouped_color.as_str()));
+            row.has_dot = group_color.is_some();
+            row.dot_color = color(task_color(group_color, t).bar);
+        } else if row.value.is_empty() {
+            let ungrouped = &summaries[0];
+            row.detail = ungrouped.count.to_string().into();
+            row.has_dot = !doc.settings.calendar.ungrouped_color.is_empty();
+            row.dot_color = color(task_color(Some(if row.has_dot { &doc.settings.calendar.ungrouped_color } else { "gray" }), t).bar);
         }
     }
     sync::rows(&w.get_groups(), groups, |m| w.set_groups(m));

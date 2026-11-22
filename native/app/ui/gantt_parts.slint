@@ -21,7 +21,7 @@ export component GBarItem {
     accessible-label: b.title;
     accessible-description: b.tip;
     accessible-item-selected: sel;
-    if !b.done: BoxShadow { width: parent.width; height: parent.height; shadow: GanttData.bar-shadow; }
+    if !b.done: BoxShadow { width: parent.width; height: parent.height; shadow: GanttData.bar-shadow; opacity: b.bar.alpha / 255; }
     if sel: Rectangle {
         x: -3px;
         y: -3px;
@@ -33,13 +33,19 @@ export component GBarItem {
     }
     body := Rectangle {
         border-radius: 4px;
-        background: b.rep ? b.bar.transparentize(0.2) : b.bar;
+        clip: true;
+        background: transparent;
         opacity: b.done ? 0.55 : 1;
-        Rectangle {
-            x: 0;
+        if !b.rep && b.progress > 0: Rectangle {
             width: parent.width * b.progress / 100;
-            border-radius: 4px;
-            background: #00000038;
+            height: parent.height;
+            background: b.bar;
+        }
+        if !b.rep && b.progress < 100: Rectangle {
+            x: parent.width * b.progress / 100;
+            width: parent.width * (100 - b.progress) / 100;
+            height: parent.height;
+            background: b.bar;
         }
         if b.rep: Rectangle { border-radius: 4px; border-width: 1px; border-color: b.rep-outline; }
         if b.inside: Text {
@@ -177,7 +183,7 @@ export component GMilestone {
     }
     Rectangle {
         opacity: b.done ? 0.55 : 1;
-        Path { y: 1px; width: 22px; height: 22px; viewbox-width: 22; viewbox-height: 22; fill: #00000024;
+        Path { y: 1px; width: 22px; height: 22px; viewbox-width: 22; viewbox-height: 22; fill: b.bar.with_alpha(1.0).transparentize(0.86).with_alpha(b.bar.alpha / 255);
             commands: "M9.59 2.51 Q11 1.1 12.41 2.51 L19.49 9.59 Q20.9 11 19.49 12.41 L12.41 19.49 Q11 20.9 9.59 19.49 L2.51 12.41 Q1.1 11 2.51 9.59 Z"; }
         Path { width: 22px; height: 22px; viewbox-width: 22; viewbox-height: 22; fill: b.bar;
             commands: "M9.59 2.51 Q11 1.1 12.41 2.51 L19.49 9.59 Q20.9 11 19.49 12.41 L12.41 19.49 Q11 20.9 9.59 19.49 L2.51 12.41 Q1.1 11 2.51 9.59 Z"; }
@@ -221,7 +227,7 @@ export component GSummaryItem {
     y: s.row * rh + 11px;
     width: s.w;
     height: 10px;
-    Rectangle { border-radius: 2px; background: s.color.transparentize(0.65); }
+    Rectangle { border-radius: 2px; background: s.color; }
     Rectangle {
         x: 0;
         width: parent.width * s.progress / 100;

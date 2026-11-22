@@ -28,12 +28,18 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Optio
     w.set_view(c.view.clone().into());
     w.set_locked(doc.settings.desk.locked);
     w.set_title_text(vm::view_title(doc, ui, today).into());
+    w.set_countdown_marked(c.countdown_marked);
+    w.set_countdown_holiday(c.holiday_countdown);
+    w.set_countdown_festival(c.countdown_festival);
+    w.set_countdown_term(c.countdown_term);
+    w.set_list_group_labels(doc.settings.calendar.list_group_labels);
     w.set_today_tip(vm::today_tip(today).into());
     w.set_heads(vm::weekday_heads(doc));
     w.set_show_week_no(c.show_week_numbers);
     w.set_selected(ui.selected.clone().into());
     w.set_flash_date(ui.flash.clone().into());
     w.set_flash_end(ui.flash_end.clone().into());
+    w.set_flash_phase(false);
     w.set_flash_task(ui.flash_task.clone().into());
     w.global::<crate::ChipKeys>().set_located_task(ui.flash_task.clone().into());
     push_weeks(w, doc, ui, today, room, t);
@@ -139,6 +145,7 @@ impl Desk {
                 w.set_flash_date(s("date").into());
                 w.set_flash_end(s("end").into());
                 w.set_flash_task(s("task").into());
+                w.set_flash_phase(false);
             }
             "dayList" => {
                 let (title, lunar, chips) = overlays::day_list(&self.doc, &self.ui, &s("date"), &self.today, &self.tokens);

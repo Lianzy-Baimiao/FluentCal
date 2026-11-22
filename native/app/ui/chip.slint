@@ -68,10 +68,10 @@ export component TaskChip inherits Rectangle {
     // 1 inside a popup (the day list): its tooltip draws on the popup's layer.
     in property <int> tip-layer;
     property <int> tip-token: -1;
-    property <bool> glow: Theme.desk.glow && !bar && !plain;
+    property <bool> glow: Theme.desk.outline-on && !bar && !plain;
     property <bool> bar: chip.multi-day;
     property <bool> hover: ta.has-hover;
-    property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.c.text-primary : chip.text;
+    property <color> fg: bar && !chip.done ? chip.on-bar : bar ? Theme.desk.text-color : chip.text;
     property <bool> link: chip.linked && !bar;
     property <length> l-radius: chip.cont-left || (link && chip.join-left) ? 0 : 4px;
     property <length> r-radius: chip.cont-right || (link && chip.join-right) ? 0 : 4px;
@@ -79,10 +79,11 @@ export component TaskChip inherits Rectangle {
     border-bottom-left-radius: l-radius;
     border-top-right-radius: r-radius;
     border-bottom-right-radius: r-radius;
-    background: bar && chip.done ? chip.bar.transparentize(0.68)
+    property <color> fill-color: bar && chip.done ? chip.bar.transparentize(0.68)
         : bar ? (hover ? chip.bar-hover : chip.bar)
         : link ? chip.bar.transparentize(chip.done ? 0.86 : hover ? 0.66 : 0.76)
         : hover ? Theme.c.subtle-fill-hover : transparent;
+    background: bar ? (chip.done ? chip.bar.with_alpha(1.0).transparentize(0.68).with_alpha(chip.bar.alpha / 255) : transparent) : fill-color;
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
     opacity: dragging ? 0.35 : 1;
     clip: true;
@@ -91,14 +92,29 @@ export component TaskChip inherits Rectangle {
     if ChipKeys.located-task != "" && ChipKeys.located-task == root.chip.task-id: Rectangle {
         border-width: 2px; border-color: Theme.c.accent-fill; border-radius: 4px;
     }
+    if bar && !chip.done && chip.fill > 0: Rectangle {
+        width: parent.width * chip.fill;
+        height: parent.height;
+        background: chip.bar;
+        border-top-left-radius: root.l-radius;
+        border-bottom-left-radius: root.l-radius;
+    }
+    if bar && !chip.done && chip.fill < 1: Rectangle {
+        x: parent.width * chip.fill;
+        width: parent.width * (1 - chip.fill);
+        height: parent.height;
+        background: hover ? chip.bar-hover : chip.bar;
+        border-top-right-radius: root.r-radius;
+        border-bottom-right-radius: root.r-radius;
+    }
+    if bar && chip.done: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: chip.bar.with_alpha(1.0).transparentize(0.68).with_alpha(chip.bar.alpha / 255);
+        border-radius: 4px;
+    }
     // A tab stop (0.2: tabindex 0): Enter opens, Space toggles, Delete deletes, the menu key /
     // Shift+F10 opens the menu; other keys go on to the calendar.
-    // the done part of a bar, darker (as in the Gantt chart)
-    if bar && chip.fill > 0: Rectangle {
-        x: 0;
-        width: parent.width * chip.fill;
-        background: #00000038;
-    }
     kfs := FocusScope {
         focus-on-click: false;
         changed has-focus => {

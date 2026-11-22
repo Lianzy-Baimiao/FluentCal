@@ -440,7 +440,6 @@ export struct ChangeRowData { id: int, text: string, when: string, undone: bool 
 // 按分组筛选 (GitHub #14): a group (or 未分组, id "") with its colour, how many tasks it has, and
 // whether the calendar shows it.
 export struct FilterRowData { id: string, name: string, color: color, dot: bool, checked: bool, count: string }
-
 // A choice: the whole row ticks the box (the box is the accessible element).
 component FilterRow inherits Rectangle {
     in property <string> name;
@@ -494,11 +493,13 @@ export component GroupFilterPanel inherits VerticalLayout {
     in property <bool> countdown-mode;
     in property <bool> marked;
     in property <bool> holiday;
+    in property <bool> festival;
+    in property <bool> term;
     callback source(string, bool);
     in property <[FilterRowData]> rows;
+    in property <string> all-count;
     // nothing is filtered
     in property <bool> all;
-    in property <string> all-count;
     // said under the list while there are no groups
     in property <string> hint;
     callback toggle(string, bool);
@@ -525,14 +526,17 @@ export component GroupFilterPanel inherits VerticalLayout {
         toggled(v) => { root.clear(); }
     }
     if root.countdown-mode: FilterRow { name: @tr("手工标记的倒数日"); checked: root.marked; toggled(v) => { root.source("countdownMarked", v); } }
-    if root.countdown-mode: FilterRow { name: @tr("下一个法定假期"); checked: root.holiday; toggled(v) => { root.source("holidayCountdown", v); } }
-    Rectangle { height: 1px; background: Theme.c.divider; }
+    if root.countdown-mode: FilterRow { name: @tr("法定假期"); checked: root.holiday; toggled(v) => { root.source("holidayCountdown", v); } }
+    if root.countdown-mode: FilterRow { name: @tr("普通节日"); checked: root.festival; toggled(v) => { root.source("countdownFestival", v); } }
+    if root.countdown-mode: FilterRow { name: @tr("节气"); checked: root.term; toggled(v) => { root.source("countdownTerm", v); } }
+    Rectangle { visible: !root.countdown-mode; height: 1px; background: Theme.c.divider; }
     Flickable {
         // eight and a half show: a cut row says the list scrolls (less in a low window)
         height: min(root.list-h, 272px, max(64px, Overlay.win-h - 200px));
         content-height: root.list-h;
         mouse-drag-pan-enabled: false;
         for r[i] in root.rows: FilterRow {
+            visible: true;
             y: i * 32px;
             width: parent.width;
             name: r.name;
@@ -554,8 +558,8 @@ export component GroupFilterPanel inherits VerticalLayout {
             color: Theme.c.text-tertiary;
         }
     }
-    Rectangle { height: 1px; background: Theme.c.divider; }
-    HorizontalLayout {
+    Rectangle { visible: !root.countdown-mode; height: 1px; background: Theme.c.divider; }
+    if !root.countdown-mode: HorizontalLayout {
         alignment: start;
         Button {
             variant: ButtonVariant.subtle;

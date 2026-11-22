@@ -221,7 +221,7 @@ component SideAdd inherits Rectangle {
         height: parent.height;
         text: @tr("＋ 添加");
         font-size: 12px * fs;
-        color: Theme.c.text-tertiary;
+                color: Theme.desk.text-tertiary;
         overflow: elide;
     }
     ata := TouchArea {
@@ -240,7 +240,7 @@ component SideAdd inherits Rectangle {
             height: parent.height;
             text: @tr("回车保存");
             font-size: 12px * fs;
-            color: Theme.c.text-tertiary;
+            color: Theme.desk.text-tertiary;
             vertical-alignment: center;
             overflow: elide;
             accessible-role: none;
@@ -250,7 +250,7 @@ component SideAdd inherits Rectangle {
             width: parent.width - 12px;
             height: parent.height;
             font-size: 12px * fs;
-            color: Theme.c.text-primary;
+            color: Theme.desk.text-color;
             selection-background-color: Theme.c.accent-fill;
             selection-foreground-color: Theme.c.text-on-accent;
             vertical-alignment: center;
@@ -370,7 +370,7 @@ export component SidePanel inherits Rectangle {
                     text: r.text;
                     font-size: 12px * fs;
                     font-weight: 600;
-                    color: r.zone == "overdue" ? Theme.c.critical : Theme.c.text-secondary;
+                    color: r.zone == "overdue" ? Theme.c.critical : Theme.desk.text-secondary;
                     overflow: elide;
                 }
                 // the line that parts it from the part above
@@ -469,7 +469,7 @@ export component SideHandle inherits Rectangle {
         y: (root.height - self.height) / 2;
         glyph: root.open ? Glyph.chevron-left : Glyph.chevron-right;
         size: 8px;
-        color: hover ? Theme.c.text-primary : Theme.c.text-secondary;
+        color: hover ? Theme.desk.text-color : Theme.desk.text-secondary;
     }
     ta := TouchArea {
         mouse-cursor: pointer;

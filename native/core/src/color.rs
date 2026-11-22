@@ -1,14 +1,20 @@
 //! Colour helpers (0.2's src/lib/color.ts).
 
-/// #RGB / #RRGGBB → (r, g, b); invalid input gives mid gray.
+/// CSS #RGB[A] / #RRGGBB[AA] → (r, g, b); invalid input gives mid gray.
 pub fn hex_to_rgb(hex: &str) -> (u8, u8, u8) {
-    let h = hex.trim().trim_start_matches('#');
-    let h: String = if h.len() == 3 { h.chars().flat_map(|c| [c, c]).collect() } else { h.to_owned() };
-    if h.len() != 6 || !h.chars().all(|c| c.is_ascii_hexdigit()) {
-        return (128, 128, 128);
-    }
-    let p = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).unwrap_or(128);
-    (p(0), p(2), p(4))
+    crate::theme::Rgba::parse(hex).map_or((128,128,128), |c| (c.r as u8,c.g as u8,c.b as u8))
+}
+
+pub fn normalize_hex(hex: &str) -> Option<String> {
+    let h = hex.trim();
+    let h = h.strip_prefix('#').unwrap_or(h);
+    if !matches!(h.len(),3|4|6|8) || !h.bytes().all(|c|c.is_ascii_hexdigit()) { return None; }
+    let h = if h.len() < 5 { h.chars().flat_map(|c|[c,c]).collect::<String>() } else { h.to_owned() };
+    Some(format!("#{}",h.to_ascii_uppercase()))
+}
+
+pub fn with_alpha(hex: &str, alpha: f64) -> String {
+    crate::theme::Rgba::parse(hex).unwrap_or(crate::theme::BLACK).with_alpha(alpha).to_hex_alpha()
 }
 
 pub fn rgb_to_hex(r: f64, g: f64, b: f64) -> String {
@@ -24,11 +30,12 @@ pub fn mix_hex(a: &str, b: &str, t: f64) -> String {
 }
 
 pub fn is_hex(s: &str) -> bool {
+    let s = s.trim();
     let h = match s.strip_prefix('#') {
         Some(h) => h,
         None => return false,
     };
-    (h.len() == 3 || h.len() == 6) && h.chars().all(|c| c.is_ascii_hexdigit())
+    matches!(h.len(),3|4|6|8) && h.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 /// HSV controls use degrees and percentages; storage remains RGB hex.

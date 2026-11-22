@@ -14,6 +14,7 @@ export interface CountdownItem {
 
 /** Festivals that are statutory holidays, used before the official schedule is published. */
 const MAJOR = ['元旦', '春节', '清明', '劳动节', '端午节', '中秋节', '国庆节'];
+const festivalHolidaySkip = (name: string) => MAJOR.some(holiday => name === holiday || name.includes(holiday));
 
 /**
  * First day of the next statutory holiday within ~5 months. When the official schedule for
@@ -36,12 +37,29 @@ export function nextHoliday(now: ISODate): { name: string; date: ISODate } | und
   }
 }
 
-/** Countdown entries: tasks flagged as countdown (next occurrence) plus, optionally, the next holiday. */
-export function countdowns(tasks: Task[], now: ISODate, withHoliday: boolean, marked = true, groups: readonly string[] = []): CountdownItem[] {
+/** Countdown entries from manually marked tasks, selected groups, and opt-in observances. */
+export function countdowns(tasks: Task[], now: ISODate, withHoliday: boolean, marked = true, groups: readonly string[] = [], withFestivals = false, withTerms = false): CountdownItem[] {
   const out: CountdownItem[] = [];
   if (withHoliday) {
     const h = nextHoliday(now);
     if (h) out.push({ key: `holiday:${h.date}`, label: h.name, date: h.date, days: diffDays(now, h.date) });
+  }
+  if (withHoliday && !withFestivals && !withTerms) return out;
+  for (let offset = 1; offset <= 366; offset++) {
+    const date = addDays(now, offset);
+    const info = dayInfo(date);
+    const holiday = withHoliday ? legalHoliday(date) : undefined;
+    const observances: Array<[string, string]> = [];
+    if (holiday?.work === false) observances.push(['holiday', holiday.name]);
+    if (withFestivals) observances.push(...info.festivals.filter(name => !festivalHolidaySkip(name)).map(name => ['festival', name] as [string, string]));
+    if (withTerms && info.term) observances.push(['term', info.term]);
+    for (const [prefix, name] of observances) {
+      const sameDate = out.find(item => item.date === date && !item.taskId);
+      if (sameDate) {
+        const normalized = (text: string) => text.replaceAll('节假日', '').replaceAll('节', '');
+        if (!sameDate.label.split('、').some(part => normalized(part) === normalized(name))) sameDate.label = `${sameDate.label}、${name}`;
+      } else out.push({ key: `${prefix}:${date}`, label: name, date, days: offset });
+    }
   }
   for (const t of tasks) {
     if (!(marked && t.countdown || groups.includes(t.groupId ?? '')) || (t.done && !t.repeat)) continue;

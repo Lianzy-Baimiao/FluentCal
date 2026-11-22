@@ -9,9 +9,11 @@ import { DialogFooter } from "dialog.slint";
 import { Checkbox } from "forms.slint";
 
 export struct GroupPick { id: string, name: string, color: color, desc: string, checked: bool }
+export struct UngroupedPick { name: string, color: color, desc: string }
 
 export global GroupDelete {
     in property <[GroupPick]> items;
+    in property <UngroupedPick> ungrouped;
     in property <string> title;
     in property <bool> can-delete;
     // 同时删除分组里的任务 (off by default); its label has the count, empty when there are none.
@@ -66,6 +68,23 @@ component GroupPickRow inherits Rectangle {
     }
 }
 
+component UngroupedRow inherits Rectangle {
+    in property <UngroupedPick> pick;
+    height: 36px;
+    accessible-role: text;
+    accessible-label: pick.name + " " + pick.desc;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 10px;
+        cross-axis-alignment: center;
+        Rectangle { width: 20px; height: 20px; border-radius: 10px; border-width: 1px; border-color: Theme.c.control-strong-stroke-disabled; background: Theme.c.control-alt-fill; }
+        Rectangle { width: 10px; height: 10px; border-radius: 3px; background: pick.color; }
+        Text { horizontal-stretch: 1; min-width: 0; text: pick.name; color: Theme.c.text-primary; overflow: elide; vertical-alignment: center; accessible-role: none; }
+        Text { text: pick.desc; font-size: 12px; color: Theme.c.text-secondary; vertical-alignment: center; accessible-role: none; }
+    }
+}
+
 export component GroupDeleteDialog {
     out property <bool> is-open: host.is-open;
     width: 0;
@@ -90,7 +109,7 @@ export component GroupDeleteDialog {
                 spacing: 12px;
                 Flickable {
                     // Seven and a half rows show: a cut row says the list scrolls.
-                    property <length> list-h: GroupDelete.items.length * 36px;
+                    property <length> list-h: (GroupDelete.items.length + 1) * 36px;
                     preferred-height: min(270px, list-h);
                     min-height: min(36px, list-h);
                     vertical-stretch: 1;
@@ -100,6 +119,18 @@ export component GroupDeleteDialog {
                         y: i * 36px;
                         width: parent.width;
                         pick: p;
+                    }
+                    Rectangle {
+                        x: 8px;
+                        y: GroupDelete.items.length * 36px;
+                        width: parent.width - 16px;
+                        height: 1px;
+                        background: Theme.c.divider;
+                    }
+                    UngroupedRow {
+                        y: GroupDelete.items.length * 36px;
+                        width: parent.width;
+                        pick: GroupDelete.ungrouped;
                     }
                 }
                 // In line with the rows' boxes (8px in); the note under the box's label.

@@ -10,6 +10,9 @@ import { barLabel, occDoneDay } from '@/lib/bar';
 import { formatFriendly, formatRange } from '@/lib/date';
 import { describeRule } from '@/lib/recur';
 import { ui } from './state';
+import { parseRgba } from '@/lib/rgba';
+import { mix, normalizeHex } from '@/fluent/theme';
+import { colorOpacity, setColorOpacity } from '@/lib/rgba';
 
 const props = defineProps<{ chip: Chip; dragging?: boolean }>();
 const emit = defineEmits<{
@@ -22,7 +25,8 @@ const emit = defineEmits<{
 
 const occ = computed(() => props.chip.occ);
 const task = computed(() => occ.value.task);
-const colors = computed(() => taskColor(task.value.color, isDark.value));
+const groupColor = computed(() => task.value.groupId ? doc.groups[task.value.groupId]?.color : undefined);
+const colors = computed(() => taskColor(task.value.color || groupColor.value, isDark.value));
 
 // A bar over several days: which day it is, the progress or the day it was done, after the
 // title (设置 › 日历 on the PC has a switch for each), and how much of this piece is done.
@@ -52,13 +56,15 @@ const tip = computed(() => {
   return { text: lines.join('\n'), placement: 'top' as const };
 });
 
-const style = computed(() =>
-  props.chip.multiDay
-    ? { '--bar': colors.value.bar, '--on-bar': colors.value.onBar }
-    : task.value.color
-      ? { '--chip-text': colors.value.text, '--bar': colors.value.bar, '--on-bar': colors.value.onBar }
-      : { '--bar': 'var(--accent-fill)', '--on-bar': 'var(--text-on-accent)' },
-);
+const style = computed(() => ({
+  '--bar': colors.value.bar, '--on-bar': colors.value.onBar,
+  '--bar-alpha': parseRgba(colors.value.bar)?.[3] ?? 'var(--accent-alpha)',
+  '--hover-bar': normalizeHex(colors.value.bar)
+    ? setColorOpacity(mix(colors.value.bar, isDark.value ? '#FFFFFF' : '#000000', 0.12), colorOpacity(colors.value.bar))
+    : colors.value.bar,
+  '--progress-width': props.chip.multiDay ? `${bar.value.fill * 100}%` : '0%',
+  '--chip-text': doc.settings.desk.taskTextMode === 'task' && (task.value.color || groupColor.value) ? colors.value.text : 'var(--calendar-text)',
+}));
 </script>
 
 <template>
@@ -123,8 +129,8 @@ const style = computed(() =>
   border-radius: 4px;
   font-size: calc(12px * var(--fs));
   line-height: 1;
-  color: var(--chip-text, var(--text-primary));
-  text-shadow: var(--text-glow);
+  color: var(--chip-text, var(--calendar-text));
+  text-shadow: var(--calendar-outline);
   cursor: default;
   overflow: hidden;
   white-space: nowrap;
@@ -135,13 +141,18 @@ const style = computed(() =>
   background: var(--subtle-fill-hover);
 }
 .chip.bar {
-  background: var(--bar);
+  --active-bar: var(--bar);
+  background: var(--active-bar);
   color: var(--on-bar);
   text-shadow: none;
   padding-left: 4px;
 }
 .chip.bar:hover {
-  background: color-mix(in srgb, var(--bar) 88%, var(--text-primary));
+  --active-bar: var(--hover-bar);
+}
+.chip.bar .fill {
+  z-index: -1;
+  background: color-mix(in srgb, var(--bar) 78%, black);
 }
 .chip.cont-l {
   border-top-left-radius: 0;
@@ -166,7 +177,7 @@ const style = computed(() =>
   left: 0;
   top: 0;
   bottom: 0;
-  background: #00000038;
+  background: transparent;
   pointer-events: none;
 }
 .located-ring { position: absolute; inset: 0; border: 2px solid var(--accent-fill); border-radius: inherit; pointer-events: none; z-index: 1; }
@@ -209,7 +220,7 @@ const style = computed(() =>
 }
 .chip.bar.done {
   background: color-mix(in srgb, var(--bar) 32%, transparent);
-  color: var(--text-primary);
+  color: var(--on-bar);
 }
 .bar.done .title {
   opacity: 0.7;

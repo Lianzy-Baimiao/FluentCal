@@ -8,27 +8,28 @@ import { Overlay, Tip, FocusRing } from "overlay.slint";
 // the halo colour behind the text, drawn only while the calendar is see-through.
 export component GText {
     in property <string> text;
-    in property <brush> color: Theme.c.text-primary;
+    in property <brush> color: Theme.desk.text-color;
     in property <length> font-size: 14px;
     in property <int> font-weight: 400;
-    in property <string> font-family: Theme.font-ui;
+    in property <string> font-family: Theme.desk.font-family;
     in property <TextHorizontalAlignment> horizontal-alignment: left;
     in property <TextVerticalAlignment> vertical-alignment: center;
     in property <TextOverflow> overflow: clip;
-    in property <bool> glow: Theme.desk.glow;
+    in property <bool> glow: Theme.desk.outline-on;
+    in property <length> outline-width: Theme.desk.outline-width * 1px;
     // Width the text needs (for decorations such as a strike-through line).
     out property <length> text-width: min(t.preferred-width, root.width);
     preferred-width: t.preferred-width;
     min-width: overflow == TextOverflow.elide ? 0 : t.preferred-width;
     preferred-height: t.preferred-height;
-    if glow: Rectangle {
-        for o in [{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 2 }]: Text {
-            x: o.x * 1px;
-            y: o.y * 1px;
+    if glow && outline-width > 0px: Rectangle {
+        for o in [{ x: -1.0, y: 0.0 }, { x: 1.0, y: 0.0 }, { x: 0.0, y: -1.0 }, { x: 0.0, y: 1.0 }, { x: -0.7, y: -0.7 }, { x: 0.7, y: -0.7 }, { x: -0.7, y: 0.7 }, { x: 0.7, y: 0.7 }]: Text {
+            x: o.x * root.outline-width;
+            y: o.y * root.outline-width;
             width: root.width;
             height: root.height;
             text: root.text;
-            color: Theme.desk.glow-color.transparentize(o.y == 2 ? 0.7 : 0.74);
+            color: Theme.desk.outline-color.transparentize(o.x == 0.0 || o.y == 0.0 ? 0.12 : 0.22);
             font-size: root.font-size;
             font-weight: root.font-weight;
             font-family: root.font-family;
@@ -71,7 +72,7 @@ export component ElevBorder inherits Rectangle {
 }
 
 export enum ButtonVariant { standard, accent, subtle, danger }
-export enum ButtonSize { medium, small, icon }
+export enum ButtonSize { medium, small, icon, compact-icon, micro-icon }
 
 // 0.2's FButton: an icon and/or a label. `danger` is the dialog's red primary button.
 export component Button inherits Rectangle {
@@ -84,6 +85,7 @@ export component Button inherits Rectangle {
     // Toggle-button state (a selected look).
     in property <bool> pressed-state;
     in property <brush> color-override: transparent;
+    in property <brush> foreground: transparent;
     // Tooltip (0.2's title / v-tip) and where it prefers to go.
     in property <string> tip;
     in property <bool> tip-bottom;
@@ -103,6 +105,7 @@ export component Button inherits Rectangle {
         : variant == ButtonVariant.accent ? (down ? Theme.c.text-on-accent-secondary : Theme.c.text-on-accent)
         : down ? Theme.c.text-secondary
         : color-override != transparent ? color-override
+        : foreground != transparent ? foreground
         : variant == ButtonVariant.subtle && pressed-state ? Theme.c.accent-text
         : Theme.c.text-primary;
     forward-focus: fs;
@@ -119,9 +122,9 @@ export component Button inherits Rectangle {
         : variant == ButtonVariant.danger ? (ta.has-hover ? Theme.c.critical.transparentize(0.1) : Theme.c.critical)
         : (down ? Theme.c.subtle-fill-pressed : hover || pressed-state ? Theme.c.subtle-fill-hover : transparent);
     animate background { duration: Theme.dur-fast; easing: cubic-bezier(0, 0, 0, 1); }
-    width: size == ButtonSize.icon ? 32px : content.preferred-width;
+    width: size == ButtonSize.icon ? 32px : size == ButtonSize.compact-icon ? 24px : size == ButtonSize.micro-icon ? 20px : content.preferred-width;
     // 0.2: .s-small has min-height 24px (its content is 21px, centred).
-    height: size == ButtonSize.icon ? 32px : size == ButtonSize.small ? max(24px, content.preferred-height) : content.preferred-height;
+    height: size == ButtonSize.icon ? 32px : size == ButtonSize.compact-icon ? 24px : size == ButtonSize.micro-icon ? 20px : size == ButtonSize.small ? max(24px, content.preferred-height) : content.preferred-height;
     accessible-role: button;
     accessible-label: text != "" ? text : tip;
     accessible-enabled: enabled;
@@ -135,13 +138,13 @@ export component Button inherits Rectangle {
         top: Theme.c.accent-elev-top;
         bottom: Theme.c.accent-elev-bottom;
     }
-    if size == ButtonSize.icon: Icon {
+    if size == ButtonSize.icon || size == ButtonSize.compact-icon || size == ButtonSize.micro-icon: Icon {
         glyph: root.icon;
-        size: 16px;
+        size: size == ButtonSize.micro-icon ? 12px : size == ButtonSize.compact-icon ? 13px : 16px;
         color: root.fg;
     }
     content := HorizontalLayout {
-        visible: size != ButtonSize.icon;
+        visible: size != ButtonSize.icon && size != ButtonSize.compact-icon && size != ButtonSize.micro-icon;
         padding-left: size == ButtonSize.small ? 8px : 12px;
         padding-right: self.padding-left;
         padding-top: size == ButtonSize.small ? 2px : 6px;
@@ -206,6 +209,7 @@ export component Segmented inherits Rectangle {
     in property <[SegOption]> options;
     in property <string> value;
     in property <bool> small;
+    in property <brush> foreground: transparent;
     callback selected(string);
     forward-focus: sfs;
     border-radius: Theme.radius-control;
@@ -239,13 +243,13 @@ export component Segmented inherits Rectangle {
                 if o.icon != "": AnyIcon {
                     glyph: o.icon;
                     size: root.small ? 14px : 16px;
-                    color: on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+                    color: root.foreground != transparent ? root.foreground : on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
                 }
                 if o.label != "": Text {
                     text: o.label;
                     font-size: root.small ? 12px : 14px;
                     vertical-alignment: center;
-                    color: on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+                    color: root.foreground != transparent ? root.foreground : on || ita.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
                 }
             }
             if on: Rectangle {

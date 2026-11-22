@@ -5,7 +5,7 @@ import { vTip } from '@/fluent';
 import type { ISODate } from '@/types';
 import type { Chip, WeekLayout } from '@/lib/layout';
 import { addTask } from '@/lib/tasks';
-import { storeState } from '@/stores/doc';
+import { doc, storeState } from '@/stores/doc';
 import { notify, ui } from './state';
 import type { CellInfo } from './types';
 import TaskChip from './TaskChip.vue';
@@ -99,7 +99,7 @@ function onCellDblClick(date: ISODate) {
           :tabindex="ui.selected === c.date ? 0 : -1"
           :aria-selected="ui.selected === c.date"
           :aria-describedby="`desc-${c.date}`"
-          :class="{ rest: c.rest, today: c.today, dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash && c.date >= ui.flash && c.date <= ui.flashEnd }"
+          :class="{ rest: c.rest, today: c.today, 'today-fill': c.today && doc.settings.desk.todayStyle === 'fill', 'today-outline': c.today && doc.settings.desk.todayStyle === 'outline', dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash && c.date >= ui.flash && c.date <= ui.flashEnd }"
           :style="c.mark ? { '--mark': c.mark } : undefined"
           @click="ui.selected = c.date"
           @dblclick="onCellDblClick(c.date)"
@@ -163,11 +163,11 @@ function onCellDblClick(date: ISODate) {
   width: 18px;
   flex: none;
   font-size: calc(10px * var(--fs));
-  color: var(--text-tertiary);
+  color: var(--calendar-text-tertiary);
   text-align: center;
   padding-top: 4px;
   font-variant-numeric: tabular-nums;
-  text-shadow: var(--text-glow);
+  text-shadow: var(--calendar-outline);
 }
 .area {
   position: relative;
@@ -195,9 +195,11 @@ function onCellDblClick(date: ISODate) {
 .cell.marked {
   background-image: linear-gradient(color-mix(in srgb, var(--mark) 30%, transparent), color-mix(in srgb, var(--mark) 30%, transparent));
 }
-.cell.today {
-  background-image: linear-gradient(color-mix(in srgb, var(--today) 12%, transparent), color-mix(in srgb, var(--today) 12%, transparent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--today) 55%, transparent);
+.cell.today-fill {
+  background-image: linear-gradient(var(--today), var(--today));
+}
+.cell.today-outline {
+  box-shadow: inset 0 0 0 1px var(--today);
 }
 .cell:focus-visible {
   box-shadow:
@@ -227,7 +229,7 @@ function onCellDblClick(date: ISODate) {
   padding: 0 4px;
   white-space: nowrap;
   overflow: hidden;
-  text-shadow: var(--text-glow);
+  text-shadow: var(--calendar-outline);
 }
 .num {
   font-size: calc(13px * var(--fs));
@@ -244,14 +246,22 @@ function onCellDblClick(date: ISODate) {
   color: var(--holiday-text);
 }
 .today .num {
+  background: transparent;
+  color: var(--calendar-text);
+  border: 1px solid var(--today);
+  box-sizing: border-box;
+  padding: 0 3px;
+}
+.today-fill .num {
   background: var(--today);
-  color: var(--text-on-accent);
+  color: var(--today-text);
+  border-color: transparent;
   text-shadow: none;
   padding: 0 4px;
 }
 .lunar {
   font-size: calc(11px * var(--fs));
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
@@ -261,19 +271,19 @@ function onCellDblClick(date: ISODate) {
   color: var(--term-text);
 }
 .lunar.month {
-  color: var(--text-primary);
+  color: var(--calendar-text);
 }
 /* Days of the adjacent months: lighter by colour and weight, not opacity, to keep 4.5:1. */
 .dim .num {
   font-weight: 400;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
 }
 .dim.rest .num {
   color: var(--holiday-text);
 }
 .dim .lunar,
 .dim .lunar.month {
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
 }
 .dim {
   background-color: color-mix(in srgb, var(--cell-bg) 55%, transparent);
@@ -293,7 +303,7 @@ function onCellDblClick(date: ISODate) {
   background: color-mix(in srgb, var(--holiday-text) 14%, transparent);
 }
 .badge.work {
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   background: var(--subtle-fill-hover);
 }
 .slot,
@@ -319,15 +329,15 @@ function onCellDblClick(date: ISODate) {
   text-align: left;
   font: inherit;
   font-size: calc(11px * var(--fs));
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   background: transparent;
   border-radius: 4px;
   cursor: pointer;
-  text-shadow: var(--text-glow);
+  text-shadow: var(--calendar-outline);
 }
 .more:hover {
   background: var(--subtle-fill-hover);
-  color: var(--text-primary);
+  color: var(--calendar-text);
 }
 .quick-add {
   left: 1px;
@@ -342,12 +352,12 @@ function onCellDblClick(date: ISODate) {
   border: 1px solid var(--control-stroke);
   border-bottom: 2px solid var(--accent-fill);
   background: var(--solid-base);
-  color: var(--text-primary);
+  color: var(--calendar-text);
   outline: none;
   box-shadow: var(--shadow-flyout);
   user-select: text;
 }
 .quick-add::placeholder {
-  color: var(--text-tertiary);
+  color: var(--calendar-text-tertiary);
 }
 </style>

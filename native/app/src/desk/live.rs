@@ -37,6 +37,7 @@ pub struct DeskLive {
     pub side_drag: Option<super::reorder::SideDrag>,
     pub toast_timer: slint::Timer,
     pub flash_timer: slint::Timer,
+    pub flash_stop_timer: slint::Timer,
     /// Scale factor the theme images (shadows) were rendered for.
     pub scale: f32,
     pub gantt: super::gantt::GanttUi,
@@ -45,7 +46,7 @@ pub struct DeskLive {
 
 impl DeskLive {
     pub fn new(window: DeskWindow, ui: DeskUi) -> DeskLive {
-        DeskLive { window, ui, room: None, drag: None, side_drag: None, toast_timer: Default::default(), flash_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
+        DeskLive { window, ui, room: None, drag: None, side_drag: None, toast_timer: Default::default(), flash_timer: Default::default(), flash_stop_timer: Default::default(), scale: 0.0, gantt: Default::default(), popups: Default::default() }
     }
 }
 

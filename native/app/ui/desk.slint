@@ -15,6 +15,7 @@ import { AgendaList, ListRangeTabs, ListRowData } from "desk_list.slint";
 import { SidePanel, SideHandle, SideRowData } from "desk_side.slint";
 import { GroupDeleteDialog } from "group_delete.slint";
 import { CalendarView, Fluent } from "inputs.slint";
+import { ColorPicker } from "color_picker.slint";
 import { Swatch } from "theme.slint";
 export { MenuEntry, SearchHitData, ChangeRowData, FilterRowData }
 export { ChipData, ListRowData, SideRowData }
@@ -76,6 +77,7 @@ component DayCell inherits Rectangle {
     in property <bool> selected;
     in property <bool> drop;
     in property <bool> flash;
+    in property <bool> flash-phase;
     callback select();
     callback quick-add();
     callback menu(length, length);
@@ -117,14 +119,14 @@ component DayCell inherits Rectangle {
     // background-image layer: today beats a day mark beats the rest-day tint.
     Rectangle {
         border-radius: 4px;
-        background: cell.today ? Theme.desk.today.transparentize(0.88)
-            : cell.marked ? cell.mark.transparentize(0.7)
+        background: cell.today && Theme.desk.today-style == "fill" ? Theme.desk.today
+            : cell.marked ? cell.mark.with_alpha(1.0).transparentize(0.7).with_alpha(cell.mark.alpha / 255)
             : cell.rest ? Theme.desk.rest-tint : transparent;
     }
-    if cell.today && !drop: Rectangle {
+    if cell.today && Theme.desk.today-style == "outline" && !drop: Rectangle {
         border-radius: 4px;
         border-width: 1px;
-        border-color: Theme.desk.today.transparentize(0.45);
+        border-color: Theme.desk.today.with_alpha(1.0).transparentize(0.45).with_alpha(Theme.desk.today.alpha / 255);
     }
     if drop: Rectangle {
         border-radius: 4px;
@@ -135,7 +137,7 @@ component DayCell inherits Rectangle {
         border-radius: 4px;
         border-width: 2px;
         border-color: Theme.c.accent-fill;
-        background: Theme.c.accent-fill.transparentize(0.84);
+        background: flash-phase ? Theme.c.accent-fill.transparentize(0.58) : Theme.c.accent-fill.transparentize(0.94);
     }
     property <int> tip-token: -1;
     changed head-hover => {
@@ -170,13 +172,15 @@ component DayCell inherits Rectangle {
         cross-axis-alignment: center;
         num := Rectangle {
             property <bool> today: cell.today;
-            property <color> c: cell.dim ? (cell.rest ? Theme.desk.holiday-text : Theme.c.text-secondary)
-                : today ? Theme.c.text-on-accent
-                : cell.rest ? Theme.desk.holiday-text : Theme.c.text-primary;
+            property <color> c: cell.dim ? (cell.rest ? Theme.desk.holiday-text : Theme.desk.text-secondary)
+                : today && Theme.desk.today-style == "fill" ? Theme.desk.today-text
+                : cell.rest ? Theme.desk.holiday-text : Theme.desk.text-color;
             width: max(18px * fs, n.preferred-width + (today ? 8px : 0));
             height: 18px * fs;
             border-radius: 9px;
-            background: today ? Theme.desk.today : transparent;
+            background: today && Theme.desk.today-style == "fill" ? Theme.desk.today : transparent;
+            border-width: today && Theme.desk.today-style == "outline" ? 1px : 0px;
+            border-color: Theme.desk.today;
             n := GText {
                 width: 100%;
                 height: 100%;
@@ -185,7 +189,7 @@ component DayCell inherits Rectangle {
                 font-size: 13px * fs;
                 font-weight: cell.dim ? 400 : 600;
                 horizontal-alignment: center;
-                glow: Theme.desk.glow && !num.today;
+                glow: Theme.desk.outline-on && !num.today;
             }
         }
         if cell.lunar != "": GText {
@@ -193,10 +197,10 @@ component DayCell inherits Rectangle {
             text: cell.lunar;
             font-size: 11px * fs;
             overflow: elide;
-            color: cell.dim ? Theme.c.text-secondary
+            color: cell.dim ? Theme.desk.text-secondary
                 : cell.lunar-kind == "festival" || cell.lunar-kind == "term" ? Theme.desk.term-text
-                : cell.lunar-kind == "month" ? Theme.c.text-primary
-                : Theme.c.text-secondary;
+                : cell.lunar-kind == "month" ? Theme.desk.text-color
+                : Theme.desk.text-secondary;
         }
     }
     if cfs.has-focus && Overlay.keyboard: Rectangle {
@@ -224,7 +228,7 @@ component DayCell inherits Rectangle {
             text: cell.badge;
             font-size: 10px * fs;
             font-weight: 600;
-            color: cell.badge == @tr("休") ? Theme.desk.holiday-text : Theme.c.text-secondary;
+            color: cell.badge == @tr("休") ? Theme.desk.holiday-text : Theme.desk.text-secondary;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
@@ -243,6 +247,7 @@ component WeekRow inherits Rectangle {
     in property <string> drop-date;
     in property <string> flash-date;
     in property <string> flash-end;
+    in property <bool> flash-phase;
     in property <string> dragging-key;
     in property <bool> read-only;
     // Quick add: the day with the inline box (0.2's ui.quickAdd), and the box's text.
@@ -273,7 +278,7 @@ component WeekRow inherits Rectangle {
         height: 16px * fs;
         text: week.week-no;
         font-size: 10px * fs;
-        color: Theme.c.text-tertiary;
+        color: Theme.desk.text-tertiary;
         horizontal-alignment: center;
         vertical-alignment: top;
     }
@@ -287,6 +292,7 @@ component WeekRow inherits Rectangle {
         selected: c.date == root.selected;
         drop: c.date == root.drop-date;
         flash: root.flash-date != "" && Fluent.days-between(root.flash-date, c.date) >= 0 && Fluent.days-between(c.date, root.flash-end) >= 0;
+        flash-phase: root.flash-phase;
         select => { root.select(c.date); }
         quick-add => { root.quick-add(c.date); }
         menu(x, y) => { root.cell-menu(c.date, x, y); }
@@ -325,7 +331,7 @@ component WeekRow inherits Rectangle {
             height: parent.height;
             text: "+\{n}";
             font-size: 11px * fs;
-            color: mta.has-hover ? Theme.c.text-primary : Theme.c.text-secondary;
+            color: mta.has-hover ? Theme.desk.text-color : Theme.desk.text-secondary;
         }
         // a <button> in 0.2: Tab reaches it, Enter / Space open the list
         mfs := FocusScope {
@@ -372,7 +378,7 @@ component WeekRow inherits Rectangle {
                 height: parent.height;
                 text: @tr("添加任务，回车保存");
                 font-size: 12px * fs;
-                color: Theme.c.text-tertiary;
+                color: Theme.desk.text-tertiary;
                 vertical-alignment: center;
                 overflow: elide;
                 accessible-role: none;
@@ -383,7 +389,7 @@ component WeekRow inherits Rectangle {
                 height: parent.height;
                 text <=> root.quick-add-text;
                 font-size: 12px * fs;
-                color: Theme.c.text-primary;
+                color: Theme.desk.text-color;
                 selection-background-color: Theme.c.accent-fill;
                 selection-foreground-color: Theme.c.text-on-accent;
                 vertical-alignment: center;
@@ -423,6 +429,7 @@ component MonthView inherits TouchArea {
     in property <string> drop-date;
     in property <string> flash-date;
     in property <string> flash-end;
+    in property <bool> flash-phase;
     in property <string> dragging-key;
     in property <bool> read-only;
     property <float> fs: Theme.desk.fs;
@@ -474,7 +481,7 @@ component MonthView inherits TouchArea {
         height: wd-h;
         text: @tr("周");
         font-size: 10px * fs;
-        color: Theme.c.text-tertiary;
+        color: Theme.desk.text-tertiary;
         horizontal-alignment: center;
     }
     for h[i] in heads: GText {
@@ -484,7 +491,7 @@ component MonthView inherits TouchArea {
         height: wd-h;
         text: h.label;
         font-size: 12px * fs;
-        color: h.rest ? Theme.desk.holiday-text : Theme.c.text-secondary;
+        color: h.rest ? Theme.desk.holiday-text : Theme.desk.text-secondary;
     }
     accessible-role: table;
     for w[i] in weeks: WeekRow {
@@ -501,6 +508,7 @@ component MonthView inherits TouchArea {
         drop-date: root.drop-date;
         flash-date: root.flash-date;
                     flash-end: root.flash-end;
+        flash-phase: root.flash-phase;
         dragging-key: root.dragging-key;
         read-only: root.read-only;
         quick-add-date: root.quick-add-date;
@@ -612,14 +620,14 @@ component TitleBar inherits Rectangle {
                         cross-axis-alignment: center;
                         GText {
                             text: root.title;
-                            font-family: Theme.font-display;
+                            font-family: Theme.desk.font-family;
                             font-size: 18px * fs;
                             font-weight: 600;
                         }
                         if title-btn.is-button: Icon {
                             glyph: Glyph.chevron-down;
                             size: 10px;
-                            color: Theme.c.text-primary.transparentize(0.3);
+                            color: Theme.desk.text-color.transparentize(0.3);
                         }
                     }
                     property <int> tip-token: -1;
@@ -640,6 +648,7 @@ component TitleBar inherits Rectangle {
                     variant: ButtonVariant.subtle;
                     size: ButtonSize.icon;
                     icon: Glyph.chevron-left;
+                    foreground: Theme.desk.text-color;
                     accessible-label: root.view == "weeks" ? @tr("上一周") : @tr("上个月");
                     tip: self.accessible-label;
                     tip-bottom: true;
@@ -649,6 +658,7 @@ component TitleBar inherits Rectangle {
                     variant: ButtonVariant.subtle;
                     size: ButtonSize.icon;
                     icon: Glyph.chevron-right;
+                    foreground: Theme.desk.text-color;
                     accessible-label: root.view == "weeks" ? @tr("下一周") : @tr("下个月");
                     tip: self.accessible-label;
                     tip-bottom: true;
@@ -658,6 +668,7 @@ component TitleBar inherits Rectangle {
             if root.view != "gantt" && wide: Button {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.small;
+                foreground: Theme.desk.text-color;
                 text: @tr("今天");
                 tip: root.today-tip;
                 clicked => { root.go-today(); }
@@ -671,6 +682,7 @@ component TitleBar inherits Rectangle {
             horizontal-stretch: 0;
             if mid: Segmented {
                 small: true;
+                foreground: Theme.desk.text-color;
                 value: root.view;
                 options: [
                     { value: "list", label: @tr("列表"), title: @tr("列表视图（按天列出任务）") },
@@ -685,6 +697,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.filter;
+                foreground: Theme.desk.text-color;
                 // red, on a tinted ground, while some tasks are hidden
                 color-override: root.filter-on ? Theme.c.critical : transparent;
                 pressed-state: root.filter-on;
@@ -697,6 +710,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.search;
+                foreground: Theme.desk.text-color;
                 accessible-label: @tr("搜索 (Ctrl+F)");
                 tip: self.accessible-label;
                 tip-bottom: true;
@@ -706,6 +720,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.delete;
+                foreground: Theme.desk.text-color;
                 accessible-label: @tr("最近更改（可撤销）");
                 tip: self.accessible-label;
                 tip-bottom: true;
@@ -720,6 +735,7 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: sync-box.spin ? "" : root.sync-failed ? Glyph.warning : Glyph.sync;
                 color-override: root.sync-failed ? Theme.c.caution : transparent;
+                foreground: Theme.desk.text-color;
                 accessible-label: root.sync-tip;
                 tip: root.sync-tip;
                 tip-bottom: true;
@@ -735,7 +751,7 @@ component TitleBar inherits Rectangle {
                     viewbox-width: 16;
                     viewbox-height: 16;
                     commands: root.spin-frames[frame];
-                    fill: Theme.c.text-primary;
+                    fill: Theme.desk.text-color;
                     accessible-role: none;
                 }
             }
@@ -744,6 +760,7 @@ component TitleBar inherits Rectangle {
                 size: ButtonSize.icon;
                 icon: root.locked ? Glyph.lock : Glyph.unlock;
                 color-override: root.locked ? transparent : Theme.c.accent-text;
+                foreground: Theme.desk.text-color;
                 accessible-label: root.locked ? @tr("解锁以调整位置和大小") : @tr("完成调整并锁定");
                 tip: self.accessible-label;
                 tip-bottom: true;
@@ -753,6 +770,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.settings;
+                foreground: Theme.desk.text-color;
                 accessible-label: @tr("设置");
                 tip: @tr("设置");
                 tip-bottom: true;
@@ -762,6 +780,7 @@ component TitleBar inherits Rectangle {
                 variant: ButtonVariant.subtle;
                 size: ButtonSize.icon;
                 icon: Glyph.more;
+                foreground: Theme.desk.text-color;
                 accessible-label: @tr("更多");
                 tip: @tr("更多");
                 tip-bottom: true;
@@ -786,7 +805,7 @@ component CountdownBar inherits Rectangle {
         alignment: start;
         for c in root.items: pill := Rectangle {
             property <bool> hover: cta.has-hover;
-            property <color> fg: hover ? Theme.c.text-primary : Theme.c.text-secondary;
+            property <color> fg: hover ? Theme.desk.text-color : Theme.desk.text-secondary;
             border-radius: 11px;
             background: hover ? Theme.c.subtle-fill-hover : Theme.desk.cell-bg;
             horizontal-stretch: 0;
@@ -863,9 +882,15 @@ component Grip inherits TouchArea {
 
 // The desk window: transparent, the calendar card inset by `pad` so its shadow has room.
 export component DeskWindow inherits Window {
+    in property <string> custom-color-original;
+    in-out property <string> custom-color-draft;
+    in-out property <bool> custom-color-default-accent;
+    callback custom-color-commit(bool, string);
+    public function open-custom-color() { color-dialog.open(); }
     in property <string> title-text;
     in property <string> view: "month";
     in property <bool> locked: true;
+    in-out property <bool> countdown-filter-mode;
     in property <bool> read-only;
     in property <[WeekData]> weeks;
     in property <[WeekdayHead]> heads;
@@ -873,6 +898,7 @@ export component DeskWindow inherits Window {
     // The list view (CAL-14): its rows, 近期 / 所有, the row of today's heading, what goes
     // under the rows ("more" = 显示更多日期, a note, or "").
     in property <[ListRowData]> list-rows;
+    in property <bool> list-group-labels;
     in property <string> list-range: "upcoming";
     in property <int> list-today-row;
     in property <string> list-footer;
@@ -886,9 +912,10 @@ export component DeskWindow inherits Window {
     in property <[CountdownData]> countdowns;
     in property <[CountdownData]> all-countdowns;
     public function close-countdown-list() { countdown-list.close(); }
-    in property <bool> countdown-filter-mode;
     in property <bool> countdown-marked;
     in property <bool> countdown-holiday;
+    in property <bool> countdown-festival;
+    in property <bool> countdown-term;
     callback countdown-source(string, bool);
     in property <string> flash-task;
     callback locate(string, string);
@@ -896,6 +923,7 @@ export component DeskWindow inherits Window {
     in property <string> selected;
     in property <string> flash-date;
     in property <string> flash-end;
+    in property <bool> flash-phase;
     in property <string> today-tip;
     in property <bool> sync-enabled;
     in property <bool> sync-busy;
@@ -1084,14 +1112,14 @@ export component DeskWindow inherits Window {
     callback onboarded();
     callback notice-closed();
     // A menu or flyout is open (Rust then watches for presses outside the window).
-    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open || countdown-list.is-open;
+    out property <bool> any-popup: menu.is-open || day-fly.is-open || ym-fly.is-open || done-fly.is-open || filter-fly.is-open || countdown-list.is-open || color-dialog.is-open;
     callback popups-changed(bool);
     changed any-popup => { root.popups-changed(self.any-popup); }
     // 设置 › 日历 › 浮动待办栏的收起方式 = 点击栏外也收起: whether a press at this point of the window
     // leaves the column open. It does on the column and its handle, on the toast, and anywhere
     // while a menu, a flyout or a dialog of the calendar is open (the press is theirs).
     public pure function side-keeps(x: length, y: length) -> bool {
-        if root.any-popup || confirm.is-open || group-delete.is-open {
+        if root.any-popup || confirm.is-open || group-delete.is-open || color-dialog.is-open {
             return true;
         }
         let cx = x - card.x;
@@ -1104,7 +1132,7 @@ export component DeskWindow inherits Window {
     title: "FluentCal";
     no-frame: true;
     background: transparent;
-    default-font-family: Theme.font-ui;
+    default-font-family: Theme.desk.font-family;
     default-font-size: 14px;
     min-width: 360px;
     min-height: 280px;
@@ -1210,6 +1238,7 @@ export component DeskWindow inherits Window {
                     selected: root.selected;
                     flash-date: root.flash-date;
                     flash-end: root.flash-end;
+                    flash-phase: root.flash-phase;
                     drop-date: root.drop-date;
                     dragging-key: root.dragging-key;
                     read-only: root.read-only;
@@ -1263,6 +1292,7 @@ export component DeskWindow inherits Window {
                 gantt := GanttView { visible: root.view == "gantt"; }
                 list := AgendaList {
                     flash-task: root.flash-task;
+                    list-group-labels: root.list-group-labels;
                     visible: root.view == "list";
                     rows: root.list-rows;
                     read-only: root.read-only;
@@ -1278,7 +1308,8 @@ export component DeskWindow inherits Window {
                     spacing: 4px;
                     height: 24px;
                     Button {
-                        horizontal-stretch: 0; variant: ButtonVariant.subtle; size: ButtonSize.icon; icon: Glyph.filter;
+                        horizontal-stretch: 0; variant: ButtonVariant.subtle; size: ButtonSize.micro-icon; icon: Glyph.filter;
+                        accessible-label: @tr("倒计时显示内容");
                         tip: @tr("倒计时显示内容");
                         clicked => { root.countdown-filter(self.absolute-position.x, self.absolute-position.y, self.width, self.height); }
                     }
@@ -1524,6 +1555,8 @@ export component DeskWindow inherits Window {
                 countdown-mode: root.countdown-filter-mode;
                 marked: root.countdown-marked;
                 holiday: root.countdown-holiday;
+                festival: root.countdown-festival;
+                term: root.countdown-term;
                 source(k, v) => { root.countdown-source(k, v); }
                 rows: root.filter-rows;
                 all: !root.filter-on;
@@ -1562,6 +1595,20 @@ export component DeskWindow inherits Window {
                 danger: root.confirm-danger;
                 primary => { root.confirm-result("primary"); }
                 close => { root.confirm-result("close"); }
+            }
+        }
+        color-dialog := DialogHost {
+            title: @tr("自定义颜色");
+            dialog-width: min(390px, Overlay.win-w - 16px);
+            primary => { if Fluent.normalize-hex(root.custom-color-draft) != "" { root.custom-color-commit(root.custom-color-default-accent, root.custom-color-draft); color-dialog.close(); } }
+            DialogBody {
+                title: @tr("自定义颜色");
+                if color-dialog.is-open: ColorPicker { draft <=> root.custom-color-draft; original: root.custom-color-original; }
+            }
+            DialogFooter {
+                primary-text: @tr("确定"); primary-enabled: Fluent.normalize-hex(root.custom-color-draft) != "";
+                primary => { root.custom-color-commit(root.custom-color-default-accent, root.custom-color-draft); color-dialog.close(); }
+                close => { color-dialog.close(); }
             }
         }
         group-delete := GroupDeleteDialog { }

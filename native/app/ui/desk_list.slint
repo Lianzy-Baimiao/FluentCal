@@ -34,6 +34,7 @@ component ListItem inherits Rectangle {
     in property <string> group-name;
     in property <color> group-color;
     in property <color> group-text;
+    in property <bool> show-group-label;
     in property <bool> highlighted;
     in property <ChipData> chip;
     in property <string> when;
@@ -145,7 +146,7 @@ component ListItem inherits Rectangle {
             width: 40px * fs;
             text: root.when;
             font-size: 12px * fs;
-            color: Theme.c.text-secondary;
+            color: Theme.desk.text-secondary;
             overflow: elide;
         }
         Rectangle {
@@ -154,7 +155,7 @@ component ListItem inherits Rectangle {
             border-radius: 2px;
             background: chip.bar;
         }
-        if root.group-name != "" && root.width > 300px * fs: Rectangle {
+        if root.show-group-label && root.group-name != "" && root.width > 240px * fs: Rectangle {
             width: min(group-text.preferred-width + 12px, 100px * fs, root.width * 0.2);
             height: 21px * fs;
             border-radius: 4px;
@@ -177,7 +178,7 @@ component ListItem inherits Rectangle {
                 width: parent.width;
                 text: (chip.milestone ? "◆ " : "") + chip.title;
                 font-size: 13px * fs;
-                color: Theme.c.text-primary;
+                color: chip.text;
                 overflow: elide;
             }
             if chip.done: Rectangle {
@@ -185,7 +186,7 @@ component ListItem inherits Rectangle {
                 y: round((parent.height / 2 + 0.8px * fs) / 1phx) * 1phx;
                 width: min(parent.width, title.text-width);
                 height: max(1px, round(0.9px * fs / 1phx) * 1phx);
-                background: Theme.c.text-primary;
+                background: title.color;
             }
         }
         if root.meta != "": GText {
@@ -193,13 +194,13 @@ component ListItem inherits Rectangle {
             max-width: root.width * 0.45;
             text: root.meta;
             font-size: 12px * fs;
-            color: Theme.c.text-secondary;
+            color: Theme.desk.text-secondary;
             overflow: elide;
         }
         if chip.repeat: Icon {
             glyph: Glyph.repeat;
             size: 11px * fs;
-            color: Theme.c.text-secondary;
+            color: Theme.desk.text-secondary;
         }
         if root.due != "": Rectangle {
             property <bool> late: root.due-kind == "overdue";
@@ -211,7 +212,7 @@ component ListItem inherits Rectangle {
                 text: root.due;
                 font-size: 12px * fs;
                 horizontal-alignment: center;
-                color: late ? Theme.c.critical : root.due-kind == "today" ? Theme.c.accent-text : Theme.c.text-secondary;
+            color: late ? Theme.c.critical : root.due-kind == "today" ? Theme.c.accent-text : Theme.desk.text-secondary;
             }
         }
     }
@@ -238,14 +239,14 @@ component ListHeading inherits Rectangle {
             text: root.heading;
             font-size: 14px * fs;
             font-weight: 600;
-            color: root.today ? Theme.c.accent-text : Theme.c.text-primary;
+            color: root.today ? Theme.c.accent-text : Theme.desk.text-color;
         }
         GText {
             min-width: 0;
             vertical-alignment: bottom;
             text: root.sub;
             font-size: 12px * fs;
-            color: Theme.c.text-secondary;
+            color: Theme.desk.text-secondary;
             overflow: elide;
         }
     }
@@ -253,6 +254,7 @@ component ListHeading inherits Rectangle {
 
 export component AgendaList inherits Rectangle {
     in property <string> flash-task;
+    in property <bool> list-group-labels;
     in property <[ListRowData]> rows;
     in property <bool> read-only;
     // Under the rows: "more" (显示更多日期), a note, or nothing.
@@ -304,6 +306,7 @@ export component AgendaList inherits Rectangle {
                 group-name: r.group-name;
                 group-color: r.group-color;
                 group-text: r.group-text;
+                show-group-label: root.list-group-labels;
                 highlighted: root.flash-task != "" && root.flash-task == r.chip.task-id;
                 y: 1px;
                 height: rh - 2px;
@@ -330,7 +333,7 @@ export component AgendaList inherits Rectangle {
                 width: parent.width - 16px;
                 text: @tr("没有任务");
                 font-size: 12px * fs;
-                color: Theme.c.text-tertiary;
+                color: Theme.desk.text-tertiary;
             }
         }
         if root.footer == "more": Button {
@@ -346,7 +349,7 @@ export component AgendaList inherits Rectangle {
             height: 32px;
             text: root.footer;
             font-size: 12px * fs;
-            color: Theme.c.text-secondary;
+            color: Theme.desk.text-secondary;
             horizontal-alignment: center;
         }
     }
@@ -363,7 +366,7 @@ export component AgendaList inherits Rectangle {
             y: (-flick.content-y) / bar.room * (bar.track - bar.thumb-h);
             height: bar.thumb-h;
             border-radius: 2px;
-            background: Theme.c.text-tertiary;
+            background: Theme.desk.text-tertiary;
             opacity: bta.has-hover || bta.pressed ? 0.9 : 0.5;
             animate width, x, opacity { duration: Theme.dur-fast; }
         }
@@ -407,10 +410,10 @@ export component ListRangeTabs inherits HorizontalLayout {
             padding-right: 8px;
             GText {
                 text: o.label;
-                font-family: Theme.font-display;
+                font-family: Theme.desk.font-family;
                 font-size: 18px * fs;
                 font-weight: 600;
-                color: on ? Theme.c.text-primary : Theme.c.text-secondary;
+            color: on ? Theme.desk.text-color : Theme.desk.text-secondary;
             }
         }
         if on: Rectangle {

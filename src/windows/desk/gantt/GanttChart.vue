@@ -8,12 +8,16 @@ import { now } from '@/composables/now';
 import { doc } from '@/stores/doc';
 import { bars, bodyH, chartEl, chartW, dw, gs, links, monthLines, range, RH, rows, selected, stripes, summaries, xOfDate, type Bar } from './model';
 import { ghost, linkDrag, onAddRowDown, onBarDblClick, onBarDown, onLinkDown } from './drag';
+import { parseRgba } from '@/lib/rgba';
+import { colorOpacity, setColorOpacity } from '@/lib/rgba';
+import { accentTextOn, bestMonochromeText } from '@/fluent/theme';
 
 const root = ref<HTMLElement>();
 onMounted(() => (chartEl.value = root.value ?? null));
 onBeforeUnmount(() => (chartEl.value = null));
 
 const todayX = computed(() => xOfDate(now.value) + dw.value / 2);
+const calendarFont = computed(() => getComputedStyle(document.documentElement).getPropertyValue('--calendar-font-family').trim());
 // Week separators: one line per week at the configured first weekday.
 const weekBg = computed(() => {
   if (gs.value.scale === 'month') return {};
@@ -24,6 +28,8 @@ const weekBg = computed(() => {
 
 const charW = (s: string) => [...s].reduce((n, c) => n + (c.charCodeAt(0) > 0x2e80 ? 12 : 6.6), 0);
 const inside = (b: Bar) => !b.task.milestone && charW(b.task.title) + 14 <= b.w;
+const todayText = computed(() => accentTextOn(getComputedStyle(document.documentElement).getPropertyValue('--accent-fill').trim(), getComputedStyle(document.documentElement).getPropertyValue('--solid-base').trim()));
+const calendarText = computed(() => bestMonochromeText(getComputedStyle(document.documentElement).getPropertyValue('--cell-bg').trim()));
 const tip = (b: Bar) => {
   const t = b.task;
   const deps = (t.deps ?? []).map((id) => doc.tasks[id]?.title).filter(Boolean);
@@ -62,14 +68,14 @@ const menu = (b: Bar, e: MouseEvent) => {
       <path v-for="l in links" :key="l.key" :d="l.d" :class="{ late: l.late }" :marker-end="l.late ? 'url(#g-arrow-late)' : 'url(#g-arrow)'" />
       <line v-if="linkDrag.show" class="rubber" :class="{ ok: linkDrag.ok }" :x1="linkDrag.x1" :y1="linkDrag.y1" :x2="linkDrag.x2" :y2="linkDrag.y2" />
     </svg>
-    <div v-for="s in summaries" :key="s.key" class="summary" :style="{ left: `${s.x}px`, width: `${s.w}px`, top: `${s.row * RH + 11}px`, '--c': s.color, '--p': `${s.progress}%` }" />
+    <div v-for="s in summaries" :key="s.key" class="summary" :style="{ left: `${s.x}px`, width: `${s.w}px`, top: `${s.row * RH + 11}px`, '--c': s.color }" />
     <template v-for="b in bars" :key="b.key">
       <div
         v-if="b.task.milestone"
         class="milestone"
         :data-task="b.task.id"
         :class="{ sel: selected === b.task.id, done: b.done }"
-        :style="{ left: `${b.x + dw / 2}px`, top: `${b.row * RH + RH / 2}px`, '--bar': b.bar }"
+        :style="{ left: `${b.x + dw / 2}px`, top: `${b.row * RH + RH / 2}px`, '--bar': b.bar, '--bar-alpha': parseRgba(b.bar)?.[3] ?? 1, '--today-fg': todayText }"
         v-tip="tip(b)"
         @pointerdown="onBarDown(b, $event)"
         @dblclick="onBarDblClick(b)"
@@ -83,7 +89,7 @@ const menu = (b: Bar, e: MouseEvent) => {
         class="bar"
         :data-task="b.task.id"
         :class="{ sel: selected === b.task.id, done: b.done, rep: b.rep }"
-        :style="{ left: `${b.x + 1}px`, width: `${Math.max(4, b.w - 2)}px`, top: `${b.row * RH + 6}px`, '--bar': b.bar, '--on': b.onBar, '--p': `${b.progress}%` }"
+        :style="{ left: `${b.x + 1}px`, width: `${Math.max(4, b.w - 2)}px`, top: `${b.row * RH + 6}px`, '--bar': b.bar, '--bar-rep': setColorOpacity(b.bar, colorOpacity(b.bar) * 0.8), '--bar-rest': setColorOpacity(b.bar, colorOpacity(b.bar) * 0.35), '--on': b.onBar, '--p': `${b.progress}%`, '--progress-width': `${b.progress}%`, '--bar-alpha': parseRgba(b.bar)?.[3] ?? 'var(--accent-alpha)', '--calendar-font-family': calendarFont, '--calendar-text': calendarText }"
         v-tip="tip(b)"
         @pointerdown="onBarDown(b, $event)"
         @dblclick="onBarDblClick(b)"

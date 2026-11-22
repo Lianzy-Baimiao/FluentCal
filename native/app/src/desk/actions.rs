@@ -120,15 +120,27 @@ impl App {
         self.desk.window.set_flash_date(date.into());
         self.desk.window.set_flash_end(end.into());
         self.desk.window.set_flash_task(task_id.into());
+        self.desk.window.set_flash_phase(false);
         self.desk.window.global::<crate::ChipKeys>().set_located_task(task_id.into());
-        self.desk.flash_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(3000), || {
+        self.desk.flash_timer.stop();
+        self.desk.flash_timer.start(slint::TimerMode::Repeated, Duration::from_millis(500), || {
             crate::app::run(|app| {
+                if !app.doc.settings.theme.reduce_motion {
+                    app.desk.window.set_flash_phase(!app.desk.window.get_flash_phase());
+                }
+            });
+        });
+        self.desk.flash_stop_timer.start(slint::TimerMode::SingleShot, Duration::from_millis(3000), || {
+            crate::app::run(|app| {
+                app.desk.flash_timer.stop();
+                app.desk.flash_stop_timer.stop();
                 app.desk.ui.flash.clear();
                 app.desk.ui.flash_end.clear();
                 app.desk.ui.flash_task.clear();
                 app.desk.window.set_flash_date("".into());
                 app.desk.window.set_flash_end("".into());
                 app.desk.window.set_flash_task("".into());
+                app.desk.window.set_flash_phase(false);
                 app.desk.window.global::<crate::ChipKeys>().set_located_task("".into());
             })
         });

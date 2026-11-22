@@ -10,7 +10,7 @@ import { Palette } from "std-widgets.slint";
 import { SetState } from "settings_state.slint";
 import { GeneralPage } from "settings_general.slint";
 import { AppearancePage } from "settings_appearance.slint";
-import { CalendarPage, GanttPage } from "settings_calendar.slint";
+import { CalendarPage, GanttPage, GroupsPage } from "settings_calendar.slint";
 import { RemindersPage, DataPage } from "settings_data.slint";
 import { SyncPage } from "settings_sync.slint";
 import { WebPage, AboutPage } from "settings_web.slint";
@@ -74,7 +74,7 @@ export component SettingsWindow inherits Window {
             if SetState.page == "appearance": AppearancePage { spacing: 4px; }
             if SetState.page == "calendar": CalendarPage { spacing: 4px; }
             if SetState.page == "gantt": GanttPage { spacing: 4px; }
-            if SetState.page == "groups": GanttPage { groups-only: true; spacing: 4px; }
+            if SetState.page == "groups": GroupsPage { spacing: 4px; }
             if SetState.page == "reminders": RemindersPage { spacing: 4px; }
             if SetState.page == "data": DataPage { }
             if SetState.page == "sync": SyncPage { }

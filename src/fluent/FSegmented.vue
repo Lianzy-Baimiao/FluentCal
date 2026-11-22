@@ -8,8 +8,9 @@ const props = withDefaults(
     options: { value: string; label?: string; icon?: string; title?: string }[];
     size?: 'small' | 'medium';
     label?: string;
+    foreground?: string;
   }>(),
-  { size: 'medium' },
+  { size: 'medium', foreground: '' },
 );
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 const name = useFieldName(() => props.label);
@@ -27,7 +28,7 @@ function key(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="f-seg" :class="size" role="radiogroup" v-bind="name.attrs()" @keydown="key">
+  <div class="f-seg" :class="size" :style="foreground ? { '--seg-foreground': foreground } : undefined" role="radiogroup" v-bind="name.attrs()" @keydown="key">
     <button
       v-for="o in options"
       :key="o.value"
@@ -67,18 +68,18 @@ function key(e: KeyboardEvent) {
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--seg-foreground, var(--text-secondary));
   white-space: nowrap;
   transition: background-color var(--dur-fast) var(--ease);
 }
 .item.iconOnly { padding: 0 7px; }
-.item:hover:not(.on) { background: var(--subtle-fill-hover); color: var(--text-primary); }
+.item:hover:not(.on) { background: var(--subtle-fill-hover); color: var(--seg-foreground, var(--text-primary)); }
 .item:active:not(.on) { background: var(--subtle-fill-pressed); }
 .item.on {
   background: var(--control-fill);
   border-color: var(--elev-top);
   border-bottom-color: var(--elev-bottom);
-  color: var(--text-primary);
+  color: var(--seg-foreground, var(--text-primary));
 }
 .item.on::after {
   content: '';

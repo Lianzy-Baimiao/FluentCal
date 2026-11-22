@@ -9,6 +9,7 @@ withDefaults(
     size?: 'medium' | 'small' | 'icon';
     disabled?: boolean;
     title?: string;
+    foreground?: string;
     /** Toggle-button state (adds aria-pressed and a selected look). */
     pressed?: boolean;
     type?: 'button' | 'submit';
@@ -24,6 +25,7 @@ withDefaults(
     :type="type"
     :disabled="disabled"
     :title="title"
+    :style="foreground ? { color: foreground } : undefined"
     :aria-label="size === 'icon' ? title : undefined"
     :aria-pressed="pressed"
   >

@@ -267,7 +267,7 @@ export component GalleryWindow inherits Window {
                         custom: true;
                         custom-value: Fluent.custom-value(root.swatch, GalleryData.swatch-colors);
                         custom-color: Fluent.hex-color(self.custom-value);
-                        custom-fg: Fluent.text-on(self.custom-value);
+                        custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base);
                         picked(v) => { root.swatch = v; }
                     }
                     ColorSwatches {
@@ -276,7 +276,7 @@ export component GalleryWindow inherits Window {
                         size: 32px;
                         custom-value: Fluent.custom-value(root.accent-pick, GalleryData.accent-colors);
                         custom-color: Fluent.hex-color(self.custom-value);
-                        custom-fg: Fluent.text-on(self.custom-value);
+                        custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base);
                         picked(v) => { root.accent-pick = v; }
                     }
                     Row {

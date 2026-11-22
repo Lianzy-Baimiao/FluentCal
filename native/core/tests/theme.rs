@@ -31,11 +31,16 @@ fn colour_math() {
     assert!((contrast(BLACK, WHITE) - 21.0).abs() < 1e-9);
     assert_eq!(BLACK.lerp(WHITE, 0.5).to_hex(), "#808080");
     assert_eq!(Rgba::parse("#abc").unwrap().to_hex(), "#AABBCC");
+    assert_eq!(Rgba::parse("#1A2B").unwrap().to_hex_alpha(), "#11AA22BB");
+    assert_eq!(Rgba::parse("#FF000080").unwrap().over(WHITE).to_hex(), "#FF7F7F");
+    assert_eq!(Rgba::parse("#12345680").unwrap().with_alpha(0.5).a, 0.5);
     assert_eq!(Rgba::parse("0078d4").unwrap().to_hex(), "#0078D4");
     assert!(Rgba::parse("nope").is_none());
     assert_eq!(best_text_on(Rgba::hex("#0078D4")), WHITE);
     assert_eq!(best_text_on(Rgba::hex("#FFB900")), BLACK);
     assert_eq!(best_text_on(Rgba::hex("#4CC2FF")), BLACK);
+    assert_eq!(best_monochrome_text(WHITE), BLACK);
+    assert_eq!(best_monochrome_text(BLACK), WHITE);
     // color-mix with transparent only scales alpha
     let m = Rgba::hex("#0067C0").mix(0.9, TRANSPARENT);
     assert_eq!(m.to_hex(), "#0067C0");
@@ -91,7 +96,26 @@ fn desk_surface() {
     assert_eq!(s.shadow.len(), 2);
     assert!((s.shadow[0].color.a - 0.22).abs() < 1e-9);
     assert!(s.glow.is_none());
+    let rgba = desk_style(&Desk { bg_color: "#F3F3F380".into(), bg_opacity: 50.0, cell_opacity: 60.0, ..Desk::default() }, &light);
+    assert!((rgba.bg.a - 128.0 / 255.0 * 0.5).abs() < 0.001);
+    assert!((rgba.cell_bg.a - 128.0 / 255.0 * 0.6).abs() < 0.001);
     assert_eq!(s.holiday_text.to_hex(), "#C42B1C");
+    let today_fill = desk_style(&Desk { today_style: "fill".into(), today_opacity: 20.0, ..Desk::default() }, &light);
+    assert_eq!(today_fill.today_style, "fill");
+    assert_eq!(today_fill.today.to_hex(), "#006DC0");
+    assert!((today_fill.today.a - 0.2).abs() < 0.001);
+    let today_outline = desk_style(&Desk { today_opacity: 0.0, ..Desk::default() }, &light);
+    assert_eq!(today_outline.today_style, "outline");
+    assert_eq!(today_outline.today.a, 0.0);
+    assert_eq!(today_outline.today_text, light.text_primary);
+    assert_eq!(calendar_text_color(&Desk { bg_color: "#FFFFFF".into(), text_color: "auto".into(), ..Desk::default() }, &light), BLACK);
+    assert_eq!(calendar_text_color(&Desk { bg_color: "#101010".into(), text_color: "auto".into(), ..Desk::default() }, &light), BLACK, "light theme cells blend strongly toward white");
+    let dark_text_theme = tokens(true, "#0078D4", None);
+    assert_eq!(calendar_text_color(&Desk { bg_color: "#101010".into(), text_color: "auto".into(), ..Desk::default() }, &dark_text_theme), WHITE);
+    let custom_text = desk_style(&Desk { text_color: "#CC0066".into(), text_outline_width: 2.5, text_shadow: "on".into(), ..Desk::default() }, &light);
+    assert_eq!(custom_text.text_color, Rgba::hex("#CC0066"));
+    assert_eq!(custom_text.outline_width, 2.5);
+    assert!(custom_text.outline_on);
     // the "transparent glass" preset of the README's dark screenshot
     let dark = tokens(true, "#8764B8", None);
     let glass = Desk { bg_opacity: 18.0, cell_opacity: 38.0, shadow: false, ..Desk::default() };

@@ -22,6 +22,7 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
     }
     v.extend([
         swatches("color:", t.color.as_deref(), true),
+        item("custom-color", tr("自定义颜色"), "color"),
         sep(),
         shortcut(item("edit", tr("编辑…"), "edit"), "Enter"),
         item("duplicate", tr("复制一份"), "copy"),
@@ -37,7 +38,7 @@ pub fn task(app: &App, id: &str, date: &str) -> Vec<Entry> {
     // when it is first chosen)
     let own = t.group_id.as_deref().filter(|g| app.doc.groups.contains_key(*g));
     let mut choices: Vec<_> = fluentcal_core::groups::summaries(&app.doc).into_iter().map(|g| Entry {
-        color: g.color, detail: g.count.to_string(),
+        color: g.color.or_else(|| (!app.doc.settings.calendar.ungrouped_color.is_empty()).then(|| app.doc.settings.calendar.ungrouped_color.clone())), detail: g.count.to_string(),
         ..radio(&format!("group:{}", g.id), &g.name, own.unwrap_or("") == g.id)
     }).collect();
     choices.extend(fluentcal_core::tasks::open_presets(&app.doc).into_iter().map(|(key, name)| radio(&format!("group:{}{key}", fluentcal_core::tasks::PRESET_PREFIX), name, false)));
@@ -66,6 +67,7 @@ pub fn day(app: &App, date: &str) -> Vec<Entry> {
         sep(),
         Entry { disabled: true, ..item("", tr("日期颜色"), "color") },
         swatches("mark:", mark.map(String::as_str), false),
+        item("custom-color", tr("自定义颜色"), "color"),
     ];
     if mark.is_some() {
         v.push(item("unmark", tr("清除日期颜色"), "close"));
@@ -111,6 +113,7 @@ pub fn group(app: &App, id: &str) -> Vec<Entry> {
             sep(),
             shortcut(item("rename", tr("重命名"), "edit"), "F2"),
             swatches("groupColor:", color.as_deref(), false),
+            item("custom-color", tr("自定义颜色"), "color"),
             item("up", tr("上移"), "chevronUp"),
             item("down", tr("下移"), "chevronDown"),
             sep(),

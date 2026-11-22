@@ -17,10 +17,12 @@ use std::collections::BTreeSet;
 pub struct Option_ {
     pub value: String,
     pub label: String,
+    pub color: Option<String>,
+    pub detail: Option<String>,
 }
 
 fn opt(value: impl Into<String>, label: impl Into<String>) -> Option_ {
-    Option_ { value: value.into(), label: label.into() }
+    Option_ { value: value.into(), label: label.into(), color: None, detail: None }
 }
 
 /// A predecessor shown as a tag; `title` None = deleted meanwhile.
@@ -114,7 +116,15 @@ impl Editor {
         let mut groups = vec![opt("", tr("未分组"))];
         let mut gs: Vec<_> = doc.groups.values().collect();
         gs.sort_by(|a, b| a.order.partial_cmp(&b.order).unwrap_or(std::cmp::Ordering::Equal));
-        groups.extend(gs.into_iter().map(|g| opt(g.id.clone(), g.name.clone())));
+        let counts = crate::groups::summaries(doc);
+        groups[0].color = (!doc.settings.calendar.ungrouped_color.is_empty()).then(|| doc.settings.calendar.ungrouped_color.clone());
+        groups[0].detail = counts.first().map(|row| row.count.to_string());
+        groups.extend(gs.into_iter().map(|g| {
+            let mut item = opt(g.id.clone(), g.name.clone());
+            item.color = Some(g.color.clone());
+            item.detail = counts.iter().find(|row| row.id == g.id).map(|row| row.count.to_string());
+            item
+        }));
         // the presets that aren't there yet (GitHub #14): made when first chosen
         groups.extend(crate::tasks::open_presets(doc).into_iter().map(|(key, name)| opt(format!("{}{key}", crate::tasks::PRESET_PREFIX), name)));
         groups.push(opt("__new__", tr("新建分组…")));

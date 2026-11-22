@@ -34,7 +34,8 @@ const dot = (o: Occurrence) => taskColor(o.task.color, isDark.value).bar;
 const range = (o: Occurrence) => (o.start !== o.end ? formatRange(o.start, o.end) : '');
 const rule = (o: Occurrence) => (all.value && o.task.repeat ? describeRule(o.task.repeat, o.task.start) : '');
 const group = (o: Occurrence) => (o.task.groupId ? doc.groups[o.task.groupId]?.name ?? '' : '');
-const meta = (o: Occurrence) => [range(o), rule(o), doc.settings.calendar.listGroupLabels ? '' : group(o)].filter(Boolean).join(' · ');
+const groupColor = (o: Occurrence) => doc.groups[o.task.groupId ?? '']?.color ?? doc.settings.calendar.ungroupedColor;
+const meta = (o: Occurrence) => [range(o), rule(o), doc.settings.calendar.listGroupLabels || !o.task.groupId ? '' : group(o)].filter(Boolean).join(' · ');
 const open = (o: Occurrence) => openEditor({ mode: 'edit', taskId: o.task.id, date: o.date });
 const visibleItems = (items: Occurrence[]) => items.filter(o => doc.settings.tasks.showCompleted || !o.done || o.task.id === ui.revealTask);
 
@@ -70,7 +71,7 @@ defineExpose({ showToday });
         <span class="time">{{ o.task.time ?? tr("全天") }}</span>
         <span class="dot" :style="{ background: dot(o) }" aria-hidden="true" />
         <span class="text">
-          <span class="title-line"><span v-if="doc.settings.calendar.listGroupLabels && group(o)" class="group-badge" :title="group(o)" :style="{ background: taskColor(doc.groups[o.task.groupId!]?.color, isDark).bar, color: taskColor(doc.groups[o.task.groupId!]?.color, isDark).onBar }">{{ group(o) }}</span><span class="title">{{ o.task.title }}</span></span>
+          <span class="title-line"><span v-if="doc.settings.calendar.listGroupLabels && group(o)" class="group-badge" :title="group(o)" :style="{ background: taskColor(groupColor(o), isDark).bar, color: taskColor(groupColor(o), isDark).onBar }">{{ group(o) }}</span><span class="title">{{ o.task.title }}</span></span>
           <span v-if="meta(o)" class="meta">{{ meta(o) }}</span>
         </span>
         <FIcon v-if="o.task.repeat" name="repeat" :size="12" class="rep" :title="tr('重复')" />

@@ -21,15 +21,17 @@ export struct SGeneral {
 export struct SAppearance {
     mode: string, follow-accent: bool, accent-hex: string, preset: string,
     bg-color: string, bg-opacity: float, cell-opacity: float, acrylic: bool, no-transparency: bool,
-    radius: float, shadow: bool, text-shadow: string, font-scale: float, cell-gap: float, line-spacing: float,
-    today-color: string, rest-color: string, holiday-color: string, term-color: string,
+    radius: float, shadow: bool, text-shadow: string, font-family: string, text-color: string, task-text-mode: string,
+    text-outline-width: float, font-scale: float, cell-gap: float, line-spacing: float,
+    today-color: string, today-style: string, today-opacity: float,
+    rest-color: string, holiday-color: string, term-color: string,
     reduce-motion: bool,
 }
 
 export struct SCalendar {
-    list-group-labels: bool, countdown-marked: bool,
+    list-group-labels: bool, countdown-marked: bool, countdown-groups: [string],
     view: string, week-start: string, month-rows: string, fit-rows: bool, bar-days: bool, bar-progress: bool, bar-done: bool, sidebar-mode: string, sidebar-close: string, weeks-rows: float, weeks-past: float,
-    show-lunar: bool, show-holidays: bool, show-week-numbers: bool, show-almanac: bool, holiday-countdown: bool,
+    show-lunar: bool, show-holidays: bool, show-week-numbers: bool, show-almanac: bool, holiday-countdown: bool, countdown-festival: bool, countdown-term: bool,
     rest-days: [bool],
     show-completed: bool, completed-last: bool, auto-postpone: bool, default-color: string,
 }
@@ -86,6 +88,8 @@ export global SetState {
     // Lists
     in property <[SelectOption]> screens;
     in property <[SGroup]> groups;
+    in property <string> ungrouped-color;
+    in property <string> ungrouped-count;
     in property <[SBackup]> backups;
     in property <[SUpcoming]> upcoming;
     in property <[SAddress]> addresses;

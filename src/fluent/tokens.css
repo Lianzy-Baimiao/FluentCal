@@ -34,8 +34,8 @@
   --text-inverse: #FFFFFF;
 
   --accent-fill: var(--accent-dark1);
-  --accent-fill-hover: color-mix(in srgb, var(--accent-dark1) 90%, transparent);
-  --accent-fill-pressed: color-mix(in srgb, var(--accent-dark1) 80%, transparent);
+  --accent-fill-hover: color-mix(in srgb, var(--accent-fill) 90%, transparent);
+  --accent-fill-pressed: color-mix(in srgb, var(--accent-fill) 80%, transparent);
   --accent-fill-disabled: #00000037;
   --accent-text: var(--accent-dark2);
   --accent-text-secondary: var(--accent-dark3);
@@ -108,8 +108,8 @@
   --text-inverse: #000000E4;
 
   --accent-fill: var(--accent-light2);
-  --accent-fill-hover: color-mix(in srgb, var(--accent-light2) 90%, transparent);
-  --accent-fill-pressed: color-mix(in srgb, var(--accent-light2) 80%, transparent);
+  --accent-fill-hover: color-mix(in srgb, var(--accent-fill) 90%, transparent);
+  --accent-fill-pressed: color-mix(in srgb, var(--accent-fill) 80%, transparent);
   --accent-fill-disabled: #FFFFFF28;
   --accent-text: var(--accent-light3);
   --accent-text-secondary: var(--accent-light3);

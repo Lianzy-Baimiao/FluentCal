@@ -1,10 +1,10 @@
 # FluentCal Android 客户端
 
-Android 客户端（0.3.5）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。
+Android 客户端（0.3.7）在同一个仓库开发，采用 Vue 3 + Capacitor 8。复用桌面网页端的任务模型、重复规则、农历、甘特计算和备份格式，独立提供适合触屏的界面，并兼容原生桌面版的自动云同步协议。任务颜色可设 RGBA 透明度并与桌面同步。
 
-下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有 0.3.0 正式版的用户安装 `FluentCal-Android-0.3.5.apk`，可直接覆盖升级并保留数据。
+下载：[GitHub 安卓发布页](https://github.com/Lianzy-Baimiao/FluentCal/releases/tag/android-latest)。新安装或已有正式版的用户安装 `FluentCal-Android-0.3.7.apk`，可直接覆盖升级并保留数据。
 
-**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.5-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。签名链与 installed-data 能力已通过 Android SDK apksig 校验，实际设备上的覆盖安装与数据保留尚待真机验收。
+**旧测试版覆盖升级**：本机早期 0.1.0 / 0.2.0 debug 包与正式包签名不同。Android 9 及以上可先安装 `FluentCal-Android-0.3.7-legacy-upgrade.apk`，它包含旧签名授权新签名的 v3 轮换证明，允许保留应用数据迁移；后续直接使用普通正式包。无需先卸载。Android 7/8 不支持签名轮换，应先导出 JSON，再卸载旧 debug 包、安装正式包并导入；不要在 Android 7/8 使用迁移包作为正式通道。
 
 0.3.1 修复扫码页面横屏问题（手机锁定竖屏），以及底部日程数字角标被按钮行高拉长的问题；角标固定高度，个位数为圆形、多位数为胶囊形，超过 99 显示 `99+`。
 
@@ -14,7 +14,9 @@ Android 客户端（0.3.5）在同一个仓库开发，采用 Vue 3 + Capacitor 
 
 0.3.4 把日程页的“不定日待办”卡片改为默认收起：只占一行，显示还有几项未完成、几项逾期，点一下展开，再点收起；展开或收起会记住。
 
-0.3.5 跟上桌面 0.3.17 的数据和显示：勾选完成时记下完成日期（`doneOn`，重复任务每次一条 `doneOnDates`；取消勾选即清除，再勾记新的一天，之前完成的不补），日程卡片和月历当天列表显示“11月27日完成”，编辑任务时可以改“完成日期”（不能晚于今天，清空则不记录）；多日任务的卡片显示“第6-2天（33%）”；日程页和月历页顶部新增按分组筛选（多选，含“未分组”），筛选时顶部一行写明正在显示哪些分组，可一键恢复全部，只筛一个分组时新建的任务默认归入它，不保存、重开应用后恢复为全部，甘特图和搜索不受影响。导入的备份里不是日期的完成日期会被略过，不会因此拒绝整份备份。规则与桌面端相同（`src/lib/done.ts`、`src/lib/filter.ts`、`src/lib/bar.ts`）。
+0.3.5 跟上桌面 0.3.17 的数据和显示：勾选完成时记下完成日期（`doneOn`，重复任务每次一条 `doneOnDates`；取消勾选即清除，再勾记新的一天，之前完成的不补），日程卡片和月历当天列表显示“11月27日完成”，编辑任务时可以改“完成日期”（不能晚于今天，清空则不记录）；多日任务的卡片显示第几天；日程页和月历页支持按分组筛选。
+
+0.3.7 任务编辑器新增自定义颜色选择、HEX 编辑和不透明度滑块，可同步编辑桌面任务的 RGBA 色值；甘特图进度段保持所选 Alpha，编辑备注等无关字段不会改变已有颜色。网页端仍只读显示 RGBA 任务、分组、日期和背景颜色。
 
 ## 功能与使用
 
@@ -80,7 +82,7 @@ $env:ANDROID_HOME = 'C:\path\to\Android\Sdk'
 npm run android:apk      # Windows 一键生成可安装的 debug APK
 ```
 
-输出：`release/FluentCal-Android-0.3.5-debug.apk`（versionCode 8）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.4.apk` 构建正式签名包 `release/FluentCal-Android-0.3.5.apk` 并检查与上一正式版的签名兼容性。
+输出：`release/FluentCal-Android-0.3.7-debug.apk`（versionCode 9）。使用 `scripts/build-android.ps1 -Release -PreviousApk release/FluentCal-Android-0.3.5.apk` 构建正式签名包 `release/FluentCal-Android-0.3.7.apk` 并检查与上一正式版的签名兼容性。
 
 构建脚本提供 `.apk.sha256` 校验和，并会自动识别装在 `%USERPROFILE%\tools\fluentcal-android` 下的工具链；在其他机器上按上例设置环境变量。如果 Gradle 需要代理，可通过当前终端的 `JAVA_OPTS` 设置 `-Dhttps.proxyHost=地址 -Dhttps.proxyPort=端口`，不需要改项目配置。Windows 中文路径下 Gradle worker 使用 `file.encoding=COMPAT` 生成与 Java 启动器一致的参数文件，Java 源码编译显式使用 UTF-8。
 
@@ -90,20 +92,20 @@ GitHub 使用稳定标签 `android-latest`，发布名称必须为 `FluentCal An
 
 迁移包在普通正式包构建完成后运行 `scripts/build-android-migration.ps1 -PreviousApk release/FluentCal-Android-0.1.0-debug.apk` 生成。必须保留原始 `.android/debug.keystore` 和正式发布密钥；脚本在仓库外保存签名轮换证明，开启旧证书的 installed-data 能力、禁止 rollback，并验证 Android 9/12L/13/16 上「旧测试包 → 迁移包 → 普通正式包」的证书关系。迁移包复用正式包内容，不启用调试；Android 9+ 使用正式签名，Android 7/8 只能识别它的旧 v2 签名，所以迁移入口明确限定 Android 9+。仅在迁移路径上提供此包，自动更新仍检查普通正式包。
 
-桌面版「设置 → 关于 → 检查更新」通过 WinRT `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` 检查微软商店，找到更新后从「打开 Microsoft Store」交给商店安装。非 MSIX 安装会提示前往商店查看；请求失败不会显示“已是最新”。桌面 0.3.7.0 已于 2026-11-06 提交商店审核，设置为通过后自动发布；以商店审核及分发进度为准。
+桌面版「设置 → 关于 → 检查更新」通过 WinRT `StoreContext.GetAppAndOptionalStorePackageUpdatesAsync` 检查微软商店，找到更新后从「打开 Microsoft Store」交给商店安装。非 MSIX 安装会提示前往商店查看；请求失败不会显示“已是最新”。桌面 0.3.22.0 的商店更新将在本次提交，设置为通过后自动发布；以商店审核及分发进度为准。
 
 `npm run build` 的桌面网页资源仍输出到 `dist/`，移动端输出为 `dist-android/`。原生桌面 Rust/Slint 工程不受移动端构建影响。
 
 ## 验证
 
-0.3.5（2026-11-21）：前端 219 项单元测试、TypeScript 类型检查、14 组移动端交互回归、两个独立客户端的 7 组同步/更新集成测试通过；完成日期记录与修改、分组筛选、窄屏布局均覆盖。正式 APK 与 0.3.4 的升级签名兼容（API 24–36），迁移包的签名链通过校验，两个 APK 均未启用调试。此轮仍未连接 Android 实体设备，设备权限、实际覆盖安装及数据保留需真机验收。
+0.3.7 新增任务自定义 RGBA 颜色和不透明度滑块，甘特条和日程任务使用相同颜色。编辑备注等其他字段会保留原始 RGBA 色值。通过无头 Android 浏览器 E2E 验证；正式 APK 与 0.3.5 的升级签名兼容，实体设备安装尚未在本轮验证。
 
 ```powershell
 npm test                 # 包括备份校验、并发持久化、写入失败恢复、通知清理测试
 npm run android:e2e       # Edge 无头模式，运行手机交互测试并在 shots/android/ 生成截图
 npm run android:sync-e2e  # 两个隔离客户端连接模拟 WebDAV，测试真实界面与自动调度
 node scripts/android-navigation-e2e.mjs  # 角标 0/1/12/99+，320/390/768px，深浅主题
-powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.5.apk
+powershell -File scripts/check-android-package.ps1 -Apk release/FluentCal-Android-0.3.7.apk
 npm run build            # 同时检查桌面网页资源可构建
 cd android
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug --console=plain

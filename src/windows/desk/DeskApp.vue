@@ -238,7 +238,10 @@ watch(
     inset 0 0 0 1px var(--desk-stroke),
     var(--desk-shadow);
   overflow: hidden;
+  font-family: var(--calendar-font-family);
+  color: var(--calendar-text);
   font-size: calc(14px * var(--fs));
+  text-shadow: var(--calendar-outline);
 }
 .unlocked .card {
   outline: 2px dashed var(--accent-fill);

@@ -52,10 +52,22 @@ section!(Desk {
     shadow: bool = true,
     /// "auto" | "on" | "off"
     text_shadow: String = "auto".into(),
+    /// "auto" | "segoe-variable" | "segoe" | "yahei-ui" | "yahei" | "arial"
+    font_family: String = "auto".into(),
+    /// "auto" or an opaque hex colour.
+    text_color: String = "auto".into(),
+    /// "calendar" | "task"; single-day task labels use the calendar text colour by default.
+    task_text_mode: String = "calendar".into(),
+    /// 0–4 px halo radius.
+    text_outline_width: f64 = 1.0,
     font_scale: f64 = 100.0,
     cell_gap: f64 = 3.0,
     line_spacing: f64 = 2.0,
     today_color: String = "accent".into(),
+    /// "fill" | "outline"
+    today_style: String = "outline".into(),
+    /// 0–100
+    today_opacity: f64 = 35.0,
     rest_bg_color: String = "auto".into(),
     holiday_text_color: String = "auto".into(),
     term_text_color: String = "auto".into(),
@@ -101,6 +113,12 @@ section!(Calendar {
     show_almanac: bool = false,
     /// Countdown to the next statutory holiday in the countdown bar.
     holiday_countdown: bool = true,
+    /// Include the next lunar or solar festival as a countdown source.
+    countdown_festival: bool = false,
+    /// Include the next solar term as a countdown source.
+    countdown_term: bool = false,
+    /// Optional display color for tasks without a real group.
+    ungrouped_color: String = String::new(),
     /// Empty groups means no group source (not all groups).
     countdown_marked: bool = true,
     countdown_groups: Vec<String> = Vec::new(),

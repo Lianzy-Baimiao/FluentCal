@@ -1,7 +1,7 @@
 /* Gantt view (desk window). Unscoped: shared by GanttView, GanttTable and GanttChart. */
 .gantt {
-  --g-grid: color-mix(in srgb, var(--text-primary) 7%, transparent);
-  --g-rowline: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --g-grid: color-mix(in srgb, var(--calendar-text) 7%, transparent);
+  --g-rowline: color-mix(in srgb, var(--calendar-text) 5%, transparent);
   --g-head-bg: var(--panel-bg);
   flex: 1;
   min-height: 0;
@@ -9,6 +9,8 @@
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
+  font-family: var(--calendar-font-family);
+  color: var(--calendar-text);
   --text-glow: none;
 }
 .g-toolbar {
@@ -56,7 +58,7 @@
   align-items: flex-end;
   padding: 0 0 6px 10px;
   box-sizing: border-box;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   background: var(--g-head-bg);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--divider);
@@ -93,7 +95,7 @@
 }
 .tier.bottom .hc {
   justify-content: center;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   border-left: 1px solid var(--divider);
   font-variant-numeric: tabular-nums;
 }
@@ -112,7 +114,7 @@
   border-radius: 9px;
   text-align: center;
   background: var(--accent-fill);
-  color: var(--text-on-accent);
+  color: var(--today-fg, var(--text-on-accent));
   font-weight: 600;
 }
 .tier.bottom:not(.day) .hc.today {
@@ -164,7 +166,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -184,14 +186,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
+  color: var(--calendar-text);
 }
 .t-row.done .name {
   text-decoration: line-through;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
 }
 .t-row .meta,
 .t-row .pct {
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
@@ -201,7 +204,7 @@
 }
 .t-row .rep,
 .t-row .ms {
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   flex: none;
 }
 .t-row .check {
@@ -210,7 +213,7 @@
   flex: none;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--bar) 70%, var(--text-secondary));
+  border: 1px solid color-mix(in srgb, var(--bar) 70%, var(--calendar-text-secondary));
   background: transparent;
   color: #fff;
   display: grid;
@@ -218,7 +221,7 @@
   cursor: pointer;
 }
 .t-row .check[aria-checked='true'] {
-  background: var(--bar);
+  background: color-mix(in srgb, var(--bar) 78%, black);
   border-color: var(--bar);
 }
 .t-row .rename {
@@ -230,7 +233,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 400;
-  color: var(--text-primary);
+  color: var(--calendar-text);
   background: var(--control-fill-input-active);
   border: 1px solid var(--control-stroke);
   border-bottom: 2px solid var(--accent-fill);
@@ -253,7 +256,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   font: inherit;
   cursor: pointer;
 }
@@ -348,7 +351,7 @@
 }
 .g-chart .links path:not(.arrow) {
   fill: none;
-  stroke: var(--text-tertiary);
+  stroke: var(--calendar-text-tertiary);
   stroke-width: 1.25;
 }
 .g-chart .links path.late:not(.arrow) {
@@ -356,7 +359,7 @@
   stroke-dasharray: 3 2;
 }
 .g-chart .links .arrow {
-  fill: var(--text-tertiary);
+  fill: var(--calendar-text-tertiary);
 }
 .g-chart .links .arrow.late {
   fill: var(--critical);
@@ -366,11 +369,11 @@
   height: 20px;
   box-sizing: border-box;
   border-radius: 4px;
-  background: var(--bar);
+  background: transparent;
   color: var(--on);
   cursor: grab;
   z-index: 2;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 2px rgb(0 0 0 / calc(.12 * var(--bar-alpha)));
 }
 .g-chart .bar:active {
   cursor: grabbing;
@@ -378,9 +381,9 @@
 .g-chart .bar .fill {
   position: absolute;
   inset: 0;
-  width: var(--p);
+  width: var(--progress-width);
   border-radius: inherit;
-  background: rgba(0, 0, 0, 0.22);
+  background: color-mix(in srgb, var(--bar) 78%, black);
   pointer-events: none;
 }
 .g-chart .bar .label {
@@ -409,8 +412,14 @@
 }
 .g-chart .bar.rep {
   cursor: pointer;
-  background: color-mix(in srgb, var(--bar) 80%, transparent);
-  outline: 1px dashed color-mix(in srgb, var(--bar) 60%, var(--text-primary));
+  background: var(--bar-rep);
+}
+.g-chart .bar.rep .fill {
+  width: 100%;
+  background: linear-gradient(to right, var(--bar-rep) var(--rest-left), var(--bar-rest) var(--rest-left));
+}
+.g-chart .bar.rep {
+  outline: 1px dashed color-mix(in srgb, var(--bar) 60%, var(--calendar-text));
   outline-offset: -1px;
 }
 .g-chart .bar.sel,
@@ -475,7 +484,7 @@
   opacity: 1;
 }
 .g-chart .links line.rubber {
-  stroke: var(--text-tertiary);
+  stroke: var(--calendar-text-tertiary);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
@@ -492,7 +501,7 @@
   background: var(--bar);
   cursor: grab;
   z-index: 2;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgb(0 0 0 / calc(.2 * var(--bar-alpha)));
 }
 .g-chart .milestone .label.out {
   transform: rotate(-45deg) translate(10px, -14px);
@@ -506,7 +515,7 @@
   position: absolute;
   height: 10px;
   border-radius: 2px;
-  background: linear-gradient(to right, var(--c) var(--p), color-mix(in srgb, var(--c) 35%, transparent) var(--p));
+  background: var(--c);
   pointer-events: none;
   z-index: 1;
 }
@@ -556,7 +565,7 @@
   place-content: center;
   justify-items: center;
   gap: 8px;
-  color: var(--text-secondary);
+  color: var(--calendar-text-secondary);
   pointer-events: none;
 }
 .g-empty > * {

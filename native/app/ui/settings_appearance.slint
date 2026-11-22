@@ -3,6 +3,7 @@
 import { Theme } from "theme.slint";
 import { Glyph } from "icons.slint";
 import { Toggle, Slider } from "forms.slint";
+import { Segmented } from "controls.slint";
 import { Select, Fluent } from "inputs.slint";
 import { ColorSwatches } from "menu.slint";
 import { SettingsGroup, SettingsCard, SettingsExpander, SettingsExpanderItems, SettingsRow, InfoBar, Severity } from "cards.slint";
@@ -15,7 +16,7 @@ component AutoSwatches inherits ColorSwatches {
     custom: true;
     custom-value: Fluent.custom-value(self.value, self.colors);
     custom-color: Fluent.hex-color(self.custom-value);
-    custom-fg: Fluent.text-on(self.custom-value);
+    custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base);
 }
 
 // A slider row of the 布局与文字 expander.
@@ -59,7 +60,7 @@ component AccentRow inherits Rectangle {
                 size: 28px;
                 custom-value: Fluent.custom-value(self.value, self.colors);
                 custom-color: Fluent.hex-color(self.custom-value);
-                custom-fg: Fluent.text-on(self.custom-value);
+                custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base);
                 picked(v) => { SetState.set-str("theme.accent", v == "" ? "system" : v); }
             }
         }
@@ -156,8 +157,8 @@ export component AppearancePage inherits VerticalLayout {
                 }
                 SettingsRow {
                     divider: true;
-                    title: @tr("文字阴影");
-                    description: @tr("背景较透明时为文字加阴影，保证在壁纸上清晰可读");
+                    title: @tr("阴影轮廓");
+                    description: @tr("自动模式会在透明背景上启用；开关可手动覆盖");
                     Select {
                         width: 120px;
                         value: SetState.appearance.text-shadow;
@@ -165,6 +166,49 @@ export component AppearancePage inherits VerticalLayout {
                         selected(v) => { SetState.set-str("desk.textShadow", v); }
                     }
                 }
+                SettingsRow {
+                    divider: true;
+                    title: @tr("日历字体");
+                    Select {
+                        width: 180px;
+                        value: SetState.appearance.font-family;
+                        options: [{ value: "auto", label: @tr("系统默认") }, { value: "segoe-variable", label: "Segoe UI Variable" }, { value: "segoe", label: "Segoe UI" }, { value: "yahei-ui", label: "Microsoft YaHei UI" }, { value: "yahei", label: "Microsoft YaHei" }, { value: "arial", label: "Arial" }];
+                        selected(v) => { SetState.set-str("desk.fontFamily", v); }
+                    }
+                }
+                SettingsRow {
+                    divider: true;
+                    title: @tr("文字颜色");
+                    description: @tr("自适应根据日期格背景选择黑色或白色");
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Select {
+                            width: 120px;
+                            value: SetState.appearance.text-color == "" ? "auto" : "custom";
+                            options: [{ value: "auto", label: @tr("自适应") }, { value: "custom", label: @tr("自选颜色") }];
+                            selected(v) => {
+                                if v == "auto" {
+                                    SetState.set-str("desk.textColor", "auto");
+                                } else {
+                                    SetState.set-str("desk.textColor", "#202020");
+                                }
+                            }
+                        }
+                        if SetState.appearance.text-color != "": AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.text-color; size: 22px; picked(v) => { SetState.set-str("desk.textColor", v == "" ? "#202020" : v); } }
+                    }
+                }
+                SettingsRow {
+                    divider: true;
+                    title: @tr("任务标题文字颜色");
+                    description: @tr("跟随日历文字提高可读性；任务/分组颜色仍显示在完成标记上");
+                    Segmented {
+                        small: true;
+                        value: SetState.appearance.task-text-mode;
+                        options: [{ value: "calendar", label: @tr("日历文字") }, { value: "task", label: @tr("任务颜色") }];
+                        selected(v) => { SetState.set-str("desk.taskTextMode", v); }
+                    }
+                }
+                SliderRow { divider: true; title: @tr("文字轮廓像素"); path: "desk.textOutlineWidth"; value: SetState.appearance.text-outline-width; min: 0; max: 4; step: 0.5; suffix: " px"; }
                 SliderRow { divider: true; title: @tr("字号"); path: "desk.fontScale"; value: SetState.appearance.font-scale; min: 80; max: 140; step: 5; suffix: "%"; }
                 SliderRow { divider: true; title: @tr("日期格间隙"); path: "desk.cellGap"; value: SetState.appearance.cell-gap; min: 0; max: 10; suffix: "px"; }
                 SliderRow { divider: true; title: @tr("任务行距"); path: "desk.lineSpacing"; value: SetState.appearance.line-spacing; min: 0; max: 8; suffix: "px"; }
@@ -182,6 +226,8 @@ export component AppearancePage inherits VerticalLayout {
                 SettingsExpanderItems {
                 expanded: root.open-detail;
                 SettingsRow { title: @tr("今日高亮"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-color; size: 22px; picked(v) => { SetState.set-str("desk.todayColor", v == "" ? "accent" : v); } } }
+                SettingsRow { divider: true; title: @tr("今日标记样式"); Segmented { small: true; value: SetState.appearance.today-style; options: [{ value: "outline", label: @tr("边框") }, { value: "fill", label: @tr("填充") }]; selected(v) => { SetState.set-str("desk.todayStyle", v); } } }
+                SettingsRow { divider: true; title: @tr("今日高亮不透明度"); Slider { value: SetState.appearance.today-opacity; minimum: 0; maximum: 100; step: 1; track-width: 180px; show-value: true; suffix: "%"; moved(v) => { SetState.set-num("desk.todayOpacity", v); } committed(v) => { SetState.set-num("desk.todayOpacity", v); } } }
                 SettingsRow { divider: true; title: @tr("休息日背景"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.rest-color; size: 22px; picked(v) => { SetState.set-str("desk.restBgColor", v == "" ? "auto" : v); } } }
                 SettingsRow { divider: true; title: @tr("节假日文字"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.holiday-color; size: 22px; picked(v) => { SetState.set-str("desk.holidayTextColor", v == "" ? "auto" : v); } } }
                 SettingsRow { divider: true; title: @tr("节日与节气文字"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.term-color; size: 22px; picked(v) => { SetState.set-str("desk.termTextColor", v == "" ? "auto" : v); } } }

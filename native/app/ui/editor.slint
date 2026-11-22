@@ -11,6 +11,7 @@ import { TextBox, NumberBox, Select, SelectOption, DatePicker, TimePicker, Fluen
 import { ColorSwatches } from "menu.slint";
 import { DialogFooter } from "dialog.slint";
 import { Card, Row, TopRow, DayButton, DepTagView } from "editor_parts.slint";
+import { Palette as WidgetPalette, TextEdit } from "std-widgets.slint";
 
 export struct DepTag { id: string, title: string, dot: color }
 
@@ -63,6 +64,9 @@ export component EditorWindow inherits Window {
     preferred-height: 720px;
     min-width: 520px;
     min-height: 560px;
+    property <bool> dark: Theme.dark;
+    init => { WidgetPalette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
+    changed dark => { WidgetPalette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
     in property <bool> is-new;
     // The task no longer exists (0.2's "这个任务已被删除。").
     in property <bool> missing;
@@ -272,7 +276,7 @@ export component EditorWindow inherits Window {
                                         spacing: 8px;
                                         alignment: start;
                                         cross-axis-alignment: center;
-                                        Select {
+                                            Select {
                                             width: 200px;
                                             options: root.freqs;
                                             value: root.data.freq;
@@ -432,7 +436,7 @@ export component EditorWindow inherits Window {
                                     size: 22px;
                                     custom-value: Fluent.custom-value(root.data.color, root.colors);
                                     custom-color: Fluent.hex-color(self.custom-value);
-                                    custom-fg: Fluent.text-on(self.custom-value);
+                                    custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base);
                                     picked(k) => { root.edit("color", k); }
                                 }
                             }
@@ -518,11 +522,15 @@ export component EditorWindow inherits Window {
                         Card {
                             pad-y: 12px;
                             pad-x: 12px;
-                            TextBox {
+    TextEdit {
+                                height: 174px;
+                                horizontal-stretch: 1;
+                                font-family: Theme.font-ui;
+                                font-size: 14px;
                                 text <=> root.notes-text;
-                                multiline: true;
-                                rows: 4;
-                                placeholder: @tr("备注");
+                                wrap: word-wrap;
+                                placeholder-text: @tr("备注");
+                                accessible-label: @tr("备注");
                                 edited(t) => { root.edit("notes", t); }
                             }
                         }

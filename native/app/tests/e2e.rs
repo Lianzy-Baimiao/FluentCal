@@ -47,15 +47,18 @@ fn countdown_popup_sources_persist_and_empty_bar_keeps_its_control() {
     let mut doc=doc_with(&[
         json!({"id":"a","title":"甲生日","start":today,"groupId":"g","countdown":true}),
         json!({"id":"b","title":"乙生日","start":today,"groupId":"g"}),
-    ],json!({"calendar":{"holidayCountdown":false}}));
+    ],json!({"calendar":{"holidayCountdown":false,"countdownFestival":false,"countdownTerm":false,"countdownMarked":true}}));
     doc["groups"]=json!({"g":{"id":"g","name":"生日","color":"red","order":1}});
     let t=start("countdown-sources",Some(doc));
     assert_eq!(t.w.get_all_countdowns().row_count(),1);
+    let filter_button=ElementHandle::find_by_accessible_label(&t.w,"倒计时显示内容").find(|e|e.accessible_role()==Some(i_slint_backend_testing::AccessibleRole::Button)).unwrap();
+    assert_eq!((filter_button.size().width,filter_button.size().height),(20.0,20.0),"countdown filter is smaller than the pills");
     t.click("倒计时显示内容");
     let tick=|label:&str| {
         let e=ElementHandle::find_by_accessible_label(&t.w,label).find(|e|e.accessible_role()==Some(i_slint_backend_testing::AccessibleRole::Checkbox)).unwrap();
         t.click_at(t.at(&e,9.0,e.size().height/2.0));
     };
+    assert!(ElementHandle::find_by_accessible_label(&t.w, "未分组").any(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Checkbox)), "countdown group filter includes ungrouped tasks");
     tick("生日");
     assert_eq!(t.w.get_all_countdowns().row_count(),2,"union has no duplicate marked birthday");
     tick("手工标记的倒数日");
@@ -318,7 +321,7 @@ fn drag_within_week_keeps_undo_and_redo_shortcuts() {
 fn countdown_shows_the_next_holiday() {
     let t = start("countdown", Some(doc_with(&[], json!({}))));
     let c = t.w.root_element().query_descendants().match_predicate(|e| e.accessible_label().is_some_and(|l| l.contains("还有") || l.contains("就是今天"))).find_first();
-    assert!(c.is_some(), "countdown pill");
+    assert!(c.is_some(), "countdown pill; entries={:?}", t.w.get_all_countdowns().iter().map(|item| (item.label.to_string(), item.date.to_string(), item.days)).collect::<Vec<_>>());
 }
 
 #[test]
@@ -361,16 +364,53 @@ fn gantt_drag_add_link_zoom() {
 #[test]
 fn gantt_export_png_and_svg() {
     let today = fluentcal_core::date::today();
-    let t = start("export", Some(doc_with(&[json!({ "title": "导出", "start": today, "end": fluentcal_core::date::add_days(&today, 3) })], json!({ "gantt": { "hideSingleDay": false } }))));
+    let t = start("export", Some(doc_with(&[json!({ "id":"export-task", "title": "导出", "start": today, "end": fluentcal_core::date::add_days(&today, 3), "color":"#12345680", "progress":50 })], json!({ "gantt": { "hideSingleDay": false } }))));
     let (svg, w, h) = with(|a| {
         let m = fluentcal_app::desk::gantt::model::compute(&a.doc, &today, &a.tokens, false);
         fluentcal_app::desk::gantt::export::svg(&a.doc, &m, &a.tokens, &today)
     })
     .unwrap();
     assert!(svg.starts_with("<svg") && svg.contains("导出"));
+    assert!(svg.contains("rgba(18,52,86,0.502)"), "SVG fill preserves task alpha");
+    assert!(svg.contains("clipPath"), "SVG masks progress sections to rounded bar geometry");
     let png = fluentcal_app::desk::gantt::export::png(&svg, w, h).unwrap();
     assert_eq!(&png[1..4], b"PNG");
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(png));
+    decoder.set_transformations(png::Transformations::IDENTITY);
+    let mut reader = decoder.read_info().unwrap();
+    let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
+    reader.next_frame(&mut pixels).unwrap();
+    assert!(pixels.chunks_exact(4).any(|p| p[3] > 0), "PNG contains visible task pixels");
     drop(t);
+}
+
+#[test]
+fn today_marker_settings_control_outline_fill_and_opacity() {
+    let light = fluentcal_core::theme::tokens(false, "#0078D4", None);
+    let defaults = fluentcal_core::theme::desk_style(&fluentcal_core::settings::Desk::default(), &light);
+    assert_eq!(defaults.today_style, "outline");
+    assert!((defaults.today.a - 0.35).abs() < 0.001);
+    let fill = fluentcal_core::theme::desk_style(&fluentcal_core::settings::Desk { today_style: "fill".into(), today_opacity: 60.0, ..Default::default() }, &light);
+    assert_eq!(fill.today_style, "fill");
+    assert!((fill.today.a - 0.6).abs() < 0.001);
+}
+
+#[test]
+fn transparent_color_picker_confirm_preserves_explicit_full_opacity_hex() {
+    let today = fluentcal_core::date::today();
+    let _t = start("explicit-opaque-picker", Some(doc_with(&[json!({ "id":"x", "title":"默认强调色", "start":today })], json!({}))));
+    use fluentcal_app::desk::menus::Target;
+    with(|a| a.desk_color_open(Target::Task("x".into(), today.clone()))).unwrap();
+    assert!(with(|a| a.desk.window.get_custom_color_default_accent()).unwrap());
+    let default = with(|a| a.tokens.accent_fill.to_hex_alpha()).unwrap();
+    assert_eq!(default.len(), 7);
+    let full_accent = format!("{default}FF");
+    with(|a| a.desk_color_commit(true, &full_accent)).unwrap();
+    assert_eq!(with(|a| a.doc.tasks["x"].color.clone()).unwrap(), Some(default[..7].to_owned()));
+    with(|a| a.desk_color_open(Target::Task("x".into(), today))).unwrap();
+    assert!(!with(|a| a.desk.window.get_custom_color_default_accent()).unwrap());
+    with(|a| a.desk_color_commit(false, "#123456FF")).unwrap();
+    assert_eq!(with(|a| a.doc.tasks["x"].color.clone()).unwrap().as_deref(), Some("#123456FF"));
 }
 
 /// What a screen reader gets (0.2's a11y.mjs ran axe on the desk and the Gantt view): every
@@ -432,6 +472,8 @@ fn menu_actions_and_undo() {
     // Day colour, then cleared.
     with(|a| a.menu_act(&Target::Day(today.clone()), "mark:green")).unwrap();
     assert_eq!(with(|a| a.store.snapshot()["dayMarks"][&today]["color"].clone()).unwrap(), "green");
+    with(|a| a.menu_act(&Target::Day(today.clone()), "mark:#12345680")).unwrap();
+    assert_eq!(with(|a| a.store.snapshot()["dayMarks"][&today]["color"].clone()).unwrap(), "#12345680");
     with(|a| a.menu_act(&Target::Day(today.clone()), "unmark")).unwrap();
     assert!(with(|a| a.store.snapshot()["dayMarks"].get(&today).is_none()).unwrap());
     // Group order: 乙 up swaps the orders.
@@ -442,6 +484,10 @@ fn menu_actions_and_undo() {
     with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "countdown")).unwrap();
     with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "color:purple")).unwrap();
     assert_eq!((t.task("看牙")["countdown"].clone(), t.task("看牙")["color"].clone()), (json!(true), json!("purple")));
+    with(|a| a.menu_act(&Target::Task("x".into(), today.clone()), "color:#12345680")).unwrap();
+    assert_eq!(t.task("看牙")["color"], "#12345680");
+    with(|a| a.menu_act(&Target::Group("a".into()), "groupColor:#12345680")).unwrap();
+    assert_eq!(with(|a| a.store.snapshot()["groups"]["a"]["color"].clone()).unwrap(), "#12345680");
 }
 
 impl T {
@@ -739,6 +785,7 @@ fn delete_several_groups_at_once() {
         json!({ "id": "a", "title": "设计", "start": today, "groupId": "g1" }),
         json!({ "id": "b", "title": "开发", "start": today, "groupId": "g2" }),
         json!({ "id": "c", "title": "测试", "start": today, "groupId": "g3", "deps": ["b"] }),
+        json!({ "id": "d", "title": "未分组任务", "start": today }),
     ];
     // The chart shows only 项目一: deleting it must not leave the chart empty.
     let mut doc = doc_with(&tasks, json!({ "calendar": { "view": "gantt" }, "gantt": { "groupFilter": ["g1"] } }));
@@ -780,6 +827,7 @@ fn delete_several_groups_at_once() {
     assert!(t.has("删除分组“项目一”？"));
     let labels: Vec<_> = boxes().iter().filter_map(|b| b.accessible_label()).map(|l| l.to_string()).collect();
     assert_eq!(labels, ["项目一", "项目二", "项目三"], "all groups, in the chart's order");
+    assert!(ElementHandle::find_by_accessible_label(&t.w, "未分组 1 个任务").find(|e| e.accessible_role() == Some(AccessibleRole::Text)).is_some(), "the read-only row reports the ungrouped task count");
     assert_eq!(ticked(), ["项目一"]);
     assert_eq!(boxes()[0].accessible_description().as_deref(), Some("1 个任务"));
     // Tasks stay by default; deleting them requires an explicit opt-in.
@@ -819,7 +867,7 @@ fn delete_several_groups_at_once() {
     let groups: Vec<String> = with(|a| a.doc.groups.keys().cloned().collect()).unwrap();
     assert_eq!(groups, ["g3"]);
     let titles: Vec<String> = t.tasks().iter().map(|x| x["title"].as_str().unwrap().to_owned()).collect();
-    assert_eq!(titles, ["测试"], "the groups' tasks are deleted");
+    assert_eq!(titles, ["测试", "未分组任务"], "unselected ungrouped tasks survive group deletion");
     assert!(t.task("测试")["deps"].as_array().is_none_or(|d| d.is_empty()), "the deleted predecessor is dropped");
     assert!(with(|a| a.doc.settings.gantt.group_filter.is_empty()).unwrap(), "the filter forgets deleted groups");
     assert_eq!(t.w.get_toast_text(), "已删除 2 个分组和其中的任务（2 个）");
@@ -829,6 +877,7 @@ fn delete_several_groups_at_once() {
     assert_eq!(groups, ["g1", "g2", "g3"]);
     assert_eq!(t.task("设计")["groupId"], "g1");
     assert_eq!(t.task("开发")["groupId"], "g2");
+    assert!(t.task("未分组任务")["groupId"].is_null());
     assert_eq!(t.task("测试")["deps"], json!(["b"]));
     // The keyboard: Tab to a box, Space ticks it, Esc cancels.
     with(|a| a.menu_act(&Target::Group("g3".into()), "deleteGroup")).unwrap();

@@ -38,10 +38,10 @@ pub fn svg(doc: &Doc, m: &Model, t: &Tokens, today: &str) -> (String, f64, f64) 
     let cw = (diff_days(&lo, &hi) + 1) as f64 * m.dw;
     let tw = if doc.settings.gantt.show_table { table_width(doc, None).max(180.0) } else { 0.0 };
     let (w, h) = (tw + cw, 44.0 + m.rows.len() as f64 * RH);
-    let (bg, text, sub, line, accent, group, crit) = (css(t.solid_base), css(t.text_primary), css(t.text_secondary), css(t.divider), css(t.accent_fill), css(t.subtle_fill_pressed), css(t.critical));
+    let (text, sub, line, accent, group, crit) = (css(t.text_primary), css(t.text_secondary), css(t.divider), css(t.accent_fill), css(t.subtle_fill_pressed), css(t.critical));
     let mut o = String::new();
     let _ = write!(o, r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" font-family="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI, sans-serif" font-size="12">"#);
-    let _ = write!(o, r#"<rect width="{w}" height="{h}" fill="{bg}"/><clipPath id="c"><rect x="{tw}" y="0" width="{cw}" height="{h}"/></clipPath>"#);
+    let _ = write!(o, r#"<clipPath id="c"><rect x="{tw}" y="0" width="{cw}" height="{h}"/></clipPath>"#);
     for (id, c) in [("a", &sub), ("l", &crit)] {
         let _ = write!(o, r#"<marker id="{id}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{c}"/></marker>"#);
     }
@@ -111,7 +111,7 @@ fn links(o: &mut String, doc: &Doc, m: &Model, sub: &str, crit: &str) {
 }
 
 fn bars(o: &mut String, m: &Model) {
-    for b in &m.bars {
+    for (i, b) in m.bars.iter().enumerate() {
         let y = 44.0 + f64::from(b.g.row) * RH;
         let op = if b.g.done { r#" opacity="0.55""# } else { "" };
         let (bar, on, text) = (slint_css(b.g.bar), slint_css(b.g.on_bar), slint_css(b.g.text));
@@ -121,12 +121,19 @@ fn bars(o: &mut String, m: &Model) {
             let _ = write!(o, r#"<text x="{}" y="{}" fill="{text}">{}</text>"#, cx + 14.0, y + 20.0, esc(&b.g.title));
             continue;
         }
-        let _ = write!(o, r#"<g{op}><rect x="{}" y="{}" width="{}" height="20" rx="4" fill="{bar}"/>"#, b.x + 1.0, y + 6.0, (b.w - 2.0).max(4.0));
-        if b.g.progress > 0.0 {
-            let _ = write!(o, r##"<rect x="{}" y="{}" width="{}" height="20" rx="4" fill="#000" opacity="0.22"/>"##, b.x + 1.0, y + 6.0, ((b.w - 2.0) * f64::from(b.g.progress) / 100.0).max(0.0));
+        let width = (b.w - 2.0).max(4.0);
+        let clip = format!("bar{i}");
+        let _ = write!(o, r#"<g{op}><clipPath id="{clip}"><rect x="{}" y="{}" width="{}" height="20" rx="4"/></clipPath><g clip-path="url(#{clip})">"#, b.x + 1.0, y + 6.0, width);
+        let progress_w = (width * f64::from(b.g.progress) / 100.0).clamp(0.0, width);
+        if progress_w > 0.0 {
+            let shade = Rgba::new(f64::from(b.g.bar.red()), f64::from(b.g.bar.green()), f64::from(b.g.bar.blue()), f64::from(b.g.bar.alpha()) / 255.0);
+            let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="20" fill="{}"/>"#, b.x + 1.0, y + 6.0, progress_w, css(shade));
+        }
+        if progress_w < width {
+            let _ = write!(o, r#"<rect x="{}" y="{}" width="{}" height="20" fill="{bar}"/>"#, b.x + 1.0 + progress_w, y + 6.0, width - progress_w);
         }
         let inside = char_w(&b.g.title) + 14.0 <= b.w;
-        let _ = write!(o, r#"<text x="{}" y="{}" fill="{}">{}</text></g>"#, if inside { b.x + 8.0 } else { b.x + b.w + 6.0 }, y + 20.0, if inside { &on } else { &text }, esc(&b.g.title));
+        let _ = write!(o, r#"</g><text x="{}" y="{}" fill="{}">{}</text></g>"#, if inside { b.x + 8.0 } else { b.x + b.w + 6.0 }, y + 20.0, if inside { &on } else { &text }, esc(&b.g.title));
     }
 }
 

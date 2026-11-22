@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
         :width="152"
         @update:model-value="setWebLanguage(String($event))"
       />
-      <FSegmented v-model="viewModel" class="views" :options="views" size="small" :label="tr('视图')" />
+      <FSegmented v-model="viewModel" class="views" :options="views" :label="tr('视图')" />
       <GroupFilter v-if="view !== 'gantt'" />
       <FButton variant="subtle" size="icon" icon="search" :title="tr('搜索')" @click="ui.searchOpen = !ui.searchOpen" />
     </header>

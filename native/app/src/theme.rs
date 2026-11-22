@@ -42,12 +42,21 @@ pub fn desk_vars(d: &DeskStyle) -> DeskVars {
         cell_gap: d.cell_gap as f32,
         line_gap: d.line_gap as f32,
         fs: d.fs as f32,
+        font_family: d.font_family.as_str().into(),
+        text_color: color(d.text_color),
+        text_secondary: color(d.text_secondary),
+        text_tertiary: color(d.text_tertiary),
+        outline_color: color(d.outline_color),
+        outline_width: d.outline_width as f32,
+        outline_on: d.outline_on,
         today: color(d.today),
+        today_text: color(d.today_text),
+        today_style: d.today_style.as_str().into(),
         rest_tint: color(d.rest_tint),
         holiday_text: color(d.holiday_text),
         term_text: color(d.term_text),
-        glow: d.glow.is_some(),
-        glow_color: d.glow.map_or(Color::default(), color),
+        glow: d.outline_on,
+        glow_color: color(d.outline_color.with_alpha(if d.outline_color.r < 128.0 { 0.85 } else { 0.9 })),
     }
 }
 
@@ -70,13 +79,22 @@ where
     let g = window.global::<Theme>();
     g.set_dark(look.tokens.dark);
     g.set_c(palette(look.tokens));
-    g.set_desk(desk_vars(look.desk));
     g.set_reduce_motion(look.reduce_motion);
     if !look.win11 {
         g.set_font_ui("Segoe UI".into());
         g.set_font_display("Segoe UI".into());
         g.set_font_icon("Segoe MDL2 Assets".into());
     }
+    let mut desk = desk_vars(look.desk);
+    desk.font_family = match look.desk.font_family.as_str() {
+        "segoe-variable" => "Segoe UI Variable Text".into(),
+        "segoe" => "Segoe UI".into(),
+        "yahei-ui" => "Microsoft YaHei UI".into(),
+        "yahei" => "Microsoft YaHei".into(),
+        "arial" => "Arial".into(),
+        _ => g.get_font_ui(),
+    };
+    g.set_desk(desk);
     let sh = |layers: &[fluentcal_core::theme::Shadow], radius: f64| -> ShadowImage {
         crate::shadow::render(layers, radius, look.scale)
     };

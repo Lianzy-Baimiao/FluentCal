@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyTheme, bestTextOn, contrast, deriveAccent, mix, normalizeHex, TASK_COLORS, taskColor, WIN_ACCENTS, withAlpha,
+  applyTheme, bestMonochromeText, bestTextOn, contrast, deriveAccent, mix, normalizeHex, progressShade, TASK_COLORS, taskColor, WIN_ACCENTS, withAlpha,
 } from './theme';
 
 function lightness(hex: string): number {
@@ -46,10 +46,26 @@ describe('colour math', () => {
     expect(withAlpha('#0078D4', 0.5)).toBe('#0078D480');
   });
 
+  it('preserves alpha when task colours are adjusted on phone', () => {
+    expect(taskColor('#12345680', false).bar).toBe('#12345680');
+    expect(taskColor('#12345680', false).onBar).toMatch(/^#(?:000000|FFFFFF)$/);
+  });
+
   it('keeps white text on mid-tone accents, black on light ones', () => {
     expect(bestTextOn('#0078D4')).toBe('#FFFFFF');
     expect(bestTextOn('#FFB900')).toBe('#000000');
     expect(bestTextOn('#4CC2FF')).toBe('#000000');
+  });
+
+  it('selects black or white with the higher contrast on custom calendar surfaces', () => {
+    expect(bestMonochromeText('#FFFFFF')).toBe('#000000');
+    expect(bestMonochromeText('#000000')).toBe('#FFFFFF');
+    expect(bestMonochromeText('#F3F3F3')).toBe('#000000');
+    expect(bestMonochromeText('#F0F0F066')).toBe('#000000');
+  });
+
+  it('keeps the accent palette AA-first white rule', () => {
+    expect(bestTextOn('#0078D4')).toBe('#FFFFFF');
   });
 });
 
@@ -76,6 +92,9 @@ describe('task colours', () => {
     expect(WIN_ACCENTS).toHaveLength(48);
     expect(new Set(WIN_ACCENTS).size).toBe(48);
   });
+  it('scales task progress without removing its alpha', () => {
+    expect(progressShade('#FF000080')).toBe('#C7000080');
+  });
 });
 
 describe('applyTheme', () => {
@@ -93,5 +112,10 @@ describe('applyTheme', () => {
     applyTheme(el, { dark: false, accent: '#0078D4', palette: win });
     expect(props.get('--accent-light2')).toBe('#4CC2FF');
     expect(props.get('--text-on-accent-light')).toBe('#FFFFFF');
+    applyTheme(el, { dark: false, accent: '#0078D480' });
+    expect(props.get('--accent-fill')).toBe('#006DC080');
+    expect(props.get('--accent-fill-hover')).toBe('#006DC073');
+    expect(props.get('--accent-alpha')).toBe(String(128 / 255));
+    expect(props.get('--accent-text')).toMatch(/^#[0-9A-F]{6}$/);
   });
 });

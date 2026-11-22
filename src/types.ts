@@ -101,7 +101,7 @@ export interface Settings {
   general: { language: 'system' | 'zh-CN' | 'zh-TW' | 'en-US'; autostart: boolean; seeded: boolean; onboarded: boolean };
   theme: {
     mode: ThemeMode;
-    /** 'system' or #RRGGBB */
+    /** 'system' or a CSS hex colour (#RGB[A] / #RRGGBB[AA]). */
     accent: string;
     reduceMotion: boolean;
   };
@@ -122,10 +122,21 @@ export interface Settings {
     shadow: boolean;
     /** 'auto' | 'on' | 'off' */
     textShadow: 'auto' | 'on' | 'off';
+    /** UI family choice; auto uses the Windows Fluent UI font stack. */
+    fontFamily: 'auto' | 'segoe-variable' | 'segoe' | 'yahei-ui' | 'yahei' | 'arial';
+    /** 'auto' adapts to the configured date-cell surface; otherwise a hex colour. */
+    textColor: string;
+    /** Calendar text improves readability; task retains per-task/per-group title colours. */
+    taskTextMode: 'calendar' | 'task';
+    /** Text outline radius in pixels, 0–4. */
+    textOutlineWidth: number;
     fontScale: number;
     cellGap: number;
     lineSpacing: number;
     todayColor: string;
+    todayStyle: 'fill' | 'outline';
+    /** 0–100 */
+    todayOpacity: number;
     restBgColor: string;
     holidayTextColor: string;
     termTextColor: string;
@@ -160,6 +171,9 @@ export interface Settings {
     showAlmanac: boolean;
     /** Countdown to the next statutory holiday in the countdown bar. */
     holidayCountdown: boolean;
+    countdownFestival: boolean;
+    countdownTerm: boolean;
+    ungroupedColor: string;
     countdownMarked: boolean;
     countdownGroups: string[];
     /** 0 = Sunday … 6 = Saturday */
