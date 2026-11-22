@@ -25,4 +25,4 @@ Rust workspace tests (including 50 desktop E2E, 15 editor and 11 settings tests)
 
 - Installer: `64716e9f3e10f480d7370edafa0f4cb9e869ef98a1dc64a5ecb8ad41a6b28e31`
 - Standalone EXE: `979cd0ac19099c5a44bddb7ed531ab808291aca0def3e40f51e8dc258f9f52de`
-- Microsoft Store MSIX: `bd7374482b3a7da48ec5c9897e5d9f93aa2ec3f12745c9635031360136dde768`
+- Microsoft Store MSIX: `ce1993aea8955b14a6600195178eeea753a7055471e29d97887bbd3babfa5f10`
