@@ -1,5 +1,5 @@
 //! The list view (0.2's src/lib/agenda.test.ts) and its 所有 mode (GitHub #4).
-use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub};
+use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub, list_day_heading};
 use fluentcal_core::model::{Freq, RepeatRule, Task};
 
 const TODAY: &str = "2026-10-30";
@@ -64,9 +64,38 @@ fn all_lists_every_task_once_on_its_start_past_ones_too() {
 }
 
 #[test]
+fn all_lists_flex_tasks_only_on_their_completion_days() {
+    let month = Task {
+        flex: Some("month".into()),
+        flex_done: Some(std::collections::BTreeMap::from([
+            ("2026-09".into(), "2026-10-12".into()),
+            ("2026-10".into(), "2026-10-12".into()),
+            ("2026-08".into(), "not-a-date".into()),
+        ])),
+        ..t("month", "2026-09-01", "2026-09-01")
+    };
+    let someday = Task {
+        flex: Some("someday".into()),
+        flex_done: Some(std::collections::BTreeMap::from([("".into(), TODAY.into())])),
+        ..t("someday", "2026-10-29", "2026-10-29")
+    };
+    let open = Task { flex: Some("month".into()), ..t("open", "2026-10-01", "2026-10-01") };
+    let tasks = [month, someday, open];
+    let days = all_tasks(&tasks, TODAY, true);
+    assert_eq!(days.iter().map(|d| d.date.as_str()).collect::<Vec<_>>(), ["2026-10-12", TODAY]);
+    assert_eq!(ids(&days[0].items), ["month"]);
+    assert_eq!(ids(&days[1].items), ["someday"]);
+    assert!(days.iter().flat_map(|d| &d.items).all(|o| o.done));
+    let open = all_tasks(&tasks, TODAY, false);
+    assert!(open.iter().flat_map(|d| &d.items).all(|o| o.task.id != "month" && o.task.id != "someday"));
+}
+
+#[test]
 fn names_days_with_the_year_when_it_differs() {
     let names: Vec<String> = [TODAY, "2026-10-31", "2026-10-29", "2026-11-02", "2025-03-04", "2027-01-01"].iter().map(|d| day_heading(d, TODAY)).collect();
     assert_eq!(names, ["今天", "明天", "昨天", "11月2日", "2025年3月4日", "2027年1月1日"]);
+    assert_eq!(list_day_heading(TODAY, TODAY), "今天（2026年10月30日）");
+    assert_eq!(list_day_heading("2026-10-31", TODAY), "明天");
     assert_eq!(day_sub("2026-10-01", true), "周四 · 八月廿一 · 国庆节·休");
     assert_eq!(day_sub("2026-10-01", false), "周四 · 八月廿一 · 国庆节");
 }

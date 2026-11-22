@@ -133,10 +133,9 @@ export interface Settings {
     fontScale: number;
     cellGap: number;
     lineSpacing: number;
-    todayColor: string;
-    todayStyle: 'fill' | 'outline';
-    /** 0–100 */
-    todayOpacity: number;
+    todayBorderColor: string;
+    todayBorderWidth: number;
+    todayFillColor: string;
     restBgColor: string;
     holidayTextColor: string;
     termTextColor: string;

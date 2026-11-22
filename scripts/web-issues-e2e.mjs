@@ -15,9 +15,13 @@ const tasks = {
   c: task('c', '乙生日', '2026-11-26', { groupId: 'birth' }),
   d: task('d', '另一项已完成', '2026-10-31', { done: true, groupId: 'work' }),
   e: task('e', '单日颜色测试', '2026-11-21', { color: 'red' }),
+  f: task('f', '月度复盘', '2026-11-01', { flex: 'month', flexDone: { '2026-11': '2026-11-05' }, groupId: 'work' }),
+  g: task('g', '整理旧照片', '2026-11-18', { flex: 'someday', groupId: 'work' }),
+  h: task('h', '每月清账', '2026-11-01', { flex: 'month' }),
 };
-let desk = { todayColor: '#22884480', todayStyle: 'outline', todayOpacity: 35, bgColor: '#F3F3F380', bgOpacity: 72, cellOpacity: 55, textColor: 'auto', taskTextMode: 'calendar', textShadow: 'on', textOutlineWidth: 2, fontFamily: 'yahei-ui' };
-const documentData = () => ({ version: 1, tasks, groups: { work: { id: 'work', name: '工作', color: '#AA443380', order: 1 }, birth: { id: 'birth', name: '生日', color: 'blue', order: 2 } }, dayMarks: { '2026-11-21': { color: '#AA443380' } }, holidays: {}, settings: { general: { language: 'zh-CN', seeded: true, onboarded: true }, calendar: { view: 'month', listRange: 'upcoming', listGroupLabels: true, holidayCountdown: false, countdownMarked: true, countdownGroups: ['birth'], monthRows: 'six' }, desk, tasks: { showCompleted: false }, theme: { mode: 'light', reduceMotion: true } } });
+let showCompleted = false;
+let desk = { todayBorderColor: '#22884480', todayBorderWidth: 2, todayFillColor: '', bgColor: '#F3F3F380', bgOpacity: 72, cellOpacity: 55, textColor: 'auto', taskTextMode: 'calendar', textShadow: 'on', textOutlineWidth: 2, fontFamily: 'yahei-ui' };
+const documentData = () => ({ version: 1, tasks, groups: { work: { id: 'work', name: '工作', color: '#AA443380', order: 1 }, birth: { id: 'birth', name: '生日', color: 'blue', order: 2 } }, dayMarks: { '2026-11-21': { color: '#AA443380' } }, holidays: {}, settings: { general: { language: 'zh-CN', seeded: true, onboarded: true }, calendar: { view: 'month', listRange: 'upcoming', listGroupLabels: true, holidayCountdown: false, countdownMarked: true, countdownGroups: ['birth'], monthRows: 'six' }, desk, tasks: { showCompleted, completedLast: true, autoPostpone: false, defaultColor: '' }, theme: { mode: 'light', reduceMotion: true } } });
 await context.addInitScript(seed => {
   const next = sessionStorage.getItem('fluentcal.test.nextDoc');
   if (next) {
@@ -61,21 +65,40 @@ try {
   assert.equal(taskColor, 'rgb(196, 43, 28)', 'task mode restores its own color-specific text');
   const todayCell = page.locator('.cell.today');
   await todayCell.waitFor();
-  assert(await todayCell.evaluate(el => el.classList.contains('today-outline')));
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today').trim()), '#2288442D');
-  desk = { ...desk, todayStyle: 'fill', todayOpacity: 20 };
+  assert(await todayCell.evaluate(el => el.classList.contains('marked')));
+  assert.equal(await todayCell.evaluate(el => getComputedStyle(el).boxShadow), 'rgba(34, 136, 68, 0.5) 0px 0px 0px 2px inset');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today-border').trim()), '#22884480');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today-fill').trim()), '');
+  desk = { ...desk, todayBorderWidth: 3.5, todayFillColor: '#22884433' };
   await stageMockDoc();
   await page.reload();
   await page.locator('.cell.today-fill').waitFor();
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today').trim()), '#2288441A');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today-fill').trim()), '#22884433');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--today-border-width').trim()), '3.5px');
+  const todayLayers = await page.locator('.cell.today-fill.marked').evaluate(el => getComputedStyle(el).backgroundImage);
+  assert.match(todayLayers, /rgba\(34, 136, 68, 0\.2\)/, 'today fill uses its configured alpha');
+  assert.match(todayLayers, /color\(srgb 0\.666667 0\.266667 0\.2 \/ 0\.150588\)/, 'day mark remains visible above the translucent fill');
   await page.getByRole('radio', { name: '多周', exact: true }).click();
   const transparentChip = page.locator('.chip.bar[aria-label="跨月旧任务"]').first();
   await transparentChip.waitFor();
   assert.match(await transparentChip.evaluate((el) => getComputedStyle(el).backgroundColor), /rgba\(18, 52, 86, 0\.5\)/, 'web task paints its RGBA fill');
   assert.equal(await page.locator('.cell.marked').first().evaluate(el => el.style.getPropertyValue('--mark')), '#AA443380', 'web date mark retains its source colour and alpha');
+  showCompleted = true;
+  await stageMockDoc();
+  await page.reload();
+  await page.locator('.chip').first().waitFor();
   await page.getByRole('radio', { name: '甘特', exact: true }).click();
   await page.getByRole('radio', { name: '列表', exact: true }).click();
   await page.locator('.agenda').waitFor();
+  assert.equal(await page.locator('.flex-sections').count(), 0, '近期 keeps undated slots in the calendar column only');
+  assert(await page.locator('.day.today h2').innerText().then(text => text.startsWith('今天（2026年11月21日）')));
+  await page.getByRole('tab', { name: '所有', exact: true }).click();
+  await page.locator('[data-flex-section="month"]').waitFor();
+  assert.equal(await page.locator('[data-flex-section="month"] [data-task]').count(), 2, 'all lists current-month slots separately');
+  assert.equal(await page.locator('[data-flex-section="someday"] [data-task]').count(), 1, 'all lists open no-date tasks separately');
+  assert.equal(await page.locator('[data-flex-section="month"] .flex-note').innerText(), '在桌面勾选时按今天记录：2026年11月21日');
+  assert.equal(await page.locator('.day [data-task="f"][data-date="2026-11-05"]').count(), 1, 'completed monthly slot is archived on its completion date');
+  await page.getByRole('tab', { name: '近期', exact: true }).click();
   assert.equal(await page.locator('.group-badge').first().innerText(), '工作');
   await page.getByRole('button', { name: '按分组筛选', exact: true }).click();
   await page.getByRole('checkbox', { name: '生日', exact: true }).click();

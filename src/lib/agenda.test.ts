@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '@/types';
-import { agenda, allTasks, dayHeading } from './agenda';
+import { agenda, allTasks, dayHeading, listDayHeading } from './agenda';
 
 const t = (id: string, start: string, end = start, extra: Partial<Task> = {}): Task => ({
   id, title: id, start, end, progress: 0, done: false, order: 1, createdAt: 0, updatedAt: 0, ...extra,
@@ -38,6 +38,11 @@ describe('agenda', () => {
     expect([dayHeading(today, today), dayHeading('2026-10-31', today), dayHeading('2026-10-29', today), dayHeading('2026-11-02', today)]).toEqual(['今天', '明天', '昨天', '11月2日']);
     expect([dayHeading('2025-03-04', today), dayHeading('2027-01-01', today)]).toEqual(['2025年3月4日', '2027年1月1日']);
   });
+
+  it('labels today with its full date in the list', () => {
+    expect(listDayHeading(today, today)).toBe('今天（2026年10月30日）');
+    expect(listDayHeading('2026-10-31', today)).toBe('明天');
+  });
 });
 
 describe('allTasks (所有)', () => {
@@ -47,15 +52,22 @@ describe('allTasks (所有)', () => {
     t('daily', '2026-01-05', '2026-01-05', { repeat: { freq: 'daily', interval: 1 } }),
     t('old', '2025-03-04', '2025-03-06', { done: true }),
     t('birthday', '1992-12-21', '1992-12-21', { repeat: { freq: 'lunarYearly' }, doneDates: ['1992-12-21'] }),
+    t('month', '2026-10-01', '2026-10-01', { flex: 'month', flexDone: { '2026-10': '2026-10-12', '2026-09': '2026-10-12' } }),
+    t('someday', '2026-10-29', '2026-10-29', { flex: 'someday', flexDone: { '': '2026-10-30' } }),
+    t('open-flex', '2026-10-01', '2026-10-01', { flex: 'month' }),
   ];
 
   it('lists every task once on its start date, past ones too, and keeps today', () => {
     const days = allTasks(tasks, today);
-    expect(days.map((d) => d.date)).toEqual(['1992-12-21', '2025-03-04', '2026-01-05', today, '2027-02-19']);
-    expect(days.reduce((n, d) => n + d.items.length, 0)).toBe(4);
+    expect(days.map((d) => d.date)).toEqual(['1992-12-21', '2025-03-04', '2026-01-05', '2026-10-12', today, '2027-02-19']);
+    expect(days.reduce((n, d) => n + d.items.length, 0)).toBe(6);
     expect(days[1].items[0]).toMatchObject({ end: '2025-03-06', done: true });
     expect(days[0].items[0].done).toBe(false);
-    expect(days[3].items).toEqual([]);
+    expect(days[3].items.map((o) => o.task.id)).toEqual(['month']);
+    expect(days[3].items[0]).toMatchObject({ date: '2026-10-12', done: true });
+    expect(days[4].items.map((o) => o.task.id)).toEqual(['someday']);
+    expect(days[4].items.find((o) => o.task.id === 'someday')).toMatchObject({ date: today, done: true });
+    expect(days[4].items.some((o) => o.task.id === 'open-flex')).toBe(false);
   });
 
   it('hides done tasks but not a series', () => {

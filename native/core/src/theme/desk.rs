@@ -1,7 +1,7 @@
 //! Task colours (fluent/theme.ts) and the desk calendar's appearance variables (the deskVars
 //! of composables/theme.ts).
 
-use super::{best_monochrome_text, best_text_on, best_text_on_over, contrast, Rgba, Shadow, Tokens, BLACK, WHITE};
+use super::{best_monochrome_text, best_text_on, best_text_on_over, contrast, Rgba, Shadow, Tokens, BLACK, TRANSPARENT, WHITE};
 use crate::settings::Desk;
 
 /// A task palette entry. `bar` carries white (or black for yellow) text; text_light/text_dark
@@ -95,9 +95,10 @@ pub struct DeskStyle {
     pub outline_color: Rgba,
     pub outline_width: f64,
     pub outline_on: bool,
-    pub today: Rgba,
+    pub today_border: Rgba,
+    pub today_border_width: f64,
+    pub today_fill: Rgba,
     pub today_text: Rgba,
-    pub today_style: String,
     pub rest_tint: Rgba,
     pub holiday_text: Rgba,
     pub term_text: Rgba,
@@ -141,8 +142,9 @@ pub fn desk_style(s: &Desk, t: &Tokens) -> DeskStyle {
         Vec::new()
     };
     let rest_auto = if dark { Rgba::new(0.0, 0.0, 0.0, 0.16) } else { Rgba::new(0.0, 0.0, 0.0, 0.035) };
-    let today_base = if s.today_color == "accent" { t.accent_fill } else { setting_color(&s.today_color, t.accent_fill) };
-    let today = today_base.with_alpha(today_base.a * s.today_opacity.clamp(0.0, 100.0) / 100.0);
+    let today_border = setting_color(&s.today_border_color, TRANSPARENT);
+    let today_border_width = s.today_border_width.clamp(0.0, 10.0);
+    let today_fill = setting_color(&s.today_fill_color, TRANSPARENT);
     let text_color = calendar_text_color(s, t);
     let outline_color = best_text_on(text_color);
     DeskStyle {
@@ -163,9 +165,10 @@ pub fn desk_style(s: &Desk, t: &Tokens) -> DeskStyle {
         outline_color,
         outline_width,
         outline_on: glow_on,
-        today,
-        today_text: if s.today_style == "fill" { best_text_on_over(today, cell) } else { t.text_primary },
-        today_style: if s.today_style == "fill" { "fill" } else { "outline" }.into(),
+        today_border,
+        today_border_width,
+        today_fill,
+        today_text: if today_fill.a > 0.0 { best_text_on_over(today_fill, cell) } else { text_color },
         rest_tint: if s.rest_bg_color == "auto" {
             rest_auto
         } else {

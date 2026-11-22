@@ -5,7 +5,7 @@
 // - "someday": once, no date at all (slot "s:"); gone from the list when done.
 // `flexDone` maps a slot's key ("2026-11", or "" for someday) to the day it was done.
 import type { ISODate, Task } from '@/types';
-import { addMonths, endOfMonth, startOfMonth } from './date';
+import { addMonths, endOfMonth, isISODate, startOfMonth } from './date';
 import type { Occurrence } from './recur';
 
 export const MONTH = 'month';
@@ -48,6 +48,14 @@ export function clearDay(t: Task, day: ISODate): Task {
   let out = t;
   for (const [k, d] of Object.entries(t.flexDone ?? {})) if (d === day) out = setSlot(out, k, undefined);
   return out;
+}
+
+/** Every calendar occurrence created by a completed flex slot, deduplicated by date. */
+export function doneOccurrences(t: Task): Occurrence[] {
+  if (!flexKind(t)) return [];
+  return [...new Set(Object.values(t.flexDone ?? {}).filter(isISODate))]
+    .sort()
+    .map((date) => ({ task: t, date, start: date, end: date, done: true }));
 }
 
 export interface FlexSide {

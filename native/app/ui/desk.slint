@@ -116,17 +116,23 @@ component DayCell inherits Rectangle {
     accessible-role: list-item;
     accessible-label: cell.aria;
     accessible-item-selected: selected;
-    // background-image layer: today beats a day mark beats the rest-day tint.
+    // Keep the day mark above the translucent today fill so both remain visible.
     Rectangle {
         border-radius: 4px;
-        background: cell.today && Theme.desk.today-style == "fill" ? Theme.desk.today
-            : cell.marked ? cell.mark.with_alpha(1.0).transparentize(0.7).with_alpha(cell.mark.alpha / 255)
-            : cell.rest ? Theme.desk.rest-tint : transparent;
+        background: cell.rest ? Theme.desk.rest-tint : transparent;
     }
-    if cell.today && Theme.desk.today-style == "outline" && !drop: Rectangle {
+    if cell.today && Theme.desk.today-fill.alpha > 0: Rectangle {
         border-radius: 4px;
-        border-width: 1px;
-        border-color: Theme.desk.today.with_alpha(1.0).transparentize(0.45).with_alpha(Theme.desk.today.alpha / 255);
+        background: Theme.desk.today-fill;
+    }
+    if cell.marked: Rectangle {
+        border-radius: 4px;
+        background: cell.mark.with_alpha(1.0).transparentize(0.7).with_alpha(cell.mark.alpha / 255);
+    }
+    if cell.today && Theme.desk.today-border-width > 0px && !drop: Rectangle {
+        border-radius: 4px;
+        border-width: Theme.desk.today-border-width;
+        border-color: Theme.desk.today-border;
     }
     if drop: Rectangle {
         border-radius: 4px;
@@ -173,14 +179,12 @@ component DayCell inherits Rectangle {
         num := Rectangle {
             property <bool> today: cell.today;
             property <color> c: cell.dim ? (cell.rest ? Theme.desk.holiday-text : Theme.desk.text-secondary)
-                : today && Theme.desk.today-style == "fill" ? Theme.desk.today-text
+                : today && Theme.desk.today-fill.alpha > 0 ? Theme.desk.today-text
                 : cell.rest ? Theme.desk.holiday-text : Theme.desk.text-color;
             width: max(18px * fs, n.preferred-width + (today ? 8px : 0));
             height: 18px * fs;
             border-radius: 9px;
-            background: today && Theme.desk.today-style == "fill" ? Theme.desk.today : transparent;
-            border-width: today && Theme.desk.today-style == "outline" ? 1px : 0px;
-            border-color: Theme.desk.today;
+            background: today ? Theme.desk.today-fill : transparent;
             n := GText {
                 width: 100%;
                 height: 100%;
@@ -910,6 +914,7 @@ export component DeskWindow inherits Window {
     callback list-toggle(ChipData);
     callback list-open(ChipData);
     callback list-menu(ChipData, length, length);
+    callback list-jump-section(string);
     public function list-scroll-to(i: int) { list.scroll-to-row(i); }
     public function list-page(dir: int) { list.page(dir); }
     in property <[CountdownData]> countdowns;
@@ -1296,6 +1301,7 @@ export component DeskWindow inherits Window {
                 list := AgendaList {
                     flash-task: root.flash-task;
                     list-group-labels: root.list-group-labels;
+                    has-undated-sections: root.list-range == "all";
                     visible: root.view == "list";
                     rows: root.list-rows;
                     read-only: root.read-only;
@@ -1303,6 +1309,7 @@ export component DeskWindow inherits Window {
                     toggle(c) => { root.list-toggle(c); }
                     open(c) => { root.list-open(c); }
                     menu(c, x, y) => { root.list-menu(c, x, y); }
+                    jump-section(section) => { root.list-jump-section(section); }
                     more => { root.list-more(); }
                     leave-focus => { root.focus-root(); }
                 }
@@ -1581,7 +1588,7 @@ export component DeskWindow inherits Window {
                     y: i * 34px; width: parent.width; height: 32px;
                     variant: ButtonVariant.subtle;
                     text: c.days == 0 ? @tr("{0} 就是今天", c.label) : @tr("距{0}还有 {1} 天", c.label, c.days);
-                    clicked => { countdown-list.close(); root.locate(c.task-id, c.date); }
+                    clicked => { root.locate(c.task-id, c.date); countdown-list.close(); }
                 }
             }
         }

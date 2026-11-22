@@ -17,10 +17,27 @@ describe('settings defaults', () => {
     expect(s.theme.accent).toBe('system');
     expect(s.desk.bounds).toEqual({ x: 1, y: 2, w: 3, h: 4 });
     expect(s.desk.bgOpacity).toBe(DEFAULT_SETTINGS.desk.bgOpacity);
-    expect(s.desk.todayStyle).toBe('outline');
-    expect(s.desk.todayOpacity).toBe(35);
+    expect(s.desk.todayBorderColor).toBe('#006DC0');
+    expect(s.desk.todayBorderWidth).toBe(2);
+    expect(s.desk.todayFillColor).toBe('#0078D426');
     expect(s.calendar.restDays).toEqual([0]);
     expect(mergeDefaults(DEFAULT_SETTINGS, undefined)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('migrates the old today marker into independent RGBA border and fill settings', () => {
+    const fill = mergeDefaults(DEFAULT_SETTINGS, { theme: { accent: '#123456' }, desk: { todayColor: '#FF000080', todayStyle: 'fill', todayOpacity: 50 } });
+    expect(fill.desk.todayBorderColor).toBe('');
+    expect(fill.desk.todayBorderWidth).toBe(0);
+    expect(fill.desk.todayFillColor).toBe('#FF000040');
+    const outline = mergeDefaults(DEFAULT_SETTINGS, { desk: { todayColor: '#FF000080', todayStyle: 'outline', todayOpacity: 50 } });
+    expect(outline.desk.todayBorderColor).toBe('#FF000040');
+    expect(outline.desk.todayBorderWidth).toBe(1);
+    expect(outline.desk.todayFillColor).toBe('');
+    const both = mergeDefaults(DEFAULT_SETTINGS, { desk: { todayColor: 'accent', todayStyle: 'outline', todayOpacity: 50,
+      todayBorderColor: '#00FF0080', todayBorderWidth: 4, todayFillColor: '#0000FF40' } });
+    expect(both.desk.todayBorderColor).toBe('#00FF0080');
+    expect(both.desk.todayBorderWidth).toBe(4);
+    expect(both.desk.todayFillColor).toBe('#0000FF40');
   });
 });
 
@@ -100,6 +117,15 @@ describe('search and sample data', () => {
     const weekly = mk({ title: '周例会', start: '2026-01-05', repeat: { freq: 'weekly' } });
     const hit = searchTasks([weekly], {}, { ...opts, q: '例会', range: '1m' }, '2026-10-29');
     expect(hit.map((h) => h.date)).toEqual(['2026-10-26']);
+  });
+
+  it('locates an undated task at its closest completion date', () => {
+    const month = mk({ id: 'month', title: '每月复盘', start: '2026-01-01', flex: 'month', flexDone: { '2026-11': '2026-11-20' } });
+    const someday = mk({ id: 'someday', title: '整理相册', start: '2026-11-01', flex: 'someday', flexDone: { '': '2026-11-18' } });
+    const opts = { q: '', range: 'all' as const, status: 'all' as const, color: '' };
+    expect(searchTasks([month, someday], {}, opts, '2026-11-21').map((h) => [h.task.id, h.date])).toEqual([
+      ['month', '2026-11-20'], ['someday', '2026-11-18'],
+    ]);
   });
 
   it('creates linked sample tasks', () => {

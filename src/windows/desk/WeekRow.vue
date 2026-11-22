@@ -9,6 +9,7 @@ import { doc, storeState } from '@/stores/doc';
 import { notify, ui } from './state';
 import type { CellInfo } from './types';
 import TaskChip from './TaskChip.vue';
+import { parseRgba } from '@/lib/rgba';
 
 const props = defineProps<{
   cells: CellInfo[];
@@ -99,7 +100,7 @@ function onCellDblClick(date: ISODate) {
           :tabindex="ui.selected === c.date ? 0 : -1"
           :aria-selected="ui.selected === c.date"
           :aria-describedby="`desc-${c.date}`"
-          :class="{ rest: c.rest, today: c.today, 'today-fill': c.today && doc.settings.desk.todayStyle === 'fill', 'today-outline': c.today && doc.settings.desk.todayStyle === 'outline', dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash && c.date >= ui.flash && c.date <= ui.flashEnd }"
+          :class="{ rest: c.rest, today: c.today, 'today-fill': c.today && (parseRgba(doc.settings.desk.todayFillColor)?.[3] ?? 0) > 0, dim: c.dim, marked: !!c.mark, drop: dropDate === c.date, flash: ui.flash && c.date >= ui.flash && c.date <= ui.flashEnd }"
           :style="c.mark ? { '--mark': c.mark } : undefined"
           @click="ui.selected = c.date"
           @dblclick="onCellDblClick(c.date)"
@@ -196,10 +197,20 @@ function onCellDblClick(date: ISODate) {
   background-image: linear-gradient(color-mix(in srgb, var(--mark) 30%, transparent), color-mix(in srgb, var(--mark) 30%, transparent));
 }
 .cell.today-fill {
-  background-image: linear-gradient(var(--today), var(--today));
+  background-image: linear-gradient(var(--today-fill), var(--today-fill));
 }
-.cell.today-outline {
-  box-shadow: inset 0 0 0 1px var(--today);
+.cell.today-fill.marked {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--mark) 30%, transparent), color-mix(in srgb, var(--mark) 30%, transparent)),
+    linear-gradient(var(--today-fill), var(--today-fill));
+}
+.cell.today-fill.rest:not(.marked) {
+  background-image:
+    linear-gradient(var(--today-fill), var(--today-fill)),
+    linear-gradient(var(--rest-tint), var(--rest-tint));
+}
+.cell.today {
+  box-shadow: inset 0 0 0 var(--today-border-width) var(--today-border);
 }
 .cell:focus-visible {
   box-shadow:
@@ -248,14 +259,12 @@ function onCellDblClick(date: ISODate) {
 .today .num {
   background: transparent;
   color: var(--calendar-text);
-  border: 1px solid var(--today);
   box-sizing: border-box;
   padding: 0 3px;
 }
 .today-fill .num {
-  background: var(--today);
+  background: var(--today-fill);
   color: var(--today-text);
-  border-color: transparent;
   text-shadow: none;
   padding: 0 4px;
 }

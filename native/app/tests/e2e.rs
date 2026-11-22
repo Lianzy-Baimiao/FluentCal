@@ -116,6 +116,28 @@ fn countdown_expand_button_keeps_its_width_after_many_long_items() {
 }
 
 #[test]
+fn expanded_countdown_item_jumps_to_its_date() {
+    let today = fluentcal_core::date::today();
+    let target = fluentcal_core::date::add_days(&today, 39);
+    let doc = doc_with(&[json!({"id":"new-year","title":"元旦","start":target,"countdown":true})], json!({"calendar":{
+        "view":"month","holidayCountdown":false,"countdownFestival":false,"countdownTerm":false,"countdownMarked":true,"countdownGroups":[]
+    }}));
+    let t = start("countdown-expanded-locate", Some(doc));
+    t.click("展开倒计时");
+    let popup_item = ElementHandle::find_by_accessible_label(&t.w, "距元旦还有 39 天")
+        .filter(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button))
+        .filter(|e| e.absolute_position().y < 580.0)
+        .min_by(|a, b| a.absolute_position().y.total_cmp(&b.absolute_position().y))
+        .expect("the expanded countdown popup button, not the matching pill below");
+    t.click_at(t.at(&popup_item, popup_item.size().width / 2.0, popup_item.size().height / 2.0));
+    assert!(!t.w.get_any_popup(), "the expanded countdown list closes after selecting a date");
+    let (selected, cursor) = with(|a| (a.desk.ui.selected.clone(), a.desk.ui.cursor.clone())).unwrap();
+    assert_eq!(selected, target, "the clicked New Year countdown selects its date");
+    assert_eq!(cursor, fluentcal_core::date::start_of_month(&target), "the calendar pages to the countdown month");
+    assert_eq!(t.w.get_flash_date(), target);
+}
+
+#[test]
 fn new_document_uses_issue18_countdown_defaults() {
     let _t = start("countdown-defaults", Some(doc_with(&[], json!({}))));
     with(|a| {
@@ -441,14 +463,16 @@ fn gantt_export_png_and_svg() {
 }
 
 #[test]
-fn today_marker_settings_control_outline_fill_and_opacity() {
+fn today_marker_settings_control_border_width_and_fill() {
     let light = fluentcal_core::theme::tokens(false, "#0078D4", None);
     let defaults = fluentcal_core::theme::desk_style(&fluentcal_core::settings::Desk::default(), &light);
-    assert_eq!(defaults.today_style, "outline");
-    assert!((defaults.today.a - 0.35).abs() < 0.001);
-    let fill = fluentcal_core::theme::desk_style(&fluentcal_core::settings::Desk { today_style: "fill".into(), today_opacity: 60.0, ..Default::default() }, &light);
-    assert_eq!(fill.today_style, "fill");
-    assert!((fill.today.a - 0.6).abs() < 0.001);
+    assert_eq!(defaults.today_border.to_hex(), "#006DC0");
+    assert_eq!(defaults.today_border_width, 2.0);
+    assert_eq!(defaults.today_fill.to_hex_alpha(), "#0078D426");
+    let both = fluentcal_core::theme::desk_style(&fluentcal_core::settings::Desk {
+        today_border_color: "#FF000080".into(), today_border_width: 5.0, today_fill_color: "#00FF0040".into(), ..Default::default()
+    }, &light);
+    assert_eq!((both.today_border.to_hex_alpha(), both.today_border_width, both.today_fill.to_hex_alpha()), ("#FF000080".into(), 5.0, "#00FF0040".into()));
 }
 
 #[test]
@@ -1160,8 +1184,14 @@ fn list_view_upcoming_and_all() {
     assert_eq!(rows, want, "by start date, a repeating task once");
     let gym = t.w.get_list_rows().iter().find(|r| r.chip.title == "健身").unwrap();
     assert!(!gym.checkable && gym.meta == "每天", "the series, with its rule: {:?}", gym.meta);
-    let heading = ElementHandle::find_by_accessible_label(&t.w, &format!("今天 {}", fluentcal_core::agenda::day_sub(&today, true))).next().expect("today's heading is built");
+    let today_heading = t.w.get_list_rows().iter().find(|r| r.kind == "day" && r.today).unwrap();
+    assert_eq!(today_heading.heading, format!("今天（{}）", fluentcal_core::date::format_ymd(&today)));
+    let section = ElementHandle::find_by_accessible_label(&t.w, &format!("本 {} 月待办（不定日）", fluentcal_core::date::parts(&today).1)).next().expect("all view shows the undated sections");
     let list = ElementHandle::find_by_accessible_label(&t.w, "任务列表").find(|e| e.accessible_role() == Some(R::List)).unwrap();
+    assert!(section.absolute_position().y - list.absolute_position().y < 80.0, "the all view starts at its undated sections");
+    with(|a| a.desk_list_scroll_date_today()).unwrap();
+    settle();
+    let heading = ElementHandle::find_by_accessible_label(&t.w, &format!("今天（{}） {}", fluentcal_core::date::format_ymd(&today), fluentcal_core::agenda::day_sub(&today, true))).next().expect("Home shows the full today's date");
     let dy = heading.absolute_position().y - list.absolute_position().y;
     assert!((0.0..40.0).contains(&dy), "today's heading at the top of the list: {dy}");
     // back to 近期, and the setting stays
@@ -1169,6 +1199,87 @@ fn list_view_upcoming_and_all() {
     assert!(item(&t, "去年的体检").is_none());
     tab(&t, "月");
     assert!(t.w.get_list_rows().row_count() == 0, "nothing kept for another view");
+}
+
+#[test]
+fn all_list_shows_flex_sections_and_records_completion_on_today() {
+    use fluentcal_core::date::{add_days, parts};
+    let today = fluentcal_core::date::today();
+    let first_month = fluentcal_core::date::start_of_month(&today);
+    let tasks = [
+        json!({"id":"month","title":"交物业费","start":first_month,"end":first_month,"flex":"month"}),
+        json!({"id":"someday","title":"整理相册","start":today,"end":today,"flex":"someday"}),
+        json!({"id":"plain","title":"普通任务","start":add_days(&today, -1),"end":add_days(&today, -1)}),
+    ];
+    let mut doc = doc_with(&tasks, json!({"calendar":{"view":"list","listRange":"all","listGroupLabels":true}}));
+    doc["groups"] = json!({"g":{"id":"g","name":"工作","color":"blue","order":1}});
+    doc["tasks"]["month"]["groupId"] = json!("g");
+    doc["tasks"]["someday"]["groupId"] = json!("g");
+    let t = start("list-flex", Some(doc));
+    let rows = || t.w.get_list_rows().iter().collect::<Vec<_>>();
+    let month_head = ElementHandle::find_by_accessible_label(&t.w, &format!("本 {} 月待办（不定日）", parts(&today).1)).next().expect("month to-do section");
+    let someday_head = ElementHandle::find_by_accessible_label(&t.w, "无日期待办").next().expect("no-date section");
+    let month = rows().iter().find(|r| r.kind == "item" && r.chip.task_id == "month").unwrap().clone();
+    let someday = rows().iter().find(|r| r.kind == "item" && r.chip.task_id == "someday").unwrap().clone();
+    assert_eq!((month.section.as_str(), month.when.as_str(), month.meta.as_str(), month.chip.date.as_str(), month.chip.done), ("month", "不定日", "每月一次（不定日）", format!("m:{}", &today[..7]).as_str(), false));
+    assert_eq!((someday.section.as_str(), someday.when.as_str(), someday.meta.as_str(), someday.chip.date.as_str()), ("someday", "无日期", "无日期", "s:"));
+    assert!(month_head.absolute_position().y < someday_head.absolute_position().y);
+    assert!(rows().iter().all(|r| r.kind != "item" || r.chip.task_id != "month" && r.chip.task_id != "someday" || r.chip.date.starts_with("m:") || r.chip.date == "s:"), "open flex tasks do not appear under a fabricated date");
+
+    with(|a| a.desk_filter_toggle("g", true)).unwrap();
+    assert_eq!(rows().iter().filter(|r| r.kind == "item").map(|r| r.chip.task_id.to_string()).collect::<Vec<_>>(), ["month", "someday"], "undated sections respect the active group filter");
+    with(|a| a.desk_filter_clear()).unwrap();
+    with(|a| a.patch_settings(json!({"tasks":{"showCompleted":false}}))).unwrap();
+    assert!(!rows().iter().any(|r| r.kind == "item" && r.chip.task_id == "month" && r.chip.done), "hide completed removes the current month slot");
+    with(|a| a.patch_settings(json!({"tasks":{"showCompleted":true}}))).unwrap();
+
+    let check = |title: &str| {
+        let e = ElementHandle::find_by_accessible_label(&t.w, title).find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::ListItem)).unwrap();
+        let p = e.absolute_position();
+        t.click_at(LogicalPosition::new(p.x + 15.0, p.y + e.size().height / 2.0));
+    };
+    check("交物业费");
+    check("整理相册");
+    assert_eq!(t.task("交物业费")["flexDone"][&today[..7]], json!(today));
+    assert!(t.task("整理相册")["flexDone"].get("").is_some_and(|d| d == &today));
+    let listed_today = rows().iter().filter(|r| r.kind == "item" && r.chip.date == today).map(|r| r.chip.task_id.to_string()).collect::<Vec<_>>();
+    assert_eq!(listed_today, ["month", "someday"]);
+    let all_rows = rows();
+    let heading = all_rows.iter().find(|r| r.kind == "day" && r.today).unwrap();
+    assert_eq!(heading.heading, format!("今天（{}）", fluentcal_core::date::format_ymd(&today)));
+}
+
+#[test]
+fn all_list_has_fixed_undated_section_jumps_after_scrolling_through_many_dates() {
+    use fluentcal_core::date::add_days;
+    use i_slint_backend_testing::AccessibleRole as R;
+    let today = fluentcal_core::date::today();
+    let mut tasks: Vec<Value> = (1..=180).map(|i| json!({"id":format!("dated-{i}"),"title":format!("日期任务 {i}"),"start":add_days(&today, i - 90)})).collect();
+    tasks.extend([
+        json!({"id":"month","title":"交物业费","start":fluentcal_core::date::start_of_month(&today),"flex":"month"}),
+        json!({"id":"someday","title":"整理相册","start":today,"flex":"someday"}),
+    ]);
+    let t = start("list-flex-jump", Some(doc_with(&tasks, json!({"calendar":{"view":"list","listRange":"all"}}))));
+    let list = ElementHandle::find_by_accessible_label(&t.w, "任务列表").find(|e| e.accessible_role() == Some(R::List)).unwrap();
+    let jump_month = ElementHandle::find_by_accessible_label(&t.w, "跳到本月待办（不定日）").find(|e| e.accessible_role() == Some(R::Button)).expect("fixed month section jump");
+    let jump_someday = ElementHandle::find_by_accessible_label(&t.w, "跳到无日期待办").find(|e| e.accessible_role() == Some(R::Button)).expect("fixed someday section jump");
+    let jump_month_y = jump_month.absolute_position().y;
+    let jump_someday_y = jump_someday.absolute_position().y;
+    t.w.invoke_list_page(100);
+    settle();
+    assert!(t.w.root_element().query_descendants().match_predicate(|e| e.accessible_label().as_deref() == Some("日期任务 180")).find_first().is_some(), "the long dated list can be scrolled to its end");
+    t.click_at(t.at(&jump_someday, jump_someday.size().width / 2.0, jump_someday.size().height / 2.0));
+    assert!(ElementHandle::find_by_accessible_label(&t.w, "整理相册").find(|e| e.accessible_role() == Some(R::ListItem)).is_some());
+    assert!(jump_month.absolute_position().y >= list.absolute_position().y);
+    assert!(jump_someday.absolute_position().y >= list.absolute_position().y);
+    t.click_at(t.at(&jump_month, jump_month.size().width / 2.0, jump_month.size().height / 2.0));
+    assert!(ElementHandle::find_by_accessible_label(&t.w, "交物业费").find(|e| e.accessible_role() == Some(R::ListItem)).is_some());
+    let jump_month = ElementHandle::find_by_accessible_label(&t.w, "跳到本月待办（不定日）")
+        .find(|e| e.accessible_role() == Some(R::Button)).unwrap();
+    let jump_someday = ElementHandle::find_by_accessible_label(&t.w, "跳到无日期待办")
+        .find(|e| e.accessible_role() == Some(R::Button)).unwrap();
+    assert_eq!(jump_month.absolute_position().y, jump_month_y, "the month jump stays fixed while the list scrolls");
+    assert_eq!(jump_someday.absolute_position().y, jump_someday_y, "the no-date jump stays fixed while the list scrolls");
 }
 
 /// GitHub #6: 行高随任务多少调整. Off (the default): equal rows, a busy day folds into "+N". On:
@@ -1927,13 +2038,11 @@ fn group_filter_shows_the_ticked_groups() {
     with(|a| a.desk_close_popups()).unwrap();
     settle();
     assert!(!t.w.get_any_popup(), "a press outside the calendar closes them");
-    with(|a| {
-        a.desk_set_view("list");
-        a.desk_set_list_range("all");
-    })
-    .unwrap();
+    with(|a| a.desk_set_view("list")).unwrap();
     settle();
-    assert_eq!(listed(&t), set(&["妈妈生日", "周报", "订蛋糕"]));
+    with(|a| a.desk_set_list_range("all")).unwrap();
+    settle();
+    assert_eq!(listed(&t), set(&["妈妈生日", "周报", "订蛋糕", "交物业费"]));
     assert!(button(&t).is_some_and(|b| b.accessible_checked() == Some(true)));
 
     // not in the Gantt chart, which has its own 只显示分组
@@ -1969,6 +2078,8 @@ fn group_filter_shows_the_ticked_groups() {
     assert_eq!(rows(&t), ["未分组:8:false"]);
     assert_eq!(t.w.get_filter_hint(), "还没有分组。右键任务 › 分组，可以把它放进“生日”“工作”等分组。");
     assert_eq!(chips(&t), set(&["妈妈生日", "周报", "买菜", "旧分组的事", "订蛋糕", "散步"]));
+    with(|a| a.desk_filter_clear()).unwrap();
+    settle();
     // 管理分组…: where groups are made, renamed and deleted
     t.click("管理分组…");
     assert!(!t.w.get_any_popup());

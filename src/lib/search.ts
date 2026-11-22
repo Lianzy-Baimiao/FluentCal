@@ -1,5 +1,6 @@
 import type { Group, ISODate, Task } from '@/types';
-import { addMonths, diffDays } from './date';
+import { addMonths, diffDays, isISODate } from './date';
+import { flexKind } from './flex';
 import { occurrences } from './recur';
 
 export interface SearchOptions {
@@ -43,7 +44,9 @@ export function searchTasks(tasks: Task[], groups: Record<string, Group>, o: Sea
     if (o.status === 'done' && !t.done) continue;
     if (o.status === 'undone' && t.done) continue;
     if (o.color && (t.color ?? '') !== o.color) continue;
-    const date = months || t.repeat ? nearest(t, now, lo, hi) : t.start;
+    const date = flexKind(t)
+      ? Object.values(t.flexDone ?? {}).filter(isISODate).sort((a, b) => Math.abs(diffDays(now, a)) - Math.abs(diffDays(now, b)))[0] ?? t.start
+      : months || t.repeat ? nearest(t, now, lo, hi) : t.start;
     if (date) hits.push({ task: t, date });
   }
   return hits.sort((a, b) => Math.abs(diffDays(now, a.date)) - Math.abs(diffDays(now, b.date)) || a.task.order - b.task.order);

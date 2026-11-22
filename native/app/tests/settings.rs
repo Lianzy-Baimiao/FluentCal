@@ -106,8 +106,9 @@ fn settings_reach_data_json_and_the_pages() {
     t.g().invoke_set_bool("desk.locked".into(), false);
     t.g().invoke_set_str("theme.mode".into(), "dark".into());
     t.g().invoke_set_num("desk.bgOpacity".into(), 40.0);
-    t.g().invoke_set_str("desk.todayStyle".into(), "fill".into());
-    t.g().invoke_set_num("desk.todayOpacity".into(), 22.0);
+    t.g().invoke_set_str("desk.todayBorderColor".into(), "#FF000080".into());
+    t.g().invoke_set_num("desk.todayBorderWidth".into(), 7.5);
+    t.g().invoke_set_str("desk.todayFillColor".into(), "#00FF0040".into());
     t.g().invoke_set_str("desk.fontFamily".into(), "yahei-ui".into());
     t.g().invoke_set_str("desk.textColor".into(), "#CC0066".into());
     t.g().invoke_set_str("desk.taskTextMode".into(), "task".into());
@@ -121,8 +122,9 @@ fn settings_reach_data_json_and_the_pages() {
     assert_eq!(s["calendar"]["weekStart"], json!(0));
     assert_eq!(s["calendar"]["restDays"], json!([0, 5, 6]));
     assert_eq!(s["desk"]["bgOpacity"], json!(18), "the preset comes last");
-    assert_eq!(s["desk"]["todayStyle"], "fill");
-    assert_eq!(s["desk"]["todayOpacity"], 22);
+    assert_eq!(s["desk"]["todayBorderColor"], "#FF000080");
+    assert_eq!(s["desk"]["todayBorderWidth"], 7.5);
+    assert_eq!(s["desk"]["todayFillColor"], "#00FF0040");
     assert_eq!(s["desk"]["fontFamily"], "yahei-ui");
     assert_eq!(s["desk"]["textColor"], "#CC0066");
     assert_eq!(s["desk"]["taskTextMode"], "task");
@@ -131,8 +133,9 @@ fn settings_reach_data_json_and_the_pages() {
     assert!(!t.g().get_general().locked);
     assert_eq!(t.g().get_appearance().preset, "glass");
     assert_eq!(t.g().get_appearance().mode, "dark");
-    assert_eq!(t.g().get_appearance().today_style, "fill");
-    assert_eq!(t.g().get_appearance().today_opacity, 22.0);
+    assert_eq!(t.g().get_appearance().today_border_color, "#FF000080");
+    assert_eq!(t.g().get_appearance().today_border_width, 7.5);
+    assert_eq!(t.g().get_appearance().today_fill_color, "#00FF0040");
     assert_eq!(t.g().get_appearance().font_family, "yahei-ui");
     assert_eq!(t.g().get_appearance().text_color, "#CC0066");
     assert_eq!(t.g().get_appearance().task_text_mode, "task");

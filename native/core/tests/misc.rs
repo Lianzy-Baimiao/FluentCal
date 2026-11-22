@@ -105,6 +105,17 @@ fn search_finds_by_words_status_and_range() {
 }
 
 #[test]
+fn search_locates_a_flex_task_at_its_closest_completion_date() {
+    let month = Task { flex: Some("month".into()), flex_done: Some(BTreeMap::from([("2026-11".into(), "2026-11-20".into())])), ..mk("month", "每月复盘", "2026-01-01") };
+    let someday = Task { flex: Some("someday".into()), flex_done: Some(BTreeMap::from([("".into(), "2026-11-18".into())])), ..mk("someday", "整理相册", "2026-11-01") };
+    let opts = SearchOptions { range: "all".into(), ..Default::default() };
+    let hits = search_tasks(&[month, someday], &BTreeMap::new(), &opts, "2026-11-21");
+    assert_eq!(hits.iter().map(|h| (h.task.id.as_str(), h.date.as_str())).collect::<Vec<_>>(), [
+        ("month", "2026-11-20"), ("someday", "2026-11-18"),
+    ]);
+}
+
+#[test]
 fn sample_data_is_linked() {
     let (groups, tasks) = sample_data("2026-10-29", 0);
     assert_eq!(groups.len(), 1);

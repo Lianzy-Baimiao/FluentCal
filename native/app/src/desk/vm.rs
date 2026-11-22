@@ -5,7 +5,7 @@ use fluentcal_core::i18n::{tr, trf};
 
 use crate::theme::color;
 use crate::{CellData, ChipData, CountdownData, ListRowData, WeekData, WeekdayHead};
-use fluentcal_core::agenda::{agenda, all_tasks, day_heading, day_sub};
+use fluentcal_core::agenda::{agenda, all_tasks, day_sub, list_day_heading};
 use fluentcal_core::countdown::selected_countdowns;
 use fluentcal_core::date::{add_days, add_months, diff_days, format_friendly, format_range, format_ymd, iso_week, month_weeks, parts, start_of_month, start_of_week, weekday, WEEKDAY_SHORT};
 use fluentcal_core::lunar::{almanac, display_info as day_info, Kind};
@@ -331,30 +331,46 @@ fn cell(doc: &Doc, date: &str, focus: &str, month_mode: bool, today: &str, occs:
 }
 
 /// The list view (CAL-14): its rows, the row today's heading is in, and what goes under them
-/// ("more" for 显示更多日期, or a note). 近期 is today and the next `list_span` days; 所有 is
-/// every task once, on its start date.
+/// ("more" for 显示更多日期, or a note). 近期 is today and the next `list_span` days; 所有
+/// also includes undated sections and past tasks.
 pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRowData>, i32, String) {
+    use fluentcal_core::flex;
     let c = &doc.settings.calendar;
-    let show_done = doc.settings.tasks.show_completed || !ui.reveal_task.is_empty();
+    let show_done = doc.settings.tasks.show_completed;
     let all = c.list_range == "all" || ui.reveal_all;
-    let tasks = doc.tasks.values().filter(|task| shown(doc, ui, task));
-    let days = if all { all_tasks(tasks, today, show_done) } else { agenda(tasks, today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, show_done) };
     let mut rows = Vec::new();
     let mut today_row = 0;
+    let tasks = doc.tasks.values().filter(|task| shown(doc, ui, task));
+    if all {
+        let side = flex::side(tasks.clone(), today);
+        let hint = trf("在桌面勾选时按今天记录：{0}", &[format_ymd(today)]);
+        let heading = trf("本 {0} 月待办（不定日）", &[parts(today).1.to_string()]);
+        let month_slot = &side.month_slot;
+        let month_rows = side.month.into_iter().filter(|(task, done)| show_done || done.is_none() || task.id == ui.reveal_task)
+            .map(|(task, _)| list_flex_item(doc, task, month_slot, today, t));
+        list_flex_section(&mut rows, flex::MONTH, &heading, &hint, month_rows);
+        let someday_rows = side.someday.into_iter().map(|task| list_flex_item(doc, task, flex::SOMEDAY_SLOT, today, t));
+        list_flex_section(&mut rows, flex::SOMEDAY, tr("无日期待办"), &hint, someday_rows);
+    }
+    let include_done = show_done || !ui.reveal_task.is_empty();
+    let days = if all { all_tasks(tasks, today, include_done) } else { agenda(tasks, today, &add_days(today, ui.list_span.clamp(1, LIST_SPAN_MAX) - 1), today, include_done) };
     for d in &days {
+        let items = d.items.iter().filter(|item| show_done || !item.done || item.task.id == ui.reveal_task);
+        if d.date != today && items.clone().next().is_none() { continue; }
         if d.date == today {
             today_row = rows.len() as i32;
         }
-        rows.push(ListRowData { kind: "day".into(), heading: day_heading(&d.date, today).into(), sub: day_sub(&d.date, c.show_holidays).into(), today: d.date == today, ..Default::default() });
-        if d.items.is_empty() {
+        rows.push(ListRowData { kind: "day".into(), heading: list_day_heading(&d.date, today).into(), sub: day_sub(&d.date, c.show_holidays).into(), today: d.date == today, ..Default::default() });
+        if items.clone().next().is_none() {
             rows.push(ListRowData { kind: "empty".into(), ..Default::default() });
         }
-        rows.extend(d.items.iter().filter(|o| doc.settings.tasks.show_completed || !o.done || o.task.id == ui.reveal_task).map(|o| list_item(doc, o, all, today, t)));
+        rows.extend(items.map(|item| list_item(doc, item, all, today, t)));
     }
-    // A no-date to-do is normally in its own column; a search must still expose a row.
-    if let Some(task) = doc.tasks.get(&ui.reveal_task).filter(|task| task.flex.is_some()) {
-        let occ = Occurrence { task, date: task.start.clone(), start: task.start.clone(), end: task.end.clone(), done: task.done };
-        rows.insert(0, list_item(doc, &occ, true, today, t));
+    // A search must expose a to-do that is outside the current section or whose completion is hidden.
+    if let Some(task) = doc.tasks.get(&ui.reveal_task).filter(|task| flex::is_flex(task) && !rows.iter().any(|r| r.kind == "item" && r.chip.task_id == task.id)) {
+        let slot = if flex::kind(task) == Some(flex::MONTH) { flex::month_slot(&task.start) } else { flex::SOMEDAY_SLOT.into() };
+        rows.insert(0, list_flex_item(doc, task, &slot, today, t));
+        today_row += 1;
     }
     let footer = if all {
         String::new()
@@ -364,6 +380,32 @@ pub fn list_rows(doc: &Doc, ui: &DeskUi, today: &str, t: &Tokens) -> (Vec<ListRo
         tr("只显示 180 天内的任务").into()
     };
     (rows, today_row, footer)
+}
+
+fn list_flex_section(rows: &mut Vec<ListRowData>, section: &str, heading: &str, hint: &str, items: impl Iterator<Item = ListRowData>) {
+    rows.push(ListRowData { kind: "section".into(), section: section.into(), heading: heading.into(), sub: hint.into(), ..Default::default() });
+    let start = rows.len();
+    rows.extend(items);
+    if rows.len() == start {
+        rows.push(ListRowData { kind: "empty".into(), section: section.into(), ..Default::default() });
+    }
+}
+
+fn list_flex_item(doc: &Doc, task: &Task, slot: &str, today: &str, t: &Tokens) -> ListRowData {
+    use fluentcal_core::flex;
+    let done_day = flex::slot_done(task, slot);
+    let occ = Occurrence { task, date: slot.to_owned(), start: today.to_owned(), end: today.to_owned(), done: done_day.is_some() };
+    let mut row = list_item(doc, &occ, true, today, t);
+    let month = slot != flex::SOMEDAY_SLOT;
+    row.section = (if month { flex::MONTH } else { flex::SOMEDAY }).into();
+    row.when = tr(if month { "不定日" } else { "无日期" }).into();
+    row.due = "".into();
+    row.due_kind = "".into();
+    row.meta = tr(flex::describe(task)).into();
+    if let Some(done_day) = done_day {
+        row.chip.tip = trf("完成于 {0}", &[format_friendly(done_day, today)]).into();
+    }
+    row
 }
 
 /// One task of the list: the chip the calendar would draw (keys, menu, tooltip, colours), its

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearDay, dueOccurrences, flexOpen, flexSide, isSlot, newFlex, openMonth, setSlot, slotDone } from './flex';
+import { clearDay, doneOccurrences, dueOccurrences, flexOpen, flexSide, isSlot, newFlex, openMonth, setSlot, slotDone } from './flex';
 import { occurrences } from './recur';
 import { computeReminders } from './reminders';
 import { mk } from './testing';
@@ -23,6 +23,11 @@ describe('to-dos without a day', () => {
     expect(setSlot(t, 'm:2026-11', undefined).flexDone).toBeUndefined();
     expect(clearDay(t, '2026-11-17').flexDone).toBeUndefined();
     expect(clearDay(t, '2026-11-16').flexDone).toEqual({ '2026-11': '2026-11-17' });
+  });
+
+  it('builds unique completed occurrences and ignores invalid stored dates', () => {
+    const t = month({ flexDone: { '2026-10': '2026-11-17', '2026-11': '2026-11-17', bad: 'not-a-date' } });
+    expect(doneOccurrences(t).map((o) => [o.date, o.done])).toEqual([['2026-11-17', true]]);
   });
 
   it('marks a someday to-do done as a whole', () => {

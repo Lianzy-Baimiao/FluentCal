@@ -1,4 +1,5 @@
 import type { Settings } from './types';
+import { parseRgba, rgbaHex } from './lib/rgba';
 
 export const DEFAULT_SETTINGS: Settings = {
   general: { language: 'system', autostart: true, seeded: false, onboarded: false },
@@ -22,9 +23,9 @@ export const DEFAULT_SETTINGS: Settings = {
     fontScale: 100,
     cellGap: 3,
     lineSpacing: 2,
-    todayColor: 'accent',
-    todayStyle: 'outline',
-    todayOpacity: 35,
+    todayBorderColor: '#006DC0',
+    todayBorderWidth: 2,
+    todayFillColor: '#0078D426',
     restBgColor: 'auto',
     holidayTextColor: 'auto',
     termTextColor: 'auto',
@@ -102,5 +103,20 @@ export function mergeDefaults<T>(defaults: T, stored: Json): T {
   const out: Record<string, Json> = {};
   for (const [k, dv] of Object.entries(defaults)) out[k] = mergeDefaults(dv, stored[k]);
   for (const [k, sv] of Object.entries(stored)) if (!(k in out)) out[k] = sv;
+  // Migrate the former exclusive today fill/outline choice on read, without writing it
+  // back or replacing explicitly configured values from a newer version.
+  const savedDesk = stored.desk;
+  const mergedDesk = out.desk;
+  if (isPlainObject(savedDesk) && isPlainObject(mergedDesk) && ['todayColor', 'todayStyle', 'todayOpacity'].some(k => k in savedDesk)) {
+    const legacyColor = typeof savedDesk.todayColor === 'string' ? savedDesk.todayColor : 'accent';
+    const accent = isPlainObject(stored.theme) && typeof stored.theme.accent === 'string' && stored.theme.accent !== 'system' ? stored.theme.accent : '#0078D4';
+    const fill = savedDesk.todayStyle === 'fill';
+    const opacity = typeof savedDesk.todayOpacity === 'number' ? Math.max(0, Math.min(100, savedDesk.todayOpacity)) / 100 : 0.35;
+    const parsed = parseRgba(legacyColor === 'accent' ? accent : legacyColor) ?? [0, 120, 212, 1];
+    const color = rgbaHex([parsed[0], parsed[1], parsed[2], parsed[3] * opacity]);
+    if (!('todayBorderColor' in savedDesk)) mergedDesk.todayBorderColor = fill ? '' : color;
+    if (!('todayBorderWidth' in savedDesk)) mergedDesk.todayBorderWidth = fill ? 0 : 1;
+    if (!('todayFillColor' in savedDesk)) mergedDesk.todayFillColor = fill ? color : '';
+  }
   return out as T;
 }

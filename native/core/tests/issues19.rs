@@ -37,6 +37,29 @@ fn countdown_defaults_match_issue18() {
 }
 
 #[test]
+fn legacy_today_highlight_migrates_to_rgba_controls_without_overwriting_new_values() {
+    use fluentcal_core::settings::Settings;
+
+    let legacy = Settings::from_value(&json!({"theme":{"accent":"#123456"},"desk":{"todayColor":"#FF000080","todayStyle":"fill","todayOpacity":50}}));
+    assert_eq!(legacy.desk.today_border_color, "");
+    assert_eq!(legacy.desk.today_border_width, 0.0);
+    assert_eq!(legacy.desk.today_fill_color, "#FF000040");
+
+    let outline = Settings::from_value(&json!({"desk":{"todayColor":"#FF000080","todayStyle":"outline","todayOpacity":50}}));
+    assert_eq!(outline.desk.today_border_color, "#FF000040");
+    assert_eq!(outline.desk.today_border_width, 1.0);
+    assert_eq!(outline.desk.today_fill_color, "");
+
+    let explicit = Settings::from_value(&json!({"desk":{
+        "todayColor":"#FF000080","todayStyle":"outline","todayOpacity":50,
+        "todayBorderColor":"#00FF0080","todayBorderWidth":4,"todayFillColor":"#0000FF40"
+    }}));
+    assert_eq!(explicit.desk.today_border_color, "#00FF0080");
+    assert_eq!(explicit.desk.today_border_width, 4.0);
+    assert_eq!(explicit.desk.today_fill_color, "#0000FF40");
+}
+
+#[test]
 fn multi_day_statutory_holiday_countdown_uses_only_the_first_day() {
     use fluentcal_core::{countdown::selected_countdowns, lunar::set_holiday_overrides, model::{HolidayDay, HolidayYear}};
     use std::collections::BTreeMap;

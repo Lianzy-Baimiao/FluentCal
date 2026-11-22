@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { FDialog, taskColor } from '@/fluent';
 import { formatFriendly, formatRange } from '@/lib/date';
 import { doneDay } from '@/lib/done';
+import { flexKind, isSlot, slotDone } from '@/lib/flex';
 import { describeRule, occurrenceOn } from '@/lib/recur';
 import { doc } from '@/stores/doc';
 import { isDark } from '@/composables/theme';
@@ -15,10 +16,15 @@ const occ = computed(() => (task.value && details.date ? occurrenceOn(task.value
 const when = computed(() => {
   const t = task.value;
   if (!t) return '';
+  if (flexKind(t)) return flexKind(t) === 'month' ? tr('每月一次（不定日）') : tr('无日期');
   const r = formatRange(occ.value?.start ?? t.start, occ.value?.end ?? t.end);
   return t.time ? `${r} ${t.time}` : r;
 });
-const done = computed(() => occ.value?.done ?? task.value?.done ?? false);
+const done = computed(() => {
+  const t = task.value;
+  if (t && flexKind(t)) return isSlot(details.date) ? !!slotDone(t, details.date) : !!occ.value?.done;
+  return occ.value?.done ?? t?.done ?? false;
+});
 // the day it was ticked done, when that is known (GitHub #15)
 const doneOn = computed(() => (task.value && done.value ? doneDay(task.value, occ.value?.date ?? details.date ?? task.value.start) : undefined));
 const group = computed(() => (task.value?.groupId ? doc.groups[task.value.groupId]?.name : ''));

@@ -11,7 +11,7 @@ import { ChipData, ChipKeys } from "chip.slint";
 
 export struct ListRowData {
     group-name: string, group-color: color, group-text: color,
-    // "day" (a day's heading) | "item" (a task) | "empty" (今天 without tasks)
+    // "day" (a date), "section" (an undated group), "item", or "empty".
     kind: string,
     heading: string,
     sub: string,
@@ -26,6 +26,7 @@ export struct ListRowData {
     // at the right (GitHub #9): "3 天后", "逾期 5 天"; "" | "today" | "overdue"
     due: string,
     due-kind: string,
+    section: string,
 }
 
 // One task: check box, time, colour, title, details. Double click opens it, right click its
@@ -252,10 +253,37 @@ component ListHeading inherits Rectangle {
     }
 }
 
+component ListSection inherits Rectangle {
+    in property <string> heading;
+    in property <string> hint;
+    property <float> fs: Theme.desk.fs;
+    accessible-role: text;
+    accessible-label: root.heading;
+    VerticalLayout {
+        alignment: start;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 2px;
+        GText {
+            text: root.heading;
+            font-size: 14px * fs;
+            font-weight: 600;
+            color: Theme.desk.text-color;
+        }
+        if root.hint != "": GText {
+            text: root.hint;
+            font-size: 12px * fs;
+            color: Theme.desk.text-secondary;
+            overflow: elide;
+        }
+    }
+}
+
 export component AgendaList inherits Rectangle {
     in property <string> flash-task;
     in property <bool> list-group-labels;
     in property <[ListRowData]> rows;
+    in property <bool> has-undated-sections;
     in property <bool> read-only;
     // Under the rows: "more" (显示更多日期), a note, or nothing.
     in property <string> footer;
@@ -263,6 +291,7 @@ export component AgendaList inherits Rectangle {
     callback open(ChipData);
     callback menu(ChipData, length, length);
     callback more();
+    callback jump-section(string);
     // The focused task scrolled out of view: Slint drops the keys of a focused item it can't
     // see (and the focus with it), so the window's keys need the focus back (Ctrl+Z, PageDown).
     callback leave-focus();
@@ -277,11 +306,36 @@ export component AgendaList inherits Rectangle {
     property <float> fs: Theme.desk.fs;
     property <length> rh: round(32 * fs) * 1px;
     property <length> foot-h: footer != "" ? 52px : 0;
+    property <length> jump-bar-height: has-undated-sections ? 30px : 0px;
     property <int> focused-row: -1;
     accessible-role: list;
     accessible-label: @tr("任务列表");
-    flick := Flickable {
+    if has-undated-sections: HorizontalLayout {
+        x: 0;
+        y: 0;
         width: root.width - 6px;
+        height: jump-bar-height;
+        alignment: start;
+        cross-axis-alignment: center;
+        spacing: 4px;
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.small;
+            text: @tr("跳到本月待办（不定日）");
+            clicked => { root.jump-section("month"); }
+        }
+        Button {
+            variant: ButtonVariant.subtle;
+            size: ButtonSize.small;
+            text: @tr("跳到无日期待办");
+            clicked => { root.jump-section("someday"); }
+        }
+    }
+    flick := Flickable {
+        x: 0;
+        y: jump-bar-height;
+        width: root.width - 6px;
+        height: root.height - jump-bar-height;
         content-height: root.rows.length * rh + foot-h;
         // overflow-y: auto: the wheel scrolls, dragging doesn't
         mouse-drag-pan-enabled: false;
@@ -301,6 +355,10 @@ export component AgendaList inherits Rectangle {
                 heading: r.heading;
                 sub: r.sub;
                 today: r.today;
+            }
+            if near && r.kind == "section": ListSection {
+                heading: r.heading;
+                hint: r.sub;
             }
             if near && r.kind == "item": ListItem {
                 group-name: r.group-name;
@@ -355,7 +413,9 @@ export component AgendaList inherits Rectangle {
     }
     // A thin scroll bar while the list is longer than the view; its thumb can be dragged.
     if flick.content-height > flick.height + 1px: bar := Rectangle {
-        property <length> track: root.height;
+        y: jump-bar-height;
+        height: flick.height;
+        property <length> track: flick.height;
         property <length> thumb-h: max(24px, track * flick.height / flick.content-height);
         property <length> room: flick.content-height - flick.height;
         x: root.width - 6px;

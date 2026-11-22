@@ -19,9 +19,9 @@ const autoColor = (path: string, auto: string) => {
   return computed({ get: () => (s.value === auto ? '' : s.value), set: (v: string) => (s.value = v || auto) });
 };
 const bgColor = autoColor('desk.bgColor', 'auto');
-const todayColor = autoColor('desk.todayColor', 'accent');
-const todayStyle = useSetting<'fill' | 'outline'>('desk.todayStyle');
-const todayOpacity = useSetting<number>('desk.todayOpacity');
+const todayBorderColor = useSetting<string>('desk.todayBorderColor');
+const todayBorderWidth = useSetting<number>('desk.todayBorderWidth');
+const todayFillColor = useSetting<string>('desk.todayFillColor');
 const restColor = autoColor('desk.restBgColor', 'auto');
 const holidayColor = autoColor('desk.holidayTextColor', 'auto');
 const termColor = autoColor('desk.termTextColor', 'auto');
@@ -114,11 +114,11 @@ const textColorMode = computed({
           <FSettingsRow title="任务行距"><FSlider v-model="lineSpacing" :min="0" :max="8" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
         </template>
       </FSettingsExpander>
-      <FSettingsExpander icon="color" title="细节颜色" description="今日、休息日、节假日和节气的颜色；留空为自动">
+      <FSettingsExpander icon="color" title="细节颜色" description="今日边框与填充可同时显示，并分别设置 RGBA 颜色">
         <template #items>
-          <FSettingsRow title="今日高亮"><FColorSwatches v-model="todayColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
-          <FSettingsRow title="今日标记样式"><FSegmented v-model="todayStyle" :options="[{ value: 'outline', label: '边框' }, { value: 'fill', label: '填充' }]" size="small" /></FSettingsRow>
-          <FSettingsRow title="今日高亮不透明度"><FSlider v-model="todayOpacity" :min="0" :max="100" :step="1" :width="180" show-value :format="pct" /></FSettingsRow>
+          <FSettingsRow title="今日高亮-边框"><FColorSwatches v-model="todayBorderColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
+          <FSettingsRow title="今日高亮-边框粗细"><FSlider v-model="todayBorderWidth" :min="0" :max="10" :step="0.5" :width="180" show-value :format="(v: number) => `${v}px`" /></FSettingsRow>
+          <FSettingsRow title="今日高亮-填充"><FColorSwatches v-model="todayFillColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
           <FSettingsRow title="休息日背景"><FColorSwatches v-model="restColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
           <FSettingsRow title="节假日文字"><FColorSwatches v-model="holidayColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>
           <FSettingsRow title="节日与节气文字"><FColorSwatches v-model="termColor" :colors="detailSwatches" allow-none custom :size="22" /></FSettingsRow>

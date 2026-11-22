@@ -44,9 +44,17 @@ pub fn agenda<'a>(tasks: impl IntoIterator<Item = &'a Task>, start: &str, end: &
 pub fn all_tasks<'a>(tasks: impl IntoIterator<Item = &'a Task>, today: &str, show_done: bool) -> Vec<AgendaDay<'a>> {
     let mut by_day: BTreeMap<String, Vec<Occurrence<'a>>> = BTreeMap::new();
     for t in tasks {
+        if crate::flex::is_flex(t) {
+            if show_done {
+                for o in crate::flex::all_done_occurrences(t) {
+                    by_day.entry(o.date.clone()).or_default().push(o);
+                }
+            }
+            continue;
+        }
         let done = t.repeat.is_none() && t.done;
         // to-dos without a day have their own column
-        if (!show_done && done) || t.start.is_empty() || t.flex.is_some() {
+        if (!show_done && done) || t.start.is_empty() {
             continue;
         }
         let o = Occurrence { task: t, date: t.start.clone(), start: t.start.clone(), end: task_end(t).to_owned(), done };
@@ -91,6 +99,14 @@ pub fn day_heading(date: &str, today: &str) -> String {
     } else {
         trf("{0}年{1}月{2}日", &[y.to_string(), m.to_string(), d.to_string()])
     }
+}
+
+/// The list spells out today's date because no-date tasks are completed on that day.
+pub fn list_day_heading(date: &str, today: &str) -> String {
+    if date == today {
+        return trf("今天（{0}）", &[crate::date::format_ymd(today)]);
+    }
+    day_heading(date, today)
 }
 
 /// What follows the heading: "周四 · 十月初四 · 国庆节·休" (the weekday, the lunar day, a holiday,

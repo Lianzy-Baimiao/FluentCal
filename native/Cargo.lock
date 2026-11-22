@@ -1282,7 +1282,7 @@ checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 
 [[package]]
 name = "fluentcal-core"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "fluentcal-native"
-version = "0.3.23"
+version = "0.3.24"
 dependencies = [
  "fluentcal-core",
  "getrandom 0.3.4",

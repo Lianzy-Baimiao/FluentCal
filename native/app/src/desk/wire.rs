@@ -18,6 +18,7 @@ pub fn wire(w: &DeskWindow) {
     w.on_list_toggle(|c| run(move |a| a.desk_chip_toggle(&c.task_id, &c.date, c.done)));
     w.on_list_open(|c| run(move |a| a.open_editor_task(&c.task_id, Some(c.date.to_string()))));
     w.on_list_menu(|c, x, y| run(move |a| a.desk_chip_menu(&c, x, y)));
+    w.on_list_jump_section(|section| run(move |a| a.desk_list_jump_section(&section)));
     w.on_select(|d| run(move |a| a.desk_select(&d)));
     w.on_quick_add(|d| run(move |a| a.desk_quick_add(&d)));
     w.on_quick_add_submit(|t| run(move |a| a.desk_quick_add_submit(&t)));

@@ -100,14 +100,20 @@ fn desk_surface() {
     assert!((rgba.bg.a - 128.0 / 255.0 * 0.5).abs() < 0.001);
     assert!((rgba.cell_bg.a - 128.0 / 255.0 * 0.6).abs() < 0.001);
     assert_eq!(s.holiday_text.to_hex(), "#C42B1C");
-    let today_fill = desk_style(&Desk { today_style: "fill".into(), today_opacity: 20.0, ..Desk::default() }, &light);
-    assert_eq!(today_fill.today_style, "fill");
-    assert_eq!(today_fill.today.to_hex(), "#006DC0");
-    assert!((today_fill.today.a - 0.2).abs() < 0.001);
-    let today_outline = desk_style(&Desk { today_opacity: 0.0, ..Desk::default() }, &light);
-    assert_eq!(today_outline.today_style, "outline");
-    assert_eq!(today_outline.today.a, 0.0);
-    assert_eq!(today_outline.today_text, light.text_primary);
+    let today = desk_style(&Desk {
+        today_border_color: "#FF000080".into(),
+        today_border_width: 3.5,
+        today_fill_color: "#00FF0040".into(),
+        ..Desk::default()
+    }, &light);
+    assert_eq!(today.today_border.to_hex_alpha(), "#FF000080");
+    assert_eq!(today.today_border_width, 3.5);
+    assert_eq!(today.today_fill.to_hex_alpha(), "#00FF0040");
+    assert_eq!(today.today_text, best_text_on_over(today.today_fill, Rgba::hex("#FDFDFD")));
+    let no_today = desk_style(&Desk { today_border_width: 0.0, today_border_color: String::new(), today_fill_color: String::new(), ..Desk::default() }, &light);
+    assert_eq!(no_today.today_border_width, 0.0);
+    assert_eq!(no_today.today_border.a, 0.0);
+    assert_eq!(no_today.today_fill.a, 0.0);
     assert_eq!(calendar_text_color(&Desk { bg_color: "#FFFFFF".into(), text_color: "auto".into(), ..Desk::default() }, &light), BLACK);
     assert_eq!(calendar_text_color(&Desk { bg_color: "#101010".into(), text_color: "auto".into(), ..Desk::default() }, &light), BLACK, "light theme cells blend strongly toward white");
     let dark_text_theme = tokens(true, "#0078D4", None);
@@ -127,4 +133,24 @@ fn desk_surface() {
     assert_eq!(s.glow, Some(Rgba::new(0.0, 0.0, 0.0, 0.85)));
     assert_eq!(s.term_text, dark.accent_text);
     assert_eq!(mark_color("orange").unwrap().to_hex(), "#B5470D");
+}
+
+#[test]
+fn today_highlight_can_combine_independent_rgba_border_and_fill() {
+    let light = tokens(false, "#0078D4", None);
+    let style = desk_style(&Desk {
+        today_border_color: "#FF000080".into(),
+        today_border_width: 3.5,
+        today_fill_color: "#00FF0040".into(),
+        ..Desk::default()
+    }, &light);
+    assert_eq!(style.today_border.to_hex_alpha(), "#FF000080");
+    assert_eq!(style.today_border_width, 3.5);
+    assert_eq!(style.today_fill.to_hex_alpha(), "#00FF0040");
+    assert_eq!(style.today_text, best_text_on_over(style.today_fill, Rgba::hex("#FDFDFD")));
+
+    let off = desk_style(&Desk { today_border_color: String::new(), today_border_width: 0.0, today_fill_color: String::new(), ..Desk::default() }, &light);
+    assert_eq!(off.today_border_width, 0.0);
+    assert_eq!(off.today_border.a, 0.0);
+    assert_eq!(off.today_fill.a, 0.0);
 }

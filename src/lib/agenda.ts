@@ -1,6 +1,7 @@
 import { t as tr } from '@/i18n';
 import type { ISODate, Task } from '@/types';
-import { addDays, parts } from './date';
+import { addDays, formatYMD, parts } from './date';
+import { doneOccurrences, flexKind } from './flex';
 import { occurrences, type Occurrence } from './recur';
 
 export interface AgendaDay {
@@ -28,13 +29,21 @@ export function agenda(tasks: Task[], start: ISODate, end: ISODate, today: ISODa
 }
 
 /**
- * 所有 (GitHub #4): every task once, on its start date, so what was recorded before can be
- * looked through. A repeating task stands for its series: never done here, its rule says when
- * it comes. Today is always there (the list opens on it). Same as the desktop's agenda.rs.
+ * 所有 (GitHub #4): dated tasks once on their start date, and completed flex slots on their
+ * actual completion dates. Open flex slots stay in dedicated undated sections in the view.
+ * Repeating tasks stand for their series, and today is always included.
  */
 export function allTasks(tasks: Task[], today: ISODate, showDone = true): AgendaDay[] {
   const byDay = new Map<ISODate, Occurrence[]>();
   for (const t of tasks) {
+    if (flexKind(t)) {
+      if (showDone) {
+        for (const o of doneOccurrences(t)) {
+          (byDay.get(o.date) ?? byDay.set(o.date, []).get(o.date)!).push(o);
+        }
+      }
+      continue;
+    }
     const done = !t.repeat && t.done;
     if ((!showDone && done) || !t.start) continue;
     const o: Occurrence = { task: t, date: t.start, start: t.start, end: t.end && t.end >= t.start ? t.end : t.start, done };
@@ -62,4 +71,9 @@ export function dayHeading(date: ISODate, today: ISODate): string {
   if (date === addDays(today, -1)) return tr("昨天");
   const [y, m, d] = parts(date);
   return y === parts(today)[0] ? tr("{0}月{1}日", m, d) : tr("{0}年{1}月{2}日", y, m, d);
+}
+
+/** The list makes today's actual date explicit because no-date tasks are completed today. */
+export function listDayHeading(date: ISODate, today: ISODate): string {
+  return date === today ? tr("今天（{0}）", formatYMD(today)) : dayHeading(date, today);
 }

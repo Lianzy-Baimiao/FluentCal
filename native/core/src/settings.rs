@@ -63,11 +63,12 @@ section!(Desk {
     font_scale: f64 = 100.0,
     cell_gap: f64 = 3.0,
     line_spacing: f64 = 2.0,
-    today_color: String = "accent".into(),
-    /// "fill" | "outline"
-    today_style: String = "outline".into(),
-    /// 0–100
-    today_opacity: f64 = 35.0,
+    /// RGBA colour; empty disables the border.
+    today_border_color: String = "#006DC0".into(),
+    /// 0–10 logical pixels; zero hides the border.
+    today_border_width: f64 = 2.0,
+    /// Empty disables the fill; otherwise a custom RGBA colour.
+    today_fill_color: String = "#0078D426".into(),
     rest_bg_color: String = "auto".into(),
     holiday_text_color: String = "auto".into(),
     term_text_color: String = "auto".into(),
@@ -245,7 +246,9 @@ impl Settings {
     /// Stored settings with the defaults filled in (merge_defaults).
     pub fn from_value(v: &Value) -> Settings {
         let defaults = serde_json::to_value(Settings::default()).unwrap_or(Value::Null);
-        let mut settings: Settings = serde_json::from_value(merge_defaults(&defaults, v)).unwrap_or_default();
+        let mut merged = merge_defaults(&defaults, v);
+        migrate_today_highlight(&mut merged, v);
+        let mut settings: Settings = serde_json::from_value(merged).unwrap_or_default();
         if !crate::i18n::valid_preference(&settings.general.language) {
             settings.general.language = "system".into();
         }
@@ -254,5 +257,32 @@ impl Settings {
 
     pub fn of_doc(doc: &Value) -> Settings {
         Settings::from_value(doc.get("settings").unwrap_or(&Value::Null))
+    }
+}
+
+/// Convert the former exclusive fill/outline marker into the independent RGBA controls. The
+/// source document is inspected on every read, so users' old files need no eager rewrite.
+fn migrate_today_highlight(merged: &mut Value, stored: &Value) {
+    let Some(old) = stored.get("desk").and_then(Value::as_object) else { return };
+    if !["todayColor", "todayStyle", "todayOpacity"].iter().any(|key| old.contains_key(*key)) {
+        return;
+    }
+    let accent = stored.get("theme").and_then(|v| v.get("accent")).and_then(Value::as_str)
+        .filter(|value| *value != "system").unwrap_or("#0078D4");
+    let legacy_color = old.get("todayColor").and_then(Value::as_str).unwrap_or("accent");
+    let color = crate::theme::Rgba::parse(if legacy_color == "accent" { accent } else { legacy_color })
+        .unwrap_or(crate::theme::Rgba::hex("#0078D4"));
+    let opacity = old.get("todayOpacity").and_then(Value::as_f64).unwrap_or(35.0).clamp(0.0, 100.0) / 100.0;
+    let fill = old.get("todayStyle").and_then(Value::as_str) == Some("fill");
+    let color = color.with_alpha(color.a * opacity).to_hex_alpha();
+    let Some(desk) = merged.get_mut("desk").and_then(Value::as_object_mut) else { return };
+    if !old.contains_key("todayBorderColor") {
+        desk.insert("todayBorderColor".into(), Value::String(if fill { String::new() } else { color.clone() }));
+    }
+    if !old.contains_key("todayBorderWidth") {
+        desk.insert("todayBorderWidth".into(), serde_json::json!(if fill { 0.0 } else { 1.0 }));
+    }
+    if !old.contains_key("todayFillColor") {
+        desk.insert("todayFillColor".into(), Value::String(if fill { color } else { String::new() }));
     }
 }

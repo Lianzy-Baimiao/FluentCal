@@ -81,7 +81,15 @@ pub fn move_day(t: &mut Task, from: &str, to: &str) {
 
 /// The calendar's view of a flex task: done, on each day one of its slots was done.
 pub fn done_occurrences<'a>(t: &'a Task, range_start: &str, range_end: &str) -> Vec<Occurrence<'a>> {
-    let days: BTreeSet<&str> = t.flex_done.iter().flatten().map(|(_, d)| d.as_str()).filter(|d| *d >= range_start && *d <= range_end).collect();
+    let days: BTreeSet<&str> = t.flex_done.iter().flatten().map(|(_, d)| d.as_str())
+        .filter(|d| crate::date::is_iso_date(d) && *d >= range_start && *d <= range_end).collect();
+    days.into_iter().map(|d| Occurrence { task: t, date: d.to_owned(), start: d.to_owned(), end: d.to_owned(), done: true }).collect()
+}
+
+/// All dated completion records for the "所有" list. Multiple slots completed on one day
+/// share one calendar occurrence, just as they do in the month and multi-week views.
+pub fn all_done_occurrences(t: &Task) -> Vec<Occurrence<'_>> {
+    let days: BTreeSet<&str> = t.flex_done.iter().flatten().map(|(_, d)| d.as_str()).filter(|d| crate::date::is_iso_date(d)).collect();
     days.into_iter().map(|d| Occurrence { task: t, date: d.to_owned(), start: d.to_owned(), end: d.to_owned(), done: true }).collect()
 }
 

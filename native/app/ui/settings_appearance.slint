@@ -218,16 +218,16 @@ export component AppearancePage inherits VerticalLayout {
                 SettingsExpander {
                 icon: Glyph.color;
                 title: @tr("细节颜色");
-                description: @tr("今日、休息日、节假日和节气的颜色；留空为自动");
+                description: @tr("今日边框与填充可同时显示并分别设置 RGBA 颜色");
                 has-content: false;
                 expanded: root.open-detail;
                 toggled(v) => { root.open-detail = v; }
             }
                 SettingsExpanderItems {
                 expanded: root.open-detail;
-                SettingsRow { title: @tr("今日高亮"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-color; size: 22px; picked(v) => { SetState.set-str("desk.todayColor", v == "" ? "accent" : v); } } }
-                SettingsRow { divider: true; title: @tr("今日标记样式"); Segmented { small: true; value: SetState.appearance.today-style; options: [{ value: "outline", label: @tr("边框") }, { value: "fill", label: @tr("填充") }]; selected(v) => { SetState.set-str("desk.todayStyle", v); } } }
-                SettingsRow { divider: true; title: @tr("今日高亮不透明度"); Slider { value: SetState.appearance.today-opacity; minimum: 0; maximum: 100; step: 1; track-width: 180px; show-value: true; suffix: "%"; moved(v) => { SetState.set-num("desk.todayOpacity", v); } committed(v) => { SetState.set-num("desk.todayOpacity", v); } } }
+                SettingsRow { title: @tr("今日高亮-边框"); ColorSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-border-color; allow-none: true; custom: true; custom-value: Fluent.custom-value(self.value, self.colors); custom-color: Fluent.hex-color(self.custom-value); custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base); size: 22px; picked(v) => { SetState.set-str("desk.todayBorderColor", v); } } }
+                SliderRow { divider: true; title: @tr("今日高亮-边框粗细"); path: "desk.todayBorderWidth"; value: SetState.appearance.today-border-width; min: 0; max: 10; step: 0.5; suffix: "px"; }
+                SettingsRow { divider: true; title: @tr("今日高亮-填充"); ColorSwatches { colors: SetState.detail-swatches; value: SetState.appearance.today-fill-color; allow-none: true; custom: true; custom-value: Fluent.custom-value(self.value, self.colors); custom-color: Fluent.hex-color(self.custom-value); custom-fg: Fluent.text-on(self.custom-value, Theme.c.solid-base); size: 22px; picked(v) => { SetState.set-str("desk.todayFillColor", v); } } }
                 SettingsRow { divider: true; title: @tr("休息日背景"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.rest-color; size: 22px; picked(v) => { SetState.set-str("desk.restBgColor", v == "" ? "auto" : v); } } }
                 SettingsRow { divider: true; title: @tr("节假日文字"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.holiday-color; size: 22px; picked(v) => { SetState.set-str("desk.holidayTextColor", v == "" ? "auto" : v); } } }
                 SettingsRow { divider: true; title: @tr("节日与节气文字"); AutoSwatches { colors: SetState.detail-swatches; value: SetState.appearance.term-color; size: 22px; picked(v) => { SetState.set-str("desk.termTextColor", v == "" ? "auto" : v); } } }

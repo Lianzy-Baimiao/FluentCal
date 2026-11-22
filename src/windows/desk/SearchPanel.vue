@@ -3,6 +3,7 @@ import { t as tr } from '@/i18n';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { FButton, FColorSwatches, FSelect, FTextBox, TASK_COLORS, taskColor } from '@/fluent';
 import { searchTasks, type SearchOptions } from '@/lib/search';
+import { flexKind } from '@/lib/flex';
 import { formatFriendly, formatRange } from '@/lib/date';
 import { doc, taskList } from '@/stores/doc';
 import { now } from '@/composables/now';
@@ -54,7 +55,7 @@ onMounted(() => void nextTick(() => box.value?.focus()));
       <li v-for="h in results" :key="h.task.id" role="option" tabindex="0" @click="go(h.date, h.task.id)" @keydown.enter="go(h.date, h.task.id)" @dblclick="openEditor({ mode: 'edit', taskId: h.task.id, date: h.date })">
         <span class="dot" :style="{ background: taskColor(h.task.color, isDark).bar }" />
         <span class="t" :class="{ done: h.task.done }">{{ h.task.title }}</span>
-        <span class="d">{{ h.task.repeat ? tr("{0}（重复）", formatFriendly(h.date)) : formatRange(h.task.start, h.task.end) }}</span>
+        <span class="d">{{ flexKind(h.task) ? tr(flexKind(h.task) === 'month' ? '每月一次（不定日）' : '无日期') : h.task.repeat ? tr("{0}（重复）", formatFriendly(h.date)) : formatRange(h.task.start, h.task.end) }}</span>
       </li>
     </ul>
     <p v-else-if="o.q.trim()" class="empty">{{ tr("没有找到相关任务") }}</p>

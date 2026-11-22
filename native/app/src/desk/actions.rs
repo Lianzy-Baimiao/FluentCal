@@ -23,7 +23,7 @@ impl App {
         self.desk_clear_reveal();
         if self.doc.settings.calendar.view == "list" {
             self.desk_refresh_data();
-            return self.desk_list_scroll_today();
+            return self.desk_list_scroll_date_today();
         }
         let today = self.today();
         let ui = &mut self.desk.ui;
@@ -68,7 +68,10 @@ impl App {
         self.desk_refresh_view();
         if list {
             let rows = self.desk.window.get_list_rows();
-            if let Some(index) = rows.iter().position(|r| r.kind == "item" && r.chip.task_id == task_id) {
+            let index = rows.iter().position(|r| r.kind == "item" && r.chip.task_id == task_id && r.chip.date == date)
+                .or_else(|| rows.iter().position(|r| r.kind == "item" && r.chip.task_id == task_id && r.chip.date == format!("m:{}", &date[..7])))
+                .or_else(|| rows.iter().position(|r| r.kind == "item" && r.chip.task_id == task_id));
+            if let Some(index) = index {
                 let w = self.desk.window.as_weak();
                 slint::Timer::single_shot(Duration::ZERO, move || { if let Some(w) = w.upgrade() { w.invoke_list_scroll_to(index as i32); } });
             }
@@ -93,7 +96,7 @@ impl App {
         self.desk_clear_reveal();
         self.history.boundary();
         self.patch_settings(json!({ "calendar": { "listRange": range } }));
-        if revealed { self.desk_refresh_data(); }
+        if revealed { self.desk_refresh_view(); }
     }
 
     /// 显示更多日期: 30 more days, up to 180.
@@ -106,7 +109,21 @@ impl App {
     /// The list view: today's heading to the top (近期: the first row).
     pub fn desk_list_scroll_today(&mut self) {
         let w = &self.desk.window;
-        w.invoke_list_scroll_to(w.get_list_today_row());
+        if w.get_list_range() == "all" {
+            w.invoke_list_scroll_to(0);
+        } else {
+            w.invoke_list_scroll_to(w.get_list_today_row());
+        }
+    }
+
+    pub fn desk_list_scroll_date_today(&mut self) {
+        self.desk.window.invoke_list_scroll_to(self.desk.window.get_list_today_row());
+    }
+
+    pub fn desk_list_jump_section(&mut self, section: &str) {
+        if let Some(index) = self.desk.window.get_list_rows().iter().position(|row| row.kind == "section" && row.section == section) {
+            self.desk.window.invoke_list_scroll_to(index as i32);
+        }
     }
 
     pub fn desk_flash(&mut self, date: &str) {

@@ -77,6 +77,7 @@ function setRange(v: 'upcoming' | 'all') {
   clearReveal();
   chosenRange.value = v;
   localStorage.setItem(RANGE_KEY, v);
+  document.dispatchEvent(new CustomEvent('fluentcal-list-range'));
 }
 
 // Opened on this PC ("在浏览器中查看"): the server there runs only after that menu item.

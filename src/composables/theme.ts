@@ -70,8 +70,9 @@ export const deskVars = computed<Record<string, string>>(() => {
   const outlineColor = contrast(calendarText, '#FFFFFF') >= contrast(calendarText, '#000000') ? '#FFFFFF' : '#000000';
   const palette = doc.settings.theme.accent === 'system' ? sys.info?.accentPalette : undefined;
   const accent = palette?.length === 7 ? palette[dark ? 1 : 4] : deriveAccent(accentColor.value)[dark ? 1 : 4];
-  const todayBase = s.todayColor === 'accent' ? setColorOpacity(accent, palette?.length === 7 ? 1 : colorOpacity(accentColor.value)) : s.todayColor;
-  const today = setColorOpacity(todayBase, colorOpacity(todayBase) * Math.max(0, Math.min(100, s.todayOpacity)) / 100);
+  const todayBorder = s.todayBorderColor === 'accent' ? setColorOpacity(accent, palette?.length === 7 ? 1 : colorOpacity(accentColor.value)) : s.todayBorderColor;
+  const todayBorderWidth = Math.max(0, Math.min(10, s.todayBorderWidth));
+  const todayFill = s.todayFillColor;
   const scale = s.fontScale / 100;
   const holiday = s.holidayTextColor === 'auto' ? (dark ? '#FF99A4' : '#C42B1C') : s.holidayTextColor;
   const rest = s.restBgColor === 'auto' ? (dark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.035)') : alpha(s.restBgColor, 0.22);
@@ -109,9 +110,10 @@ export const deskVars = computed<Record<string, string>>(() => {
     '--cell-gap': `${s.cellGap}px`,
     '--line-gap': `${s.lineSpacing}px`,
     '--fs': String(scale),
-    '--today': today,
-    '--today-text': s.todayStyle === 'fill' ? bestTextOn(today, cell) : 'var(--text-primary)',
-    '--today-style': s.todayStyle,
+    '--today-border': todayBorder,
+    '--today-border-width': `${todayBorderWidth}px`,
+    '--today-fill': todayFill,
+    '--today-text': colorOpacity(todayFill) > 0 ? bestTextOn(todayFill, cell) : 'var(--text-primary)',
     '--rest-tint': rest,
     '--holiday-text': holiday,
     '--term-text': s.termTextColor === 'auto' ? 'var(--accent-text)' : s.termTextColor,

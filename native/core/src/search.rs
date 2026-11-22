@@ -69,7 +69,11 @@ pub fn search_tasks(tasks: &[Task], groups: &BTreeMap<String, Group>, o: &Search
         if !o.color.is_empty() && t.color.as_deref().unwrap_or("") != o.color {
             continue;
         }
-        let date = if months != 0 || t.repeat.is_some() { nearest(t, now, &lo, &hi) } else { Some(t.start.clone()) };
+        let date = if crate::flex::is_flex(t) {
+            t.flex_done.iter().flatten().map(|(_, day)| day.as_str()).filter(|day| crate::date::is_iso_date(day))
+                .min_by_key(|day| diff_days(now, day).abs()).map(str::to_owned)
+                .or_else(|| Some(t.start.clone()))
+        } else if months != 0 || t.repeat.is_some() { nearest(t, now, &lo, &hi) } else { Some(t.start.clone()) };
         if let Some(date) = date {
             hits.push(SearchHit { task: t.clone(), date });
         }
