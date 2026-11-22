@@ -796,6 +796,9 @@ component CountdownBar inherits Rectangle {
     in property <[CountdownData]> items;
     callback jump(string);
     property <float> fs: Theme.desk.fs;
+    preferred-width: 0px;
+    min-width: 0px;
+    horizontal-stretch: 1;
     height: 22px * fs;
     clip: true;
     accessible-role: groupbox;

@@ -17,6 +17,46 @@ fn countdown_sources_are_a_union_and_empty_means_none() {
 }
 
 #[test]
+fn countdown_defaults_match_issue18() {
+    let settings = fluentcal_core::settings::Settings::default();
+    assert!(settings.calendar.countdown_marked);
+    assert!(settings.calendar.countdown_festival);
+    assert!(!settings.calendar.holiday_countdown);
+    assert!(!settings.calendar.countdown_term);
+    let loaded = fluentcal_core::settings::Settings::from_value(&serde_json::Value::Null);
+    assert!(loaded.calendar.countdown_marked);
+    assert!(loaded.calendar.countdown_festival);
+    assert!(!loaded.calendar.holiday_countdown);
+    assert!(!loaded.calendar.countdown_term);
+    let explicit_legacy = fluentcal_core::settings::Settings::from_value(&json!({
+        "calendar": { "countdownMarked": true, "countdownFestival": false, "holidayCountdown": true }
+    }));
+    assert!(explicit_legacy.calendar.countdown_marked);
+    assert!(!explicit_legacy.calendar.countdown_festival);
+    assert!(explicit_legacy.calendar.holiday_countdown);
+}
+
+#[test]
+fn multi_day_statutory_holiday_countdown_uses_only_the_first_day() {
+    use fluentcal_core::{countdown::selected_countdowns, lunar::set_holiday_overrides, model::{HolidayDay, HolidayYear}};
+    use std::collections::BTreeMap;
+
+    set_holiday_overrides(BTreeMap::from([("2027".into(), HolidayYear {
+        year: 2027,
+        fetched_at: 0,
+        days: ["2027-01-01", "2027-01-02", "2027-01-03"].into_iter().map(|date| HolidayDay {
+            date: date.into(), name: "元旦".into(), is_off_day: true,
+        }).collect(),
+    })]));
+    let items = selected_countdowns(&[], "2026-11-22", true, true, false, false, &[]);
+    let new_year: Vec<_> = items.iter().filter(|item| item.date.starts_with("2027-01-") && item.label.contains("元旦")).collect();
+    assert_eq!(new_year.len(), 1, "the New Year holiday is one countdown, not one per day: {new_year:?}");
+    assert_eq!(new_year[0].date, "2027-01-01");
+    assert_eq!(new_year[0].days, 40);
+    set_holiday_overrides(BTreeMap::from([("2026".into(), HolidayYear::default())]));
+}
+
+#[test]
 fn group_counts_include_done_and_do_not_expand_recurrences() {
     let mut doc=Doc::from_value(&json!({"groups":{"g":{"id":"g","name":"工作","color":"blue","order":1}}}));
     let a=task("a",Some("g"),false);

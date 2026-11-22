@@ -50,7 +50,9 @@ export function countdowns(tasks: Task[], now: ISODate, withHoliday: boolean, ma
     const info = dayInfo(date);
     const holiday = withHoliday ? legalHoliday(date) : undefined;
     const observances: Array<[string, string]> = [];
-    if (holiday?.work === false) observances.push(['holiday', holiday.name]);
+    const previousHoliday = holiday?.work === false ? legalHoliday(addDays(date, -1)) : undefined;
+    const startsHoliday = !previousHoliday || previousHoliday.work || previousHoliday.name !== holiday?.name;
+    if (holiday?.work === false && startsHoliday) observances.push(['holiday', holiday.name]);
     if (withFestivals) observances.push(...info.festivals.filter(name => !festivalHolidaySkip(name)).map(name => ['festival', name] as [string, string]));
     if (withTerms && info.term) observances.push(['term', info.term]);
     for (const [prefix, name] of observances) {

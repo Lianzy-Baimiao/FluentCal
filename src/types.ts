@@ -169,7 +169,7 @@ export interface Settings {
     showHolidays: boolean;
     showWeekNumbers: boolean;
     showAlmanac: boolean;
-    /** Countdown to the next statutory holiday in the countdown bar. */
+    /** Include statutory holidays as a countdown source. */
     holidayCountdown: boolean;
     countdownFestival: boolean;
     countdownTerm: boolean;

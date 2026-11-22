@@ -91,7 +91,11 @@ fn add_upcoming_observances(out: &mut Vec<CountdownItem>, now: &str, with_holida
         let info = day_info(&date);
         if with_holidays {
             if let Some(holiday) = legal_holiday(&date).filter(|holiday| !holiday.work) {
-                add_source(out, "holiday", holiday.name, date.clone(), now);
+                let previous = legal_holiday(&add_days(&date, -1));
+                let starts_holiday = !previous.is_some_and(|previous| !previous.work && previous.name == holiday.name);
+                if starts_holiday {
+                    add_source(out, "holiday", holiday.name, date.clone(), now);
+                }
             }
         }
         if with_festivals {

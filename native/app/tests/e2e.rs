@@ -71,6 +71,62 @@ fn countdown_popup_sources_persist_and_empty_bar_keeps_its_control() {
     assert!(!with(|a|a.doc.settings.calendar.countdown_marked).unwrap());
 }
 
+#[test]
+fn countdown_expand_button_keeps_its_width_after_many_long_items() {
+    let today = fluentcal_core::date::today();
+    let tasks: Vec<Value> = (0..14)
+        .map(|i| json!({
+            "id": format!("countdown-{i}"),
+            "title": format!("重要项目-{i:02}-这是较长的倒计时任务名称"),
+            "start": fluentcal_core::date::add_days(&today, i + 1),
+            "groupId": "g",
+        }))
+        .collect();
+    let mut doc = doc_with(&tasks, json!({ "calendar": {
+        "view": "month",
+        "holidayCountdown": false,
+        "countdownFestival": false,
+        "countdownTerm": false,
+        "countdownMarked": false,
+        "countdownGroups": ["g"],
+    }}));
+    doc["groups"] = json!({ "g": { "id": "g", "name": "项目组", "color": "blue", "order": 1 } });
+    let t = start("countdown-expand-width", Some(doc));
+    let button = || ElementHandle::find_by_accessible_label(&t.w, "展开倒计时")
+        .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Button))
+        .expect("expand countdown button");
+    let assert_visible_at_right = |width: f32| {
+        t.w.window().set_size(slint::LogicalSize::new(width, 640.0));
+        settle();
+        let root = t.w.root_element();
+        let button = button();
+        let root_right = root.absolute_position().x + root.size().width;
+        let right = button.absolute_position().x + button.size().width;
+        assert!(button.size().width >= 72.0, "expand button keeps its complete label width: {:?}", button.size());
+        assert!(right <= root_right + 0.5, "expand button is fully visible: right={right}, root-right={root_right}");
+        assert!(right >= root_right - 28.0, "expand button is fixed to the far right: right={right}, root-right={root_right}");
+        let bar = ElementHandle::find_by_accessible_label(&t.w, "倒数日")
+            .find(|e| e.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::Groupbox))
+            .expect("countdown strip");
+        assert!(bar.absolute_position().x + bar.size().width <= button.absolute_position().x - 3.0, "countdown items stop before the pinned button");
+    };
+    assert_visible_at_right(880.0);
+    assert_visible_at_right(600.0);
+    assert_eq!(t.w.get_all_countdowns().row_count(), 14);
+}
+
+#[test]
+fn new_document_uses_issue18_countdown_defaults() {
+    let _t = start("countdown-defaults", Some(doc_with(&[], json!({}))));
+    with(|a| {
+        let c = &a.doc.settings.calendar;
+        assert!(c.countdown_marked);
+        assert!(c.countdown_festival);
+        assert!(!c.holiday_countdown);
+        assert!(!c.countdown_term);
+    }).unwrap();
+}
+
 /// A fresh data folder (with `doc` as data.json) and the app on it.
 fn start(name: &str, doc: Option<Value>) -> T {
     // Real time (the published crate has no mock-time helper outside its own tests): events,

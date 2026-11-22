@@ -111,10 +111,10 @@ section!(Calendar {
     show_holidays: bool = true,
     show_week_numbers: bool = false,
     show_almanac: bool = false,
-    /// Countdown to the next statutory holiday in the countdown bar.
-    holiday_countdown: bool = true,
+    /// Include statutory holidays as a countdown source.
+    holiday_countdown: bool = false,
     /// Include the next lunar or solar festival as a countdown source.
-    countdown_festival: bool = false,
+    countdown_festival: bool = true,
     /// Include the next solar term as a countdown source.
     countdown_term: bool = false,
     /// Optional display color for tasks without a real group.
