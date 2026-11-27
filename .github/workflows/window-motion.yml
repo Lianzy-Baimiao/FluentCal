@@ -20,7 +20,35 @@ permissions:
   contents: read
 
 jobs:
+  fetch-release:
+    if: inputs.release_sha256 != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch the hash-pinned release or maintainer-only draft (no checkout or executable runs here)
+        env:
+          EXPECTED_SHA: ${{ inputs.release_sha256 }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[A-Fa-f0-9]{64}$ ]]
+          version=$(gh api "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$GITHUB_SHA" --jq '.content' | base64 --decode | jq -r '.version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          asset="FluentCal-Desktop-$version.exe"
+          gh release download "v$version" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$RUNNER_TEMP/input"
+          printf '%s  %s\n' "$EXPECTED_SHA" "$RUNNER_TEMP/input/$asset" | sha256sum --check
+          mv "$RUNNER_TEMP/input/$asset" "$RUNNER_TEMP/input/candidate.exe"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: validated-candidate
+          path: ${{ runner.temp }}/input/candidate.exe
+          retention-days: 1
   measure:
+    needs: fetch-release
+    if: ${{ !cancelled() && (needs.fetch-release.result == 'success' || (needs.fetch-release.result == 'skipped' && inputs.release_sha256 == '')) }}
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -31,6 +59,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pywin32==311
+      - uses: actions/download-artifact@v4
+        if: inputs.release_sha256 != ''
+        with:
+          name: validated-candidate
+          path: ${{ runner.temp }}/motion-input
       - name: Compile presentation timestamp reader
         shell: cmd
         run: |
@@ -46,7 +79,6 @@ jobs:
           COMPARE_SOURCE: ${{ inputs.compare_source }}
           ONE_CORE: ${{ inputs.one_core }}
           CANDIDATE_SHA: ${{ inputs.release_sha256 }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $baseline = Join-Path $env:RUNNER_TEMP 'stock-motion.exe'
@@ -54,16 +86,10 @@ jobs:
           if ((Get-FileHash $baseline).Hash -ne '58D2E2CD097BC9D65D74E8A858D5CFF17303373DCAFC2617935E7EB1A0A09EC2') { throw 'Wrong baseline' }
           $arguments = @('--stock', $baseline, '--output', "$env:RUNNER_TEMP\motion-results")
           if ($env:CANDIDATE_SHA) {
-            if ($env:CANDIDATE_SHA -notmatch '^[0-9a-fA-F]{64}$') { throw 'Invalid candidate hash' }
-            $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
-            $asset = "FluentCal-Desktop-$version.exe"
-            gh release download "v$version" --pattern $asset --dir $env:RUNNER_TEMP
-            if ($LASTEXITCODE) { throw 'Cannot read candidate release' }
-            $candidate = Join-Path $env:RUNNER_TEMP $asset
+            $candidate = Join-Path $env:RUNNER_TEMP 'motion-input/candidate.exe'
             if ((Get-FileHash $candidate).Hash -ne $env:CANDIDATE_SHA) { throw 'Wrong candidate' }
             $arguments += @('--candidate', $candidate)
           } elseif ($env:COMPARE_SOURCE -eq 'true') { $arguments += @('--candidate', (Resolve-Path 'native/target/release/fluentcal.exe').Path) }
-          Remove-Item Env:GH_TOKEN
           if ($env:ONE_CORE -eq 'true') { $arguments += '--one-core' }
           Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate | Format-Table
           python scripts/window-motion.py --self-test
