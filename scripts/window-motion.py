@@ -1,6 +1,7 @@
 """Native mouse/geometry/composited-pixel replay on a disposable hosted Windows runner only."""
 
 import argparse
+import bisect
 import csv
 import ctypes
 from ctypes import wintypes as win
@@ -48,6 +49,19 @@ def visible_edge(background, filled, line):
     return statistics.median(cuts)
 
 
+def crossing_delays(requests, samples, span, tolerance):
+    times = [stamp for stamp,_ in samples]
+    delays, missed = [], 0
+    for number, (sent, old, target) in enumerate(requests):
+        if not span*.15 < target < span*.85: continue
+        direction = 1 if target>old else -1
+        deadline = min(sent+200, next((when for when,start,end in requests[number+1:] if (end-start)*direction<0), sent+200))
+        delay = next((when-sent for when,value in samples[bisect.bisect_left(times,sent):bisect.bisect_right(times,deadline)] if value is not None and direction*(value-target)>=-tolerance), None)
+        if delay is None: missed+=1
+        else: delays.append(delay)
+    return percentile(delays), missed
+
+
 def self_test():
     dark, light = bytes([20, 30, 40, 0]), bytes([190, 200, 180, 0])
     background, filled = dark * 120, light * 120
@@ -56,6 +70,8 @@ def self_test():
     assert visible_edge(background, background, filled) is None
     assert visible_edge(background, filled, (light + dark) * 60) is None
     assert percentile([0, 0, 5, 20]) == 20 and percentile([]) is None
+    assert crossing_delays([(10,10,30),(30,30,50)],[(15,10),(22,30),(43,50)],100,1)==(13,0)
+    assert crossing_delays([(10,10,30)],[(35,None)],100,1)==(None,1)
     print('Offline edge, ambiguous-frame and quantile tests passed; no desktop APIs called.')
 
 
@@ -155,6 +171,34 @@ class Strip:
         self.select(self.dest, self.old); self.delete(self.bitmap); self.delete_dc(self.dest); self.release_dc(None, self.screen)
 
 
+class PresentedStrip:
+    def __init__(self, origin, span, vertical):
+        hosted_only()
+        library = ctypes.CDLL(str(Path(__file__).resolve().with_name('window-motion-frame.dll')))
+        handle = ctypes.c_void_p
+        self.handle = handle()
+        opener = api(library, 'open_strip', ctypes.c_long, ctypes.c_int, ctypes.c_int, win.UINT, win.UINT, ctypes.POINTER(handle))
+        status = opener(*origin, 1 if vertical else span, span if vertical else 1, ctypes.byref(self.handle))
+        if status:
+            raise OSError(f'Desktop Duplication unavailable: 0x{status & 0xffffffff:08x}')
+        self.next = api(library,'next_strip',ctypes.c_long,handle,handle,ctypes.POINTER(ctypes.c_longlong),ctypes.POINTER(win.UINT))
+        self.release = api(library,'close_strip',None,handle)
+        self.buffer = ctypes.create_string_buffer(span*4)
+        frequency, tick = ctypes.c_longlong(), ctypes.c_longlong()
+        ctypes.windll.kernel32.QueryPerformanceFrequency(ctypes.byref(frequency))
+        before=time.perf_counter(); ctypes.windll.kernel32.QueryPerformanceCounter(ctypes.byref(tick)); after=time.perf_counter()
+        self.frequency, self.offset = frequency.value, (before+after)/2 - tick.value/frequency.value
+
+    def read(self):
+        stamp, count = ctypes.c_longlong(), win.UINT()
+        result = self.next(self.handle,self.buffer,ctypes.byref(stamp),ctypes.byref(count))
+        if result == 1: return None
+        if result != 0: raise OSError(f'Desktop Duplication read failed: 0x{result & 0xffffffff:08x}')
+        return self.offset+stamp.value/self.frequency, count.value, self.buffer.raw
+
+    def close(self): self.release(self.handle)
+
+
 def wait_until(deadline):
     remaining = deadline - time.perf_counter()
     if remaining > 0:
@@ -171,7 +215,8 @@ def measure(desktop, hwnd, reference, operation, directory):
     if span < 48:
         raise RuntimeError(f'Not enough room for a move/resize gesture: {initial}, span={span}')
     mid_x = (left + right) // 2
-    point = (mid_x, bottom - 3 if vertical else (top + bottom) // 2)
+    dpi = api(desktop.user, 'GetDpiForWindow', win.UINT, win.HWND)(hwnd)
+    point = (mid_x, bottom - round(14*dpi/96) if vertical else (top + bottom) // 2)
     if reference:
         code = 15 if vertical else 2
         candidates = range(bottom - 1, bottom - 20, -1) if vertical else range(top + 1, top + 50)
@@ -189,12 +234,31 @@ def measure(desktop, hwnd, reference, operation, directory):
         for steps, dwell in [(range(1, 7), 'mid'), (range(7, 13), 'far'), (range(11, -1, -1), 'near')]:
             offsets = [step * span // 12 for step in steps]
             schedule += [('moving', offset) for offset in offsets] + [(dwell, offsets[-1])] * 12
-    rows, pixels, requests, failures = [], [], [], []
+    rows, frames, requests, failures = [], [], [], []
     state = [('near', 0, 0.0)]
     desktop.mouse(1, point)
     time.sleep(.12)
-    baseline = strip.read()
+    try: baseline = strip.read()
+    finally: strip.close()
+    try:
+        capture = PresentedStrip(origin, span, vertical)
+        first = capture.read()
+        if first: baseline = first[2]
+    except OSError as error:
+        print('No presentation timestamps:', error, flush=True)
+        capture = None
+    stop_capture = threading.Event()
     started = time.perf_counter()
+    frames.append((0., 1, baseline))
+    def collect():
+        try:
+            while not stop_capture.is_set():
+                frame = capture.read()
+                if frame:
+                    stamp, count, image = frame
+                    if stamp >= started: frames.append(((stamp-started)*1000, count, image))
+        except OSError as error: print('Presentation collection stopped:', error, flush=True)
+    reader = threading.Thread(target=collect) if capture else None
     def drive():
         try:
             previous = 0
@@ -213,6 +277,7 @@ def measure(desktop, hwnd, reference, operation, directory):
     driver = threading.Thread(target=drive)
     desktop.mouse(2)
     try:
+        if reader: reader.start()
         driver.start()
         while driver.is_alive():
             begin = (time.perf_counter()-started)*1000
@@ -220,22 +285,26 @@ def measure(desktop, hwnd, reference, operation, directory):
             pos = desktop.system.GetCursorPos()[axis] - point[axis]
             rect = gui.GetWindowRect(hwnd)
             native = desktop.moving(thread, hwnd)
-            line = strip.read()
             rows.append([begin, (time.perf_counter()-started)*1000, phase, offset, begin-changed, pos, rect[edge]-initial[edge], int(native), *rect])
-            pixels.append(line)
             time.sleep(.002)
     finally:
-        driver.join(6); desktop.mouse(4); strip.close()
+        driver.join(6); desktop.mouse(4); stop_capture.set()
+        if reader:
+            reader.join(); capture.close()
     time.sleep(.15)
     if failures:
         raise RuntimeError(failures)
     directory.mkdir(parents=True, exist_ok=True)
-    (directory/'scan.bgra').write_bytes(b''.join(pixels))
+    (directory/'scan.bgra').write_bytes(b''.join(frame[2] for frame in frames))
+    (directory/'presentation.json').write_text(json.dumps([(stamp,count) for stamp,count,_ in frames]))
     (directory/'background.bgra').write_bytes(baseline)
     (directory/'requests.json').write_text(json.dumps(requests))
     stable = [index for index, row in enumerate(rows) if row[2]=='far' and row[4]>90 and abs(row[6]-span)<=2]
-    far = pixels[stable[len(stable)//2]] if stable else baseline
-    estimates = [visible_edge(baseline, far, line) for line in pixels]
+    times = [frame[0] for frame in frames]
+    indexes = [max(0,bisect.bisect_right(times,row[0])-1) for row in rows]
+    far = frames[indexes[stable[len(stable)//2]]][2] if stable else baseline
+    detected = [visible_edge(baseline,far,frame[2]) for frame in frames]
+    estimates = [detected[index] if index+1==len(frames) or frames[index+1][1]<=1 else None for index in indexes]
     middle = [estimate-row[6] for row, estimate in zip(rows, estimates) if estimate is not None and row[2]=='mid' and row[4]>90 and abs(row[6]-span/2)<=2]
     bias = statistics.median(middle) if middle else None
     measured, visual = [], []
@@ -250,9 +319,14 @@ def measure(desktop, hwnd, reference, operation, directory):
                     visual.append(abs(row[5]-visible))
     anchors = (all(abs(row[8]-left)<=2 and abs(row[9]-top)<=2 for row in rows) if vertical else
                all(abs(row[10]-row[8]-(right-left))<=2 and abs(row[9]-top)<=2 and abs(row[11]-bottom)<=2 for row in rows))
+    hwnd_delay, hwnd_misses = crossing_delays(requests, [(row[0],row[6]) for row in rows],span,1)
+    pixel_ok = len(visual)>=.8*len(measured) and len(middle)>=5 and bool(measured)
+    pixel_delay, pixel_misses = crossing_delays(requests, [(stamp, detected[index]-bias if detected[index] is not None else None) for index,stamp in enumerate(times)],span,2) if pixel_ok else (None,None)
     result = dict(operation=operation, span_px=span, samples=len(rows), input_steps=len(requests), modal_samples=sum(row[7] for row in rows), moving_samples=len(measured), pixel_samples=len(visual),
+                  input_to_hwnd_p95_ms=hwnd_delay, hwnd_missed_thresholds=hwnd_misses, input_to_composed_p95_ms=pixel_delay, pixel_missed_thresholds=pixel_misses,
+                  presented_frames=len(frames)-1, skipped_presents=sum(max(0,frame[1]-1) for frame in frames),
                   capture_p95_ms=percentile([row[1]-row[0] for row in rows]), sample_interval_p95_ms=percentile([second[0]-first[0] for first,second in zip(rows,rows[1:])]),
-                  hwnd_offset_p95_px=percentile(measured), pixel_offset_p95_px=percentile(visual) if len(visual)>=.8*len(measured) and len(middle)>=5 else None, pixel_bias_px=bias)
+                  hwnd_offset_p95_px=percentile(measured), pixel_offset_p95_px=percentile(visual) if pixel_ok else None, pixel_bias_px=bias)
     print(directory.name, json.dumps(result), flush=True)
     if not anchors or len(measured)<25 or not stable or max(abs(actual-want) for actual,want in zip(gui.GetWindowRect(hwnd),initial))>3:
         raise RuntimeError(f'Invalid or incomplete native gesture: {result}; anchors={anchors}; final={gui.GetWindowRect(hwnd)} initial={initial}')

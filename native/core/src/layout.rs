@@ -50,6 +50,15 @@ pub struct Home {
 }
 
 impl Home {
+    pub fn from_user_rect(monitors: &[Mon], rect: Rect) -> Option<Home> {
+        if !title_visible(monitors, rect) { return None; }
+        let monitor = monitor_at(monitors, rect).map(|index| {
+            let screen = &monitors[index];
+            (screen.name.clone(), screen.rect, screen.scale)
+        });
+        Some(Home { x: rect.x, y: rect.y, w: rect.w, h: rect.h, monitor })
+    }
+
     pub fn rect(&self) -> Rect {
         Rect { x: self.x, y: self.y, w: self.w, h: self.h }
     }

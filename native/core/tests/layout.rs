@@ -24,6 +24,17 @@ fn home_on_primary() -> Home {
 }
 
 #[test]
+fn dropping_onto_a_disconnected_screen_does_not_replace_home() {
+    let saved = home_on_primary();
+    assert_eq!(Home::from_user_rect(&both(), saved.rect()), Some(saved.clone()));
+    assert_eq!(Home::from_user_rect(&secondary_only(), saved.rect()), None);
+    assert_eq!(Home::from_user_rect(&[], saved.rect()), None);
+    let fallback = target(&secondary_only(), Some(&saved), Some(saved.rect())).unwrap();
+    assert!(layout::title_visible(&secondary_only(), fallback));
+    assert_eq!(target(&both(), Some(&saved), Some(fallback)), Some(saved.rect()));
+}
+
+#[test]
 fn primary_off_then_on_returns_to_the_users_place() {
     let home = home_on_primary();
     // Off: home's screen is gone and the window is off-screen, so it goes to the remaining one.

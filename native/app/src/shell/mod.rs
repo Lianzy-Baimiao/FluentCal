@@ -157,10 +157,9 @@ pub fn save_home(app: &mut App) {
     let Some(r) = screens::window_rect(h).filter(|r| r.x > -20000 && r.y > -20000 && r.w >= 100 && r.h >= 100) else { return };
     let mons = screens::monitors();
     // what is remembered is the calendar alone, without the to-do column on its left
-    app.side_ext = side_ext(app, &mons, r).min(r.w.saturating_sub(100));
-    let r = layout::without_side(r, app.side_ext);
-    let monitor = layout::monitor_at(&mons, r).map(|i| (mons[i].name.clone(), mons[i].rect, mons[i].scale));
-    let home = Home { x: r.x, y: r.y, w: r.w, h: r.h, monitor };
+    let extension = side_ext(app, &mons, r).min(r.w.saturating_sub(100));
+    let Some(home) = Home::from_user_rect(&mons, layout::without_side(r, extension)) else { return };
+    app.side_ext = extension;
     fluentcal_core::store::patch_settings_silent(&app.store, serde_json::json!({ "desk": { "bounds": home } }));
 }
 

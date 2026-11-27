@@ -105,11 +105,8 @@ impl App {
     /// The room the layout gives the rows changed (lanes, or the grid for rows that follow
     /// their tasks): lay the chips out again.
     pub fn desk_sync_capacity(&mut self) {
-        let room = super::room_of(&self.desk.window, self.doc.settings.calendar.fit_rows);
-        if room != self.desk.room {
-            self.desk.room = room;
-            self.desk_refresh_data();
-        }
+        let desk = &mut self.desk;
+        super::sync_grid_capacity(&desk.window, &self.doc, &desk.ui, &self.day, &mut desk.room, &self.tokens);
     }
 
     /// Theme global of the desk window (and its chip colours, which come from the theme).

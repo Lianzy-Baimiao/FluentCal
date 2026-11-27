@@ -48,8 +48,7 @@ pub fn push_all(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Optio
 /// The week rows, the list view and the countdowns (the parts that follow tasks).
 pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Option<vm::Room>, t: &Tokens) {
     use slint::Model;
-    let weeks: Vec<crate::WeekData> = vm::weeks(doc, ui, today, room, t).iter().collect();
-    sync::weeks(&w.get_weeks(), weeks, |m| w.set_weeks(m));
+    push_week_rows(w, doc, ui, today, room, t);
     // the group filter's button: red, and named after what it shows, while it filters
     w.set_filter_on(!ui.group_filter.is_empty());
     w.set_filter_tip(vm::filter_tip(doc, ui).into());
@@ -65,6 +64,21 @@ pub fn push_weeks(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Opt
     let cds: Vec<crate::CountdownData> = vm::countdown_items(doc, today).iter().collect();
     sync::rows(&w.get_countdowns(), cds.iter().take(6).cloned().collect(), |m| w.set_countdowns(m));
     sync::rows(&w.get_all_countdowns(), cds, |m| w.set_all_countdowns(m));
+}
+
+fn push_week_rows(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: Option<vm::Room>, tokens: &Tokens) {
+    use slint::Model;
+    let weeks = vm::weeks(doc, ui, today, room, tokens).iter().collect();
+    sync::weeks(&w.get_weeks(), weeks, |model| w.set_weeks(model));
+}
+
+fn sync_grid_capacity(w: &DeskWindow, doc: &Doc, ui: &DeskUi, today: &str, room: &mut Option<vm::Room>, tokens: &Tokens) -> bool {
+    let next = room_of(w, doc.settings.calendar.fit_rows);
+    if *room == next { return false; }
+    *room = next;
+    if matches!(doc.settings.calendar.view.as_str(), "list" | "gantt") { return false; }
+    push_week_rows(w, doc, ui, today, next, tokens);
+    true
 }
 
 /// The list view's rows; none while another view shows (nothing kept for it).
@@ -248,13 +262,7 @@ impl Desk {
             self.gantt_view().scrolled();
             return true;
         }
-        let room = room_of(&self.window, self.doc.settings.calendar.fit_rows);
-        if room == self.room {
-            return false;
-        }
-        self.room = room;
-        self.refresh_weeks();
-        true
+        sync_grid_capacity(&self.window, &self.doc, &self.ui, &self.today, &mut self.room, &self.tokens)
     }
 
     pub fn show(&self) -> Result<(), slint::PlatformError> {

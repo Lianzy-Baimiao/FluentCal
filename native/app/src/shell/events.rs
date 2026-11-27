@@ -64,21 +64,34 @@ pub fn on_desk_event(app: &mut App, e: DeskEvent) {
             });
         }
         DeskEvent::DisplayChanged => {
-            super::apply_layout(app, false);
-            super::tray_refresh(app);
+            if crate::platform::desk::display_layout_due() { restore_display(app); }
         }
-        DeskEvent::MovedByUser => super::save_home(app),
-        DeskEvent::Moved => {
-            app.desk_check_scale();
-            let cur = super::current_screen(app);
-            if cur != app.last_monitor {
-                app.last_monitor = cur;
-                super::tray_refresh(app);
+        DeskEvent::MovedByUser(generation) => {
+            if let Some(restore_pending) = crate::platform::desk::finish_user_placement(generation) {
+                super::save_home(app);
+                if restore_pending { restore_display(app); }
+                check_position(app);
             }
         }
+        DeskEvent::Moved => check_position(app),
+        DeskEvent::DpiChanged => app.desk_check_scale(),
         DeskEvent::Reattach => crate::startup::ensure_desk_window(app),
         DeskEvent::Deactivated => {}
     }
+}
+
+fn check_position(app: &mut App) {
+    app.desk_check_scale();
+    let current = super::current_screen(app);
+    if current != app.last_monitor {
+        app.last_monitor = current;
+        super::tray_refresh(app);
+    }
+}
+
+fn restore_display(app: &mut App) {
+    super::apply_layout(app, false);
+    super::tray_refresh(app);
 }
 
 impl App {

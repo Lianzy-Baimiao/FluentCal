@@ -9,6 +9,7 @@ pub mod msgwin;
 pub mod net;
 pub mod outside;
 pub mod package;
+mod placement;
 pub mod screens;
 pub mod sysinfo;
 pub mod toast;

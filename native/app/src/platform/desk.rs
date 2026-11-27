@@ -6,6 +6,8 @@
 //! calendar survives "Show desktop", and a subclass keeps it just above the desktop on z-order
 //! changes so clicking it never lifts it above other apps.
 
+use super::placement::UserPlacement;
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU8, Ordering};
 use std::sync::OnceLock;
 use windows::core::{s, w, BOOL, PCWSTR};
@@ -55,9 +57,10 @@ pub enum DeskEvent {
     /// A screen was added, removed or rearranged (sent twice: 1 s and 4 s later).
     DisplayChanged,
     /// End of a move or resize by the user: the new home.
-    MovedByUser,
+    MovedByUser(u64),
     /// The window moved or changed size (any cause).
     Moved,
+    DpiChanged,
     /// Explorer restarted and Progman is back: re-apply the layer.
     Reattach,
     /// The desk lost the keyboard after a summon or typing.
@@ -65,6 +68,15 @@ pub enum DeskEvent {
 }
 
 static MODE: AtomicU8 = AtomicU8::new(0);
+thread_local! { static PLACEMENT: RefCell<UserPlacement> = RefCell::default(); }
+
+pub(crate) fn display_layout_due() -> bool {
+    PLACEMENT.with_borrow_mut(UserPlacement::display_due)
+}
+
+pub(crate) fn finish_user_placement(generation: u64) -> Option<bool> {
+    PLACEMENT.with_borrow_mut(|placement| placement.finish(generation))
+}
 static CLICK_THROUGH: AtomicBool = AtomicBool::new(false);
 static ACRYLIC: AtomicBool = AtomicBool::new(false);
 /// Temporarily raised by the hotkey/tray; dropped back to the desktop layer on deactivation.
@@ -121,6 +133,7 @@ pub fn watch_presses(on: bool) {
 
 /// Subclasses the desk window. Call once per window, on the main thread.
 pub fn install(hwnd: HWND) {
+    PLACEMENT.with_borrow_mut(UserPlacement::reset);
     DESK.store(hwnd.0 as isize, Ordering::Relaxed);
     unsafe {
         MSG_TASKBAR_CREATED.store(RegisterWindowMessageW(w!("TaskbarCreated")), Ordering::Relaxed);
@@ -130,6 +143,7 @@ pub fn install(hwnd: HWND) {
 
 /// The window is gone (recreated after an Explorer restart, or quitting).
 pub fn uninstall() {
+    PLACEMENT.with_borrow_mut(UserPlacement::reset);
     DESK.store(0, Ordering::Relaxed);
 }
 
@@ -306,7 +320,9 @@ pub fn refresh() {
 unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id: usize, _data: usize) -> LRESULT {
     match msg {
         WM_NCDESTROY => {
-            let _ = DESK.compare_exchange(hwnd.0 as isize, DESTROYED, Ordering::Relaxed, Ordering::Relaxed);
+            if DESK.compare_exchange(hwnd.0 as isize, DESTROYED, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                PLACEMENT.with_borrow_mut(UserPlacement::reset);
+            }
         }
         WM_WINDOWPOSCHANGING => {
             let pos = &mut *(lp.0 as *mut WINDOWPOS);
@@ -317,10 +333,11 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
         }
         WM_WINDOWPOSCHANGED => {
             let pos = &*(lp.0 as *const WINDOWPOS);
-            if pos.flags.0 & (SWP_NOMOVE.0 | SWP_NOSIZE.0) != (SWP_NOMOVE.0 | SWP_NOSIZE.0) {
+            if pos.flags.0 & (SWP_NOMOVE.0 | SWP_NOSIZE.0) != (SWP_NOMOVE.0 | SWP_NOSIZE.0) && PLACEMENT.with_borrow(UserPlacement::position_notice_due) {
                 emit(DeskEvent::Moved);
             }
         }
+        WM_DPICHANGED => emit(DeskEvent::DpiChanged),
         WM_STYLECHANGING if wp.0 as i32 == GWL_EXSTYLE.0 => {
             let ss = &mut *(lp.0 as *mut STYLESTRUCT);
             ss.styleNew = fix_ex(ss.styleNew);
@@ -363,8 +380,12 @@ unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LP
                 f(pt.x, pt.y);
             }
         }
-        // End of a drag or resize by the user (also through drag_window): the new home.
-        WM_EXITSIZEMOVE => emit(DeskEvent::MovedByUser),
+        // Track a user drag or resize through the deferred save of its final rectangle.
+        WM_ENTERSIZEMOVE if desk_hwnd() == Some(hwnd) => PLACEMENT.with_borrow_mut(UserPlacement::begin),
+        WM_EXITSIZEMOVE if desk_hwnd() == Some(hwnd) => {
+            let generation = PLACEMENT.with_borrow_mut(UserPlacement::end_message);
+            emit(DeskEvent::MovedByUser(generation));
+        }
         m if m != 0 && m == MSG_TASKBAR_CREATED.load(Ordering::Relaxed) => reattach_later(),
         _ => {}
     }

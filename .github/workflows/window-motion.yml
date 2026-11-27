@@ -11,6 +11,10 @@ on:
         description: Limit only the measured processes to one logical CPU
         type: boolean
         default: false
+      release_sha256:
+        description: Optional SHA-256 of the current version's release asset to compare instead of compiling
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -27,22 +31,39 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pywin32==311
+      - name: Compile presentation timestamp reader
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%p in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do call "%%p\VC\Auxiliary\Build\vcvars64.bat"
+          cl /nologo /EHsc /O2 /LD scripts\window-motion-frame.cpp d3d11.lib dxgi.lib /link /OUT:scripts\window-motion-frame.dll
       - name: Build candidate
-        if: inputs.compare_source
+        if: inputs.compare_source && inputs.release_sha256 == ''
         working-directory: native
-        run: cargo build --locked --release -p fluentcal-native --bin fluentcal
+        run: cargo build --locked -j 2 --release -p fluentcal-native --bin fluentcal
       - name: Replay on the disposable guest desktop
         env:
           MOTION_RUNNER: ${{ runner.environment }}
           COMPARE_SOURCE: ${{ inputs.compare_source }}
           ONE_CORE: ${{ inputs.one_core }}
+          CANDIDATE_SHA: ${{ inputs.release_sha256 }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $baseline = Join-Path $env:RUNNER_TEMP 'stock-motion.exe'
           Invoke-WebRequest 'https://github.com/Lianzy-Baimiao/FluentCal/releases/download/v0.3.25/FluentCal-Desktop-0.3.25.exe' -OutFile $baseline
           if ((Get-FileHash $baseline).Hash -ne '58D2E2CD097BC9D65D74E8A858D5CFF17303373DCAFC2617935E7EB1A0A09EC2') { throw 'Wrong baseline' }
           $arguments = @('--stock', $baseline, '--output', "$env:RUNNER_TEMP\motion-results")
-          if ($env:COMPARE_SOURCE -eq 'true') { $arguments += @('--candidate', (Resolve-Path 'native/target/release/fluentcal.exe').Path) }
+          if ($env:CANDIDATE_SHA) {
+            if ($env:CANDIDATE_SHA -notmatch '^[0-9a-fA-F]{64}$') { throw 'Invalid candidate hash' }
+            $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+            $asset = "FluentCal-Desktop-$version.exe"
+            gh release download "v$version" --pattern $asset --dir $env:RUNNER_TEMP
+            if ($LASTEXITCODE) { throw 'Cannot read candidate release' }
+            $candidate = Join-Path $env:RUNNER_TEMP $asset
+            if ((Get-FileHash $candidate).Hash -ne $env:CANDIDATE_SHA) { throw 'Wrong candidate' }
+            $arguments += @('--candidate', $candidate)
+          } elseif ($env:COMPARE_SOURCE -eq 'true') { $arguments += @('--candidate', (Resolve-Path 'native/target/release/fluentcal.exe').Path) }
+          Remove-Item Env:GH_TOKEN
           if ($env:ONE_CORE -eq 'true') { $arguments += '--one-core' }
           Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate | Format-Table
           python scripts/window-motion.py --self-test

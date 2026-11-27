@@ -153,7 +153,11 @@ fn new_document_uses_issue18_countdown_defaults() {
 fn start(name: &str, doc: Option<Value>) -> T {
     // Real time (the published crate has no mock-time helper outside its own tests): events,
     // then timers run in `settle`.
-    slint::platform::set_platform(Box::new(TestingBackend::new(TestingBackendOptions { mock_time: false, threading: false, ..Default::default() }))).expect("platform");
+    start_on(name, doc, Box::new(TestingBackend::new(TestingBackendOptions { mock_time: false, threading: false, ..Default::default() })))
+}
+
+fn start_on(name: &str, doc: Option<Value>, backend: Box<dyn slint::platform::Platform>) -> T {
+    slint::platform::set_platform(backend).expect("platform");
     let dir = std::env::temp_dir().join(format!("fluentcal-e2e-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -1280,6 +1284,107 @@ fn all_list_has_fixed_undated_section_jumps_after_scrolling_through_many_dates()
         .find(|e| e.accessible_role() == Some(R::Button)).unwrap();
     assert_eq!(jump_month.absolute_position().y, jump_month_y, "the month jump stays fixed while the list scrolls");
     assert_eq!(jump_someday.absolute_position().y, jump_someday_y, "the no-date jump stays fixed while the list scrolls");
+}
+
+#[test]
+fn resizing_list_keeps_its_rows_until_data_changes() {
+    use slint::{ModelExt, ModelRc};
+    let tasks = [json!({"title":"已完成的待办", "start":"2024-01-10", "flex":"month", "flexDone":{"2024-01":"2024-01-10"}})];
+    let session = start("resize-list", Some(doc_with(&tasks, json!({"desk":{"locked":false}, "calendar":{"view":"list", "listRange":"all", "fitRows":true}, "tasks":{"showCompleted":true}}))));
+    let window = &session.w;
+    let history_visible = || window.get_list_rows().iter().any(|row| row.kind == "item" && row.chip.date == "2024-01-10");
+    assert!(history_visible());
+    let watched_rows = ModelRc::new(window.get_list_rows().map(|row| row));
+    window.set_list_rows(watched_rows.clone());
+    let initial_room = with(|app| app.desk.room.unwrap().grid_h).unwrap();
+    window.window().set_size(slint::LogicalSize::new(880.0, 740.0));
+    settle();
+    assert!(with(|app| app.desk.room.unwrap().grid_h).unwrap() > initial_room);
+    assert!(window.get_list_rows() == watched_rows, "geometry alone must not reconcile the agenda model");
+    assert!(history_visible());
+    with(|app| app.patch_settings(json!({"tasks":{"showCompleted":false}}))).unwrap();
+    assert!(!history_visible(), "a real filter change still updates the agenda");
+
+    for (view, height) in [("month", 680.0), ("weeks", 790.0)] {
+        window.invoke_set_view(view.into());
+        settle();
+        let previous_room = window.get_rows_room();
+        window.window().set_size(slint::LogicalSize::new(880.0, height));
+        settle();
+        assert_ne!(window.get_rows_room(), previous_room);
+        let last = window.get_weeks().iter().last().unwrap();
+        assert!((last.row_y + last.row_h - window.get_rows_room()).abs() < 0.01, "{view} rows must fill the resized grid");
+    }
+}
+
+#[test]
+#[ignore = "opt-in headless timing comparison, without Win32 input or a native window"]
+fn replay_long_list_resize_in_memory() {
+    use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType};
+    use slint::platform::{Platform, WindowAdapter};
+    use std::{cell::RefCell, rc::Rc};
+
+    struct MemoryScreen(Rc<RefCell<Option<Rc<MinimalSoftwareWindow>>>>);
+    impl Platform for MemoryScreen {
+        fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+            let adapter = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+            *self.0.borrow_mut() = Some(adapter.clone());
+            Ok(adapter)
+        }
+    }
+
+    let tasks: Vec<Value> = (0..40).map(|number| {
+        let day = number % 28 + 1;
+        let history: serde_json::Map<_, _> = (0..36).map(|offset| {
+            let month = 2026 * 12 + 9 - offset;
+            let slot = format!("{:04}-{:02}", month / 12, month % 12 + 1);
+            (slot.clone(), json!(format!("{slot}-{day:02}")))
+        }).collect();
+        json!({"title":format!("task-{number}"), "start":format!("2023-11-{day:02}"), "flex":"month", "flexDone":history})
+    }).collect();
+    let mut doc = doc_with(&tasks, json!({"desk":{"locked":false}, "calendar":{"view":"list", "listRange":"all", "fitRows":true}, "tasks":{"showCompleted":true}, "theme":{"reduceMotion":true}}));
+    doc["settings"]["general"]["language"] = json!("en-US");
+    let slot = Rc::new(RefCell::new(None));
+    let session = start_on("replay-list-resize", Some(doc), Box::new(MemoryScreen(slot.clone())));
+    let window = &session.w;
+    assert!(!window.get_locked());
+    let screen = slot.borrow().as_ref().unwrap().clone();
+    let rows = window.get_list_rows().row_count();
+    assert!(rows >= 40 * 36);
+    let width = 1800;
+    let base_height = 1100;
+    let mut pixels = vec![PremultipliedRgbaColor::default(); width * (base_height + 12 * 14)];
+    let mut draw = |height| {
+        screen.request_redraw();
+        assert!(screen.draw_if_needed(|renderer| { renderer.render(&mut pixels[..width * height], width); }));
+    };
+    window.window().set_size(slint::PhysicalSize::new(width as u32, base_height as u32));
+    settle();
+    draw(base_height);
+    let mut room = with(|app| app.desk.room.unwrap().grid_h).unwrap();
+    let mut update_us = Vec::new();
+    let mut frame_us = Vec::new();
+    for step in (1..=12).chain((0..12).rev()).cycle().take(72) {
+        let height = base_height + step * 14;
+        let started = std::time::Instant::now();
+        window.window().set_size(slint::PhysicalSize::new(width as u32, height as u32));
+        slint::platform::update_timers_and_animations();
+        update_us.push(started.elapsed().as_micros());
+        draw(height);
+        frame_us.push(started.elapsed().as_micros());
+        let next = with(|app| app.desk.room.unwrap().grid_h).unwrap();
+        assert_ne!(next, room, "every step must run the real Slint capacity callback");
+        room = next;
+    }
+    assert_eq!(window.get_list_rows().row_count(), rows);
+    let final_frame = &pixels[..width * base_height];
+    assert!(final_frame.iter().any(|pixel| pixel.alpha != 0));
+    let hash = final_frame.iter().flat_map(|pixel| [pixel.red, pixel.green, pixel.blue, pixel.alpha])
+        .fold(0xcbf29ce484222325u64, |state, byte| (state ^ u64::from(byte)).wrapping_mul(0x100000001b3));
+    update_us.sort_unstable();
+    frame_us.sort_unstable();
+    println!("offscreen resize: rows={rows} steps={} update_p95_us={} frame_median_us={} frame_p95_us={} frame_max_us={} final_rgba={hash:016x}",
+        frame_us.len(), update_us[68], frame_us[35], frame_us[68], frame_us[71]);
 }
 
 /// GitHub #6: 行高随任务多少调整. Off (the default): equal rows, a busy day folds into "+N". On:
