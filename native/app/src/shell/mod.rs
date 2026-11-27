@@ -18,8 +18,12 @@ pub use tray::tray_refresh;
 pub fn apply_settings(app: &mut App, old: &Settings) {
     let new = app.doc.settings.clone();
     let (o, n) = (&old.desk, &new.desk);
-    if o.pin_mode != n.pin_mode || o.click_through != n.click_through || o.no_activate != n.no_activate || o.acrylic != n.acrylic || o.locked != n.locked {
+    if o.pin_mode != n.pin_mode {
         apply_desk_platform(app);
+    } else {
+        if o.click_through != n.click_through { pd::set_click_through(n.click_through); }
+        if o.no_activate != n.no_activate { pd::set_no_activate(n.no_activate); }
+        if o.acrylic != n.acrylic { pd::set_acrylic(n.acrylic); }
     }
     if old.shortcuts != new.shortcuts {
         events::register_hotkeys(app);
@@ -183,19 +187,32 @@ pub fn desk_visible(app: &App) -> bool {
     window::hwnd(app.desk.window.window()).is_some_and(screens::is_visible)
 }
 
-pub fn show_desk(app: &mut App) {
+fn reveal_desk(app: &mut App, summon: bool) {
+    if crate::startup::recreate_desk_if_gone(app, summon) {
+        return;
+    }
     if !desk_visible(app) {
         let _ = app.desk.window.show();
         apply_desk_platform(app);
     }
+    if summon {
+        raise_desk();
+        tray_refresh(app);
+    }
+}
+
+pub fn show_desk(app: &mut App) {
+    reveal_desk(app, false);
 }
 
 /// In front of everything with the keyboard; in desktop mode back to the desktop layer when
 /// it loses the focus (0.2's summon).
 pub fn summon_desk(app: &mut App) {
-    show_desk(app);
+    reveal_desk(app, true);
+}
+
+pub(crate) fn raise_desk() {
     pd::summon();
-    tray_refresh(app);
     slint::Timer::single_shot(std::time::Duration::from_millis(400), pd::restore_if_not_foreground);
 }
 

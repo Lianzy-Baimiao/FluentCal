@@ -1290,11 +1290,16 @@ fn all_list_has_fixed_undated_section_jumps_after_scrolling_through_many_dates()
 fn rows_follow_their_tasks() {
     let busy = "2026-11-11";
     let tasks: Vec<Value> = (1..=7).map(|k| json!({ "title": format!("忙碌 {k}"), "start": busy })).collect();
-    let t = start("fit-rows", Some(doc_with(&tasks, json!({ "calendar": { "weekStart": 1 } }))));
+    let t = start("fit-rows", Some(doc_with(&tasks, json!({ "calendar": { "weekStart": 1, "weeksRows": 4 } }))));
     t.w.invoke_jump(busy.into());
     settle();
     let weeks = || -> Vec<fluentcal_app::WeekData> { t.w.get_weeks().iter().collect() };
-    let row_of = |ws: &[fluentcal_app::WeekData], d: &str| ws.iter().position(|w| w.cells.iter().any(|c| c.date == d)).unwrap();
+    let row_of = |weeks: &[fluentcal_app::WeekData], date: &str| {
+        weeks.iter().position(|week| week.cells.iter().any(|cell| cell.date == date)).unwrap_or_else(|| {
+            let starts: Vec<_> = weeks.iter().filter_map(|week| week.cells.row_data(0)).map(|cell| cell.date).collect();
+            panic!("expected {date} in the displayed weeks starting {starts:?}");
+        })
+    };
     let ws = weeks();
     assert_eq!(ws.len(), 6, "November 2026, Monday first");
     let r = row_of(&ws, busy);
@@ -1341,7 +1346,7 @@ fn rows_follow_their_tasks() {
     assert!(ws[r].row_h > ws[s].row_h, "6 lanes still the tallest");
 
     // 多周 too
-    with(|a| a.patch_settings(json!({ "calendar": { "view": "weeks", "weeksRows": 4 } }))).unwrap();
+    with(|a| a.patch_settings(json!({ "calendar": { "view": "weeks" } }))).unwrap();
     settle();
     let ws = weeks();
     let r = row_of(&ws, busy);

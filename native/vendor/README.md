@@ -19,6 +19,10 @@ still mostly on the old screen. 0.30.13 judged the suggested rectangle by the sc
 was on and pushed it back there, so the scale flipped back and forth during the drag and the
 size ran away (winit #4704, slint #11073). With the patch the window takes the rectangle
 Windows suggests on Windows 11; Windows 10 (build < 22000) keeps the old code. The fix is in
-winit 0.31: delete this copy when Slint moves to it. To check, run `cargo run --example
+winit 0.31. To check, run `cargo run --example
 dpi_probe` with two side-by-side screens at different scales; it fails without the patch.
+
+The Windows move/resize path in `window.rs` also packs the signed screen coordinates into
+`WM_NCLBUTTONDOWN` by value instead of posting the address of a local `POINTS`. When upgrading
+winit, verify both this and the mixed-DPI behavior before removing the vendored copy.
 License: Apache-2.0, as upstream (LICENSE).

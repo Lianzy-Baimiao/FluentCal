@@ -141,6 +141,18 @@ const fn get_y_lparam(x: u32) -> i16 {
     hiword(x) as _
 }
 
+const fn screen_point_lparam(horizontal: i32, vertical: i32) -> u32 {
+    (horizontal as u16 as u32) | ((vertical as u16 as u32) << 16)
+}
+
+#[test]
+fn drag_origin_preserves_signed_screen_coordinates() {
+    for (horizontal, vertical) in [(0, 0), (2496, 1097), (-1920, 125), (250, -1080), (-32768, 32767)] {
+        let packed = screen_point_lparam(horizontal, vertical);
+        assert_eq!((get_x_lparam(packed), get_y_lparam(packed)), (horizontal as i16, vertical as i16));
+    }
+}
+
 #[inline(always)]
 pub(crate) const fn primarylangid(lgid: u16) -> u16 {
     lgid & 0x3ff

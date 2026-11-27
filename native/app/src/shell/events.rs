@@ -76,7 +76,7 @@ pub fn on_desk_event(app: &mut App, e: DeskEvent) {
                 super::tray_refresh(app);
             }
         }
-        DeskEvent::Reattach => super::apply_desk_platform(app),
+        DeskEvent::Reattach => crate::startup::ensure_desk_window(app),
         DeskEvent::Deactivated => {}
     }
 }

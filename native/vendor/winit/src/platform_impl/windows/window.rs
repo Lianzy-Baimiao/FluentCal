@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::{io, panic, ptr};
 
 use windows_sys::Win32::Foundation::{
-    HWND, LPARAM, OLE_E_WRONGCOMPOBJ, POINT, POINTS, RECT, RPC_E_CHANGED_MODE, S_OK, WPARAM,
+    HWND, LPARAM, OLE_E_WRONGCOMPOBJ, POINT, RECT, RPC_E_CHANGED_MODE, S_OK, WPARAM,
 };
 use windows_sys::Win32::Graphics::Dwm::{
     DwmEnableBlurBehindWindow, DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR,
@@ -31,7 +31,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows_sys::Win32::UI::Input::Touch::{RegisterTouchWindow, TWF_WANTPALM};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, EnableMenuItem, FlashWindowEx, GetClientRect, GetCursorPos,
+    CreateWindowExW, EnableMenuItem, FlashWindowEx, GetClientRect,
     GetForegroundWindow, GetSystemMenu, GetSystemMetrics, GetWindowPlacement, GetWindowTextLengthW,
     GetWindowTextW, IsWindowVisible, LoadCursorW, PeekMessageW, PostMessageW, RegisterClassExW,
     SetCursor, SetCursorPos, SetForegroundWindow, SetMenuDefaultItem, SetWindowDisplayAffinity,
@@ -494,6 +494,7 @@ impl Window {
         let window_state = self.window_state.clone();
 
         self.thread_executor.execute_in_thread(move || {
+            let Ok(position) = util::get_cursor_position() else { return };
             {
                 let mut guard = window_state.lock().unwrap();
                 if !guard.dragging {
@@ -503,19 +504,14 @@ impl Window {
                 }
             }
 
-            let points = {
-                let mut pos = unsafe { mem::zeroed() };
-                unsafe { GetCursorPos(&mut pos) };
-                pos
-            };
-            let points = POINTS { x: points.x as i16, y: points.y as i16 };
+            let lparam = super::screen_point_lparam(position.x, position.y) as LPARAM;
 
             // ReleaseCapture needs to execute on the main thread
             unsafe { ReleaseCapture() };
 
-            unsafe {
-                PostMessageW(window, WM_NCLBUTTONDOWN, wparam, &points as *const _ as LPARAM)
-            };
+            if unsafe { PostMessageW(window, WM_NCLBUTTONDOWN, wparam, lparam) } == 0 {
+                window_state.lock().unwrap().dragging = false;
+            }
         });
     }
 

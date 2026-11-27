@@ -181,7 +181,7 @@ pub fn init(app: &mut App, headless: bool) {
         pd::on_event(|e| post(move |app| events::on_desk_event(app, e)));
         // (at once, not posted: the column is gone before the calendar gets the press)
         pd::on_press(|x, y| run(move |app| app.desk_side_pressed_px(x, y)));
-        show_desk_window(app);
+        show_desk_window(app, false);
     }
     seed_if_first_run(app);
     startup_notice(app);
@@ -257,7 +257,7 @@ fn start_platform(app: &mut App, id: &str) {
 }
 
 /// Shows the (new) desk window: sized first, then pinned and moved into place once it exists.
-fn show_desk_window(app: &mut App) {
+fn show_desk_window(app: &mut App, summon_on_show: bool) {
     app.desk_refresh();
     shell::apply_layout(app, true);
     app.desk.window.window().on_close_requested(|| {
@@ -269,34 +269,37 @@ fn show_desk_window(app: &mut App) {
         slint::CloseRequestResponse::KeepWindowShown
     });
     let _ = app.desk.window.show();
-    window::when_created(app.desk.window.as_weak(), |hwnd| {
+    window::when_created(app.desk.window.as_weak(), move |hwnd| {
         pd::install(hwnd);
-        run(|app| {
+        run(move |app| {
             shell::apply_desk_platform(app);
             shell::apply_layout(app, false);
             app.desk_apply_theme(); // the window's real scale factor
             app.desk_side_watch();
             app.last_monitor = shell::current_screen(app);
+            if summon_on_show && app.desk.window.window().is_visible() { shell::raise_desk(); }
             shell::tray_refresh(app);
         });
     });
 }
 
-/// Explorer restarts can take the calendar down with Progman (its owner): build a new one
-/// (0.2's recreate_desk_later). The view state (month, selection) carries over.
 pub fn ensure_desk_window(app: &mut App) {
-    let gone = pd::desk_hwnd().is_some_and(|h| unsafe { !windows::Win32::UI::WindowsAndMessaging::IsWindow(Some(h)).as_bool() });
-    if !gone {
-        return;
+    if app.desk.window.window().is_visible() && !recreate_desk_if_gone(app, false) {
+        pd::repair_desktop_owner();
     }
-    pd::uninstall();
+}
+
+pub(crate) fn recreate_desk_if_gone(app: &mut App, summon_on_show: bool) -> bool {
+    if !pd::installed_window_gone() { return false; }
     window::next(window::Kind::Desk);
-    let Ok(w) = DeskWindow::new() else { return };
+    let Ok(w) = DeskWindow::new() else { return true };
+    pd::uninstall();
     crate::desk::wire::wire(&w);
     let ui = std::mem::take(&mut app.desk.ui);
     app.desk = DeskLive::new(w, ui);
     app.recompute_theme();
-    show_desk_window(app);
+    show_desk_window(app, summon_on_show);
+    true
 }
 
 /// First start with an empty document: sample tasks so the calendar isn't blank (REL-03; the

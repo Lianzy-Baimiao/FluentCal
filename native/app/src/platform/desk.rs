@@ -3,8 +3,8 @@
 //! Windows 11 24H2 renders the desktop (Progman) through DirectComposition, so re-parenting a
 //! window into Progman/WorkerW no longer draws anything. The desk window stays a top-level
 //! WS_EX_TOOLWINDOW whose owner is Progman: owned windows always sit above their owner, so the
-//! calendar survives "Show desktop", and a subclass forces HWND_BOTTOM on every z-order change
-//! so clicking it never lifts it above other apps.
+//! calendar survives "Show desktop", and a subclass keeps it just above the desktop on z-order
+//! changes so clicking it never lifts it above other apps.
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU8, Ordering};
 use std::sync::OnceLock;
@@ -83,12 +83,13 @@ static PRESS_WATCH: AtomicBool = AtomicBool::new(false);
 static ON_PRESS: OnceLock<Box<dyn Fn(i32, i32) + Send + Sync>> = OnceLock::new();
 
 const SUBCLASS_ID: usize = 0xFC01;
+const DESTROYED: isize = -1;
 const WM_APP_RESTORE_LAYER: u32 = WM_APP + 1;
 const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
 
 pub fn desk_hwnd() -> Option<HWND> {
     let v = DESK.load(Ordering::Relaxed);
-    (v != 0).then_some(HWND(v as *mut _))
+    (v != 0 && v != DESTROYED).then_some(HWND(v as *mut _))
 }
 
 fn progman() -> Option<HWND> {
@@ -132,22 +133,60 @@ pub fn uninstall() {
     DESK.store(0, Ordering::Relaxed);
 }
 
+pub(crate) fn installed_window_gone() -> bool {
+    match DESK.load(Ordering::Relaxed) {
+        0 => false,
+        DESTROYED => true,
+        handle => unsafe { !IsWindow(Some(HWND(handle as *mut _))).as_bool() },
+    }
+}
+
+unsafe fn desktop_insert_after(hwnd: HWND) -> HWND {
+    let Ok(owner) = GetWindow(hwnd, GW_OWNER) else { return HWND_BOTTOM };
+    let topmost = |window| GetWindowLongPtrW(window, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+    match GetWindow(owner, GW_HWNDPREV) {
+        Ok(previous) if previous == hwnd => HWND_BOTTOM,
+        Ok(previous) if !topmost(previous) => previous,
+        _ if topmost(hwnd) => HWND_NOTOPMOST,
+        _ => HWND_TOP,
+    }
+}
+
+fn restack(hwnd: HWND, mode: PinMode) {
+    let after = match mode {
+        PinMode::Desktop if test_raised() => HWND_TOPMOST,
+        PinMode::Desktop => unsafe { desktop_insert_after(hwnd) },
+        PinMode::Top => HWND_TOPMOST,
+        PinMode::Normal => HWND_NOTOPMOST,
+    };
+    unsafe { let _ = SetWindowPos(hwnd, Some(after), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE); }
+}
+
+pub(crate) fn repair_desktop_owner() {
+    if PinMode::current() != PinMode::Desktop { return; }
+    let (Some(hwnd), Some(owner)) = (desk_hwnd(), progman()) else { return };
+    unsafe {
+        if GetWindow(hwnd, GW_OWNER).ok() == Some(owner) { return; }
+        SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner.0 as isize);
+        if !is_summoned() && GetWindow(hwnd, GW_OWNER).ok() == Some(owner) {
+            restack(hwnd, PinMode::Desktop);
+        }
+    }
+}
+
 pub fn set_mode(mode: PinMode) {
     MODE.store(mode as u8, Ordering::Relaxed);
     SUMMONED.store(false, Ordering::Relaxed);
     let Some(hwnd) = desk_hwnd() else { return };
     unsafe {
-        let owner = if mode == PinMode::Desktop { progman() } else { None };
-        SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner.map_or(0, |h| h.0 as isize));
+        if mode != PinMode::Desktop {
+            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, 0);
+        } else if let Some(owner) = progman() {
+            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner.0 as isize);
+        }
         refresh_ex_style(hwnd);
-        let after = match mode {
-            PinMode::Desktop if test_raised() => HWND_TOPMOST,
-            PinMode::Desktop => HWND_BOTTOM,
-            PinMode::Top => HWND_TOPMOST,
-            PinMode::Normal => HWND_NOTOPMOST,
-        };
-        let _ = SetWindowPos(hwnd, Some(after), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
+    restack(hwnd, mode);
 }
 
 /// Whether the desk window belongs in the topmost band: only in "always on top" mode.
@@ -266,10 +305,14 @@ pub fn refresh() {
 
 unsafe extern "system" fn subclass_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id: usize, _data: usize) -> LRESULT {
     match msg {
+        WM_NCDESTROY => {
+            let _ = DESK.compare_exchange(hwnd.0 as isize, DESTROYED, Ordering::Relaxed, Ordering::Relaxed);
+        }
         WM_WINDOWPOSCHANGING => {
             let pos = &mut *(lp.0 as *mut WINDOWPOS);
             if pos.flags.0 & SWP_NOZORDER.0 == 0 && PinMode::current() == PinMode::Desktop && !SUMMONED.load(Ordering::Relaxed) && !test_raised() {
-                pos.hwndInsertAfter = HWND_BOTTOM;
+                pos.hwndInsertAfter = desktop_insert_after(hwnd);
+                pos.flags |= SWP_NOOWNERZORDER;
             }
         }
         WM_WINDOWPOSCHANGED => {
@@ -355,11 +398,8 @@ pub fn restore_layer() {
         return;
     }
     if let (Some(hwnd), PinMode::Desktop) = (desk_hwnd(), PinMode::current()) {
-        unsafe {
-            let after = if test_raised() { HWND_TOPMOST } else { HWND_BOTTOM };
-            let _ = SetWindowPos(hwnd, Some(after), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-            refresh_ex_style(hwnd);
-        }
+        restack(hwnd, PinMode::Desktop);
+        unsafe { refresh_ex_style(hwnd); }
     }
 }
 
